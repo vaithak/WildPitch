@@ -1,0 +1,6 @@
+build/
+build-*/
+third_party/SDL/
+*.bmp
+compile_commands.json
+.cache/
