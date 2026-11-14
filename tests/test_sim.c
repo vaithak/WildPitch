@@ -30,6 +30,21 @@ int main(void) {
     steps(&s, (WpSeatInput){0, 127, 0}, 10);
     CHECK(s.players[me].facing == 16384);
 
+    /* jump (for headers): rises to a plausible apex, lands, action clears; can't double-jump */
+    sim_init(&s, &cfg);
+    sim_player_jump(&s, 2, WP_ACT_JUMP_HEADER);
+    CHECK(s.players[2].action == WP_ACT_JUMP_HEADER);
+    fx apex = 0; int air_ticks = 0;
+    for (int t = 0; t < 120; t++) {
+        steps(&s, (WpSeatInput){0, 0, 0}, 1);
+        if (s.players[2].z > apex) apex = s.players[2].z;
+        if (s.players[2].z > 0) air_ticks++;
+        if (t == 5) { fx vz = s.players[2].vz; sim_player_jump(&s, 2, WP_ACT_JUMP_HEADER); CHECK(s.players[2].vz == vz); }
+    }
+    CHECKF(apex > FX(0.5) && apex < FX(0.7), "apex %d", apex);
+    CHECKF(air_ticks > 35 && air_ticks < 50, "air ticks %d", air_ticks);   /* ~0.69 s */
+    CHECK(s.players[2].z == 0 && s.players[2].action == WP_ACT_NONE);
+
     /* ball: a lobbed ball never goes below ground, bounces lower each time, and comes to rest */
     sim_init(&s, &cfg);
     s.ball.vel = fv2_make(FX(10.0), 0);

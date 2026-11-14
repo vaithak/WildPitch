@@ -94,74 +94,100 @@ static void draw_goal(SDL_Renderer *r, const WpCamera *c, const WpPitch *p, int 
 
 static float lerpf(float a, float b, float t) { return a + (b - a) * t; }
 
+void wp_render_ctx_init(WpRenderCtx *ctx, SDL_Renderer *r, uint64_t seed) {
+    SDL_memset(ctx, 0, sizeof *ctx);
+    ctx->soft = wp_soft_disc_create(r);
+    ctx->look_seed = seed;
+}
+
+void wp_render_reset_anim(WpRenderCtx *ctx) {
+    for (int i = 0; i < WP_MAX_PLAYERS; i++) ctx->anim[i].init = false;
+}
+
 typedef struct { float y; int kind, idx; } DrawItem;   /* depth-sorted sprites */
 
-void wp_render_match(SDL_Renderer *r, const WpCamera *cam, const SimState *prev, const SimState *cur, float alpha) {
+void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
+                     const SimState *prev, const SimState *cur, float alpha, float dt) {
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-    draw_pitch(r, cam, &cur->pitch);
-    draw_goal(r, cam, &cur->pitch, -1);  /* far-to-near order doesn't matter much for side goals */
-
+    ctx->time += dt;
     int np = 2 * cur->n_per_side;
+    if (!ctx->looks_ready) {
+        for (int i = 0; i < np; i++)
+            wp_avatar_make_look(&ctx->look[i], ctx->look_seed, i, cur->players[i].team, cur->players[i].role == WP_ROLE_KEEPER);
+        ctx->looks_ready = true;
+    }
+    const WpAvatarStyle *style = &wp_avatar_styles[ctx->style];
+
+    draw_pitch(r, cam, &cur->pitch);
+    draw_goal(r, cam, &cur->pitch, -1);
+
     DrawItem items[WP_MAX_PLAYERS + 1];
+    float px[WP_MAX_PLAYERS], py[WP_MAX_PLAYERS], pz[WP_MAX_PLAYERS];
     int n = 0;
-    for (int i = 0; i < np; i++)
-        items[n++] = (DrawItem){lerpf(tof(prev->players[i].pos.y), tof(cur->players[i].pos.y), alpha), 0, i};
+    for (int i = 0; i < np; i++) {
+        const WpPlayer *a = &prev->players[i], *b = &cur->players[i];
+        px[i] = lerpf(tof(a->pos.x), tof(b->pos.x), alpha);
+        py[i] = lerpf(tof(a->pos.y), tof(b->pos.y), alpha);
+        pz[i] = lerpf(tof(a->z), tof(b->z), alpha);
+        float spd = sqrtf(tof(b->vel.x) * tof(b->vel.x) + tof(b->vel.y) * tof(b->vel.y));
+        float face = (float)b->facing * (6.2831853f / 65536.0f);
+        wp_avatar_anim_update(&ctx->anim[i], px[i], py[i], face, spd, dt);
+        items[n++] = (DrawItem){py[i], 0, i};
+    }
     float bx = lerpf(tof(prev->ball.pos.x), tof(cur->ball.pos.x), alpha);
     float by = lerpf(tof(prev->ball.pos.y), tof(cur->ball.pos.y), alpha);
     float bz = lerpf(tof(prev->ball.z), tof(cur->ball.z), alpha);
     items[n++] = (DrawItem){by, 1, 0};
-    /* far (large y) first */
-    for (int i = 1; i < n; i++) {
+    for (int i = 1; i < n; i++) {   /* far (large y) first */
         DrawItem t = items[i]; int j = i - 1;
         while (j >= 0 && items[j].y < t.y) { items[j + 1] = items[j]; j--; }
         items[j + 1] = t;
     }
-    /* shadows first (on the ground) */
+    /* shadows on the grass (soft), shrinking with height */
     for (int i = 0; i < np; i++) {
-        float x = lerpf(tof(prev->players[i].pos.x), tof(cur->players[i].pos.x), alpha);
-        float y = lerpf(tof(prev->players[i].pos.y), tof(cur->players[i].pos.y), alpha);
-        WpScreenPt g = wp_project(cam, x + 0.15f, y - 0.1f, 0);
-        wp_fill_ellipse(r, g.x, g.y, 0.45f * cam->ppm * g.s, 0.45f * cam->ppm * g.s * cam->tilt, (SDL_FColor){0, 0, 0, 0.28f});
+        WpScreenPt g = wp_project(cam, px[i] + 0.12f, py[i] - 0.08f, 0);
+        float sh = 1.0f / (1.0f + pz[i] * 0.8f);
+        wp_soft_disc(r, ctx->soft, g.x, g.y, 0.42f * cam->ppm * g.s * sh, 0.42f * cam->ppm * g.s * cam->tilt * sh,
+                     (SDL_FColor){0, 0, 0, 0.30f * sh});
     }
     {
         WpScreenPt g = wp_project(cam, bx, by, 0);
         float sh = 1.0f / (1.0f + bz * 0.25f);
-        wp_fill_ellipse(r, g.x, g.y, 0.16f * cam->ppm * g.s * sh, 0.16f * cam->ppm * g.s * cam->tilt * sh,
-                        (SDL_FColor){0, 0, 0, 0.35f * sh});
+        wp_soft_disc(r, ctx->soft, g.x, g.y, 0.16f * cam->ppm * g.s * sh, 0.16f * cam->ppm * g.s * cam->tilt * sh,
+                     (SDL_FColor){0, 0, 0, 0.35f * sh});
     }
     for (int k = 0; k < n; k++) {
         if (items[k].kind == 0) {
             int i = items[k].idx;
             const WpPlayer *p = &cur->players[i];
-            float x = lerpf(tof(prev->players[i].pos.x), tof(p->pos.x), alpha);
-            float y = items[k].y;
-            WpScreenPt base = wp_project(cam, x, y, 0), head = wp_project(cam, x, y, 1.7f);
-            float rad = 0.38f * cam->ppm * base.s;
-            SDL_FColor body = p->team == 0 ? (SDL_FColor){0.92f, 0.36f, 0.20f, 1} : (SDL_FColor){0.22f, 0.45f, 0.92f, 1};
-            if (p->role == WP_ROLE_KEEPER) body = p->team == 0 ? (SDL_FColor){0.95f, 0.85f, 0.2f, 1} : (SDL_FColor){0.6f, 0.9f, 0.3f, 1};
-            /* body: a capsule from feet to shoulders */
-            float top = head.y + rad * 0.9f;
-            SDL_FRect torso = {base.x - rad, top, rad * 2, base.y - top};
-            SDL_SetRenderDrawColor(r, (Uint8)(body.r * 255), (Uint8)(body.g * 255), (Uint8)(body.b * 255), 255);
-            SDL_RenderFillRect(r, &torso);
-            wp_fill_ellipse(r, base.x, base.y, rad, rad * cam->tilt, body);
-            wp_fill_ellipse(r, head.x, head.y + rad * 0.2f, rad * 0.75f, rad * 0.75f, (SDL_FColor){0.96f, 0.80f, 0.66f, 1});
-            /* controlled marker */
+            WpAvatarPose pose = {
+                .facing = ctx->anim[i].facing,
+                .speed = sqrtf(tof(p->vel.x) * tof(p->vel.x) + tof(p->vel.y) * tof(p->vel.y)),
+                .phase = ctx->anim[i].phase,
+                .z = pz[i],
+                .action = p->action,
+                .action_t = ((float)p->action_timer + alpha) / (float)WP_TICK_HZ,
+                .time = ctx->time + (float)i * 0.37f,
+                .keeper = p->role == WP_ROLE_KEEPER,
+            };
+            wp_avatar_draw(r, ctx->soft, cam, px[i], py[i], &pose, &ctx->look[i], style);
             for (int s = 0; s < WP_MAX_SEATS; s++)
                 if (cur->seat_player[s] == i) {
-                    WpScreenPt m = wp_project(cam, x, y, 2.35f);
+                    WpScreenPt m = wp_project(cam, px[i], py[i], pz[i] + 2.25f * ctx->look[i].height / 1.8f);
+                    float rad = 0.32f * cam->ppm * m.s;
                     SDL_Vertex tri[3] = {
-                        {{m.x - rad * 0.6f, m.y - rad * 0.7f}, {1, 1, 0.3f, 1}, {0, 0}},
-                        {{m.x + rad * 0.6f, m.y - rad * 0.7f}, {1, 1, 0.3f, 1}, {0, 0}},
-                        {{m.x, m.y}, {1, 1, 0.3f, 1}, {0, 0}},
+                        {{m.x - rad * 0.6f, m.y - rad * 0.8f}, {1, 0.95f, 0.3f, 1}, {0, 0}},
+                        {{m.x + rad * 0.6f, m.y - rad * 0.8f}, {1, 0.95f, 0.3f, 1}, {0, 0}},
+                        {{m.x, m.y}, {1, 0.95f, 0.3f, 1}, {0, 0}},
                     };
                     SDL_RenderGeometry(r, NULL, tri, 3, NULL, 0);
                 }
         } else {
             WpScreenPt b = wp_project(cam, bx, by, bz + 0.11f);
-            float br = 0.11f * cam->ppm * b.s * 1.6f;  /* slightly exaggerated for readability */
-            wp_fill_ellipse(r, b.x, b.y, br, br, (SDL_FColor){0.98f, 0.98f, 0.98f, 1});
-            wp_fill_ellipse(r, b.x - br * 0.25f, b.y - br * 0.25f, br * 0.35f, br * 0.35f, (SDL_FColor){0.7f, 0.7f, 0.75f, 1});
+            float br = 0.11f * cam->ppm * b.s * 1.5f;  /* slightly exaggerated for readability */
+            wp_soft_disc(r, ctx->soft, b.x, b.y, br + 1.0f, br + 1.0f, (SDL_FColor){0.07f, 0.07f, 0.09f, 1});
+            wp_soft_disc(r, ctx->soft, b.x, b.y, br, br, (SDL_FColor){0.98f, 0.98f, 0.98f, 1});
+            wp_soft_disc(r, ctx->soft, b.x + br * 0.2f, b.y + br * 0.15f, br * 0.38f, br * 0.38f, (SDL_FColor){0.25f, 0.25f, 0.3f, 1});
         }
     }
     draw_goal(r, cam, &cur->pitch, 1);

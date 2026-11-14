@@ -15,7 +15,9 @@ generated world. Long-term project built in small, playtested checkpoints with t
 tools/fetch_deps.sh                       # once: fetches pinned SDL3 into third_party/SDL (git-ignored)
 cmake -S . -B build -G Ninja && cmake --build build
 ./build/wildpitch                         # play (F3 = debug overlay, Esc = quit)
-./build/wildpitch --screenshot out.bmp    # headless-ish visual check: renders 1 s, saves a frame, exits
+./build/wildpitch --screenshot out.bmp    # visual check: renders --frames N (default 60), saves BMP, exits
+./build/wildpitch --demo                  # 8 scripted runners (avatar motion check); --gallery = pose sheet
+                                          # --style 0|1|2 (Modern/Arcade/Retro), --zoom 0|1|2; P/Z keys in game
 ctest --test-dir build --output-on-failure   # all headless tests
 tools/check_determinism.sh                # gcc+clang × -O0/-O2 must give identical golden hash
 ./build/bench_sim                         # sim speed (ticks/s); note it in STATUS when it changes a lot

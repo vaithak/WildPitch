@@ -3,39 +3,38 @@
 _Last updated: 2026-11-14 by Claude session #1_
 
 ## Current checkpoint
-**CP0.0 — Foundations: ✅ done.** Waiting on the owner's roadmap feedback before starting **CP0.1 "Ball on grass"**.
+**CP0.0b — Human avatars: ✅ done** (inserted after owner feedback on CP0.0). Waiting for the owner to:
+(1) pick an avatar look preset, (2) pick a default camera zoom, (3) OK contextual headers (D-010),
+(4) give the go-ahead for **CP0.1 "Ball on grass"**.
 
 ## What works now
-- Build: CMake + Ninja, SDL 3.4.8 vendored and statically linked (`build/wildpitch` ≈ 15 MB with debug info).
-- Deterministic sim core (`src/sim/`): Q16.16 maths, PCG32, `SimState`/`WpInput`, kickoff layout for 5v5,
-  player movement from seat 0 input (WASD/arrows, Shift sprint), basic ball flight/bounce/roll (ball isn't
-  kickable yet).
-- Game window: tilted 2.5D tabletop pitch, goals with nets, players (team colours, keepers distinct),
-  ball + shadows, camera easing, F3 debug overlay, `--screenshot` flag.
-- Tests (3, all passing): `test_fixed` (maths accuracy), `test_sim` (movement speeds/stop/facing; lobbed ball
-  never below ground, decaying bounces, comes to rest), `test_determinism` (golden hash `c5cdc2d8ec209d89`,
-  snapshot/resume; script launches the ball every 3 s and drives one player per team so physics is covered).
-  `tools/check_determinism.sh`: identical under gcc/clang × -O0/-O2.
-- `bench_sim`: ~38,000× real time — but the sim has no AI yet, so this is NOT a training-headroom figure.
-- Lesson recorded in CLAUDE.md: gcc/clang evaluate function arguments in different orders; never do two
-  RNG draws in one expression (this caused a real cross-compiler hash mismatch, now fixed).
+- Build: CMake + Ninja, SDL 3.4.8 vendored and statically linked.
+- Deterministic sim core (`src/sim/`): Q16.16 maths, PCG32, `SimState`/`WpInput`, 5v5 kickoff layout, player
+  movement from seat input (WASD/arrows, Shift sprint), basic ball flight/bounce/roll (ball not kickable yet),
+  **player jump state for headers** (`z/vz/action/action_timer`, `sim_player_jump`; no gameplay trigger yet).
+- Avatars (D-009): procedural skeleton footballers — run cycle, kick, jump-header, keeper stance; seeded
+  skin/hair/height/build; kits per team; 3 look presets (P), 3 zoom levels (Z). ~5% of one core at 60 fps.
+- Flags: `--demo`, `--gallery`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
+- Tests (3, passing): `test_fixed`, `test_sim` (movement, jump apex/airtime/landing, ball bounce/rest),
+  `test_determinism` (golden `9c15a05267885e09`); `tools/check_determinism.sh` identical across gcc/clang × -O0/-O2.
 
 ## Next step (exact)
-Once the owner OKs the roadmap, start CP0.1 per `docs/ROADMAP.md`:
-1. Split ball physics into `src/sim/ball.c`; add spin/curl; tune bounce/roll on grass.
-2. Ball control: possession/dribble (ball pushed ahead in small touches), touch cooldowns.
-3. Kicking: shoot (hold to charge, release), chip modifier, power/direction from stick + facing.
-4. Goal detection (posts/crossbar collisions, net catches ball), score, celebration pause, kickoff reset.
-5. Camera framing for attack direction; HUD power bar; F3 overlay with ball speed/height.
-6. Tests: ball physics unit tests (a kicked ball lands/rolls within expected ranges), goal detection test,
-   golden hash update. Then the playtest guide in this file, commit, and ask the owner to play.
+1. Record the owner's answers (look preset → `WpRenderCtx.style` default in `main.c`; zoom → `start_zoom`;
+   header decision) in DECISIONS/PLAYTEST_FEEDBACK.
+2. Start CP0.1 per `docs/ROADMAP.md`: split ball physics into `src/sim/ball.c` (+ spin/curl); possession/dribble
+   with **height-band contact** (D-010); turn rate in the sim; shoot (charge) + chip; goal detection with
+   posts/crossbar/net; score + kickoff reset; HUD power bar; F3 ball speed/height. Avatar: dribble-touch pose.
+3. Tests: kicked-ball ranges, goal detection, overhead ball not controllable; update golden; playtest guide; commit.
 
 ## Known issues / environment notes
-- **No audio backend:** `libasound2-dev`, `libpulse-dev` are not installed, so SDL builds without sound.
-  `libudev-dev` is also missing (gamepad hotplug falls back to non-udev path). Needed by CP0.4/CP0.5 —
-  owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then `rm -rf build && cmake ...`.
-- ImageMagick not installed; use `./build/wildpitch --screenshot x.bmp` + Python PIL to view frames.
+- **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
+  `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build` (needed by CP0.4/CP0.5).
+- ImageMagick not installed; view screenshots by converting BMP→PNG with Python PIL.
+- Avatar nits for later: eyes only drawn on large heads; torso is a capsule blend (fine at match scale);
+  header-rise pose legs could be tidier; no shirt numbers yet.
 
 ## Playtest guide (current build)
-Not a game yet. `./build/wildpitch`: move the marked orange player with WASD/arrows, Shift to sprint; F3 shows
-tick + sim cost. Judge only: is the camera angle / tilt / look a good base for the game?
+- `./build/wildpitch --demo` — 8 players walk/jog/sprint/stand, kick and jump. Press **P** to cycle looks
+  (Modern / Arcade / Retro pixel) and **Z** to cycle zoom. Judge: do they look and move like footballers? Which look?
+- `./build/wildpitch --gallery` (P/Z also work… press a key to redraw) — every pose up close + at match scale.
+- `./build/wildpitch` — move the marked player yourself (WASD/arrows, Shift sprint).

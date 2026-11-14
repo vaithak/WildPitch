@@ -9,8 +9,11 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
   rng.h/.c              PCG32; state lives in SimState
   sim.h/.c              SimState, WpInput, sim_init / sim_step / sim_hash
 src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
-  main.c                window, input -> WpInput, fixed-step loop, camera follow, HUD, --screenshot
-  render.h/.c           tilted 2.5D projection (WpCamera), pitch/goals/players/ball drawing
+  main.c                window, input -> WpInput, fixed-step loop, camera, HUD, flags (--demo --gallery
+                        --style --zoom --screenshot --frames), retro low-res render target, 60 fps vsync pacing
+  camera.h              WpCamera + wp_project (tilted 2.5D projection)
+  render.h/.c           WpRenderCtx (presentation state), pitch/goals/ball/shadows, sim -> avatar pose adapter
+  avatar.h/.c           procedural skeleton footballers (D-009): looks, styles, pose solver, soft-capsule drawing
 tests/                  headless tests (test_*.c auto-registered with ctest), bench_sim.c
   scripted_match.h      deterministic input script shared by determinism test + bench
   golden/determinism.txt  golden final-state hash of the scripted 10-min match
@@ -43,7 +46,16 @@ SDL_Renderer + `SDL_RenderGeometry` for filled shapes. `wp_project(cam, x, y, z)
 depth (y) is foreshortened by `tilt` and scaled by a mild perspective factor; height (z) lifts straight up.
 Sprites are depth-sorted by y (far first). Ball height reads via its ground shadow shrinking/fading.
 
+## Avatars (D-009)
+`wp_avatar_draw(pose, look, style)` is independent of SimState; `render.c` fills `WpAvatarPose` from the sim
+(facing smoothed + stride phase from `WpAvatarAnim`, action + action_timer, jump z). Pose solver: per-joint angles
+(`build_pose`) → 17 joint positions (`solve`), lowest foot snapped to the grass (+ jump z) which yields natural
+running bob → parts (kit-coloured capsule segments) sorted along the camera depth `y - tilt*z` → silhouette outline
+pass, then fills; limbs in front of the body get their own outline. Antialiasing comes from one 64×64 soft-disc
+texture (linear filtered) used for every disc and capsule. Add a new action = add a case in `build_pose`.
+
 ## Performance notes
+- Avatars: 10 animated players, 60 fps: ~5% of one core (dev desktop, `--demo`, both styles).
 - `bench_sim` (CP0.0, dev desktop): ~2.3 M ticks/s (~38,000× real time) for the AI-less 5v5 skeleton.
   Meaningless for training headroom until AI exists; keep ≥ 500× real time for Phase 1 training.
 - Frame loop sleeps in vsync; fallback `SDL_DelayNS` if vsync unavailable.

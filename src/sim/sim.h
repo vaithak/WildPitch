@@ -54,9 +54,32 @@ typedef struct {
     int8_t last_touch;           /* player index, or -1 */
 } WpBall;
 
+/* Player actions drive both gameplay timing and the avatar's animation pose (so replays animate exactly).
+ * Headers (DECISIONS D-010): contextual — pressing pass/shoot while a reachable ball is in the air triggers
+ * WP_ACT_JUMP_HEADER; ball contact is resolved in height bands (feet / body / head), never 2D distance alone. */
+enum {
+    WP_ACT_NONE = 0,
+    WP_ACT_KICK,          /* shot / pass wind-up + follow-through */
+    WP_ACT_JUMP_HEADER,   /* airborne, head contact window around the apex */
+    WP_ACT_STAND_HEADER,  /* header without leaving the ground (ball at head height) */
+    WP_ACT_TACKLE,        /* standing tackle / shoulder challenge (CP0.3) */
+    WP_ACT_SLIDE,         /* sliding tackle (CP0.3+) */
+    WP_ACT_KEEPER_DIVE,   /* CP0.3 */
+    WP_ACT_COUNT
+};
+
+/* Contact height bands (metres) for ball control; see D-010. */
+#define WP_BAND_FEET_MAX  FX(0.55)
+#define WP_BAND_BODY_MAX  FX(1.45)
+#define WP_BAND_HEAD_MAX  FX(2.05)   /* standing head reach; jumping adds the player's z */
+#define WP_JUMP_VZ        FX(3.4)    /* ~0.59 m jump apex */
+
 typedef struct {
     fv2 pos, vel;
+    fx  z, vz;                   /* feet height above grass (jumping), vertical speed */
     wp_angle facing;
+    uint8_t action;              /* WP_ACT_* */
+    uint16_t action_timer;       /* ticks since the action started */
     uint8_t team;                /* 0 or 1 */
     uint8_t role;                /* WP_ROLE_* */
     uint16_t kick_charge;        /* ticks the kick button has been held */
@@ -89,6 +112,8 @@ typedef struct {
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);
+/* Start a jump for player i (no-op if already airborne). Gameplay triggers come in CP0.1/0.2. */
+void     sim_player_jump(SimState *s, int i, uint8_t action);
 void     sim_init(SimState *s, const WpMatchConfig *cfg);
 void     sim_step(SimState *s, const WpInput *in);
 uint64_t sim_hash(const SimState *s);   /* field-wise FNV-1a; independent of struct padding */

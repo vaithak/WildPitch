@@ -3,7 +3,7 @@
 #include "sim/sim.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 728  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 992  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* ---- tuning (metres, seconds) ---- */
 #define GRAVITY          FX(9.81)
@@ -84,6 +84,32 @@ static void step_player_from_input(WpPlayer *p, const WpSeatInput *in) {
     if (fv2_len2_wide(want)) p->facing = fx_atan2(want.y, want.x);
 }
 
+/* Vertical motion + action timers. Airborne players keep horizontal momentum (input steering is
+ * already reduced by the caller in CP0.1). */
+static void step_player_air(WpPlayer *p) {
+    if (p->z > 0 || p->vz > 0) {
+        p->vz -= fx_mul(GRAVITY, WP_DT);
+        p->z += fx_mul(p->vz, WP_DT);
+        if (p->z <= 0) { p->z = 0; p->vz = 0; }
+    }
+    if (p->action != WP_ACT_NONE) {
+        p->action_timer++;
+        if (p->action == WP_ACT_JUMP_HEADER && p->z == 0 && p->vz == 0 && p->action_timer > 4) {
+            p->action = WP_ACT_NONE; p->action_timer = 0;
+        } else if (p->action != WP_ACT_JUMP_HEADER && p->action_timer > 30) {
+            p->action = WP_ACT_NONE; p->action_timer = 0;
+        }
+    }
+}
+
+void sim_player_jump(SimState *s, int i, uint8_t action) {
+    WpPlayer *p = &s->players[i];
+    if (p->z > 0 || p->vz != 0) return;
+    p->vz = WP_JUMP_VZ;
+    p->action = action;
+    p->action_timer = 0;
+}
+
 static void step_ball(SimState *s) {
     WpBall *b = &s->ball;
     fx speed = fv2_len(b->vel);
@@ -123,6 +149,7 @@ void sim_step(SimState *s, const WpInput *in) {
         else { WpSeatInput idle = {0, 0, 0}; step_player_from_input(p, &idle); }
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
         if (p->touch_cooldown) p->touch_cooldown--;
+        step_player_air(p);
     }
     step_ball(s);
     for (int k = 0; k < WP_MAX_SEATS; k++) s->prev_buttons[k] = in->seat[k].buttons;
@@ -153,6 +180,7 @@ uint64_t sim_hash(const SimState *s) {
     for (int i = 0; i < 2 * s->n_per_side; i++) {
         const WpPlayer *p = &s->players[i];
         fnv_i(&f, p->pos.x); fnv_i(&f, p->pos.y); fnv_i(&f, p->vel.x); fnv_i(&f, p->vel.y);
+        fnv_i(&f, p->z); fnv_i(&f, p->vz); fnv_i(&f, p->action); fnv_i(&f, p->action_timer);
         fnv_i(&f, p->facing); fnv_i(&f, p->team); fnv_i(&f, p->role);
         fnv_i(&f, p->kick_charge); fnv_i(&f, p->touch_cooldown); fnv_i(&f, p->stamina);
     }

@@ -22,6 +22,12 @@ Not playable; invisible plumbing every later CP depends on.
 - Test harness + golden-hash determinism test (gcc & clang, -O0 & -O2); headless benchmark
   (`bench_sim`: ticks/second).
 
+### CP0.0b — Human avatars ✅ 🔵  (from owner feedback on CP0.0)
+- Procedural skeleton footballers (D-009): run cycle, kick, jump-header, keeper stance; seeded skin/hair/height/build.
+- Presets to choose by eye: Modern / Arcade / Retro pixel (P key); zoom presets (Z key).
+- Sim: player jump state (`z`, `vz`, `action`, `action_timer`) for headers (D-010).
+- `--demo` (8 scripted runners), `--gallery` (pose sheet), `--style`, `--zoom`, `--frames` flags.
+
 ### CP0.1 — "Ball on grass" ⏭ 🔵
 **Playable:** one player you control on a tilted 2.5D pitch with goals, and a ball that feels right.
 - Window, 60 Hz fixed-step loop with interpolated rendering, vsync + sleep (no spinning).
@@ -31,6 +37,8 @@ Not playable; invisible plumbing every later CP depends on.
 - Controlled player: accelerate/turn with momentum, **dribble** (ball kept at feet with small touches),
   **sprint**, **shoot** (hold to charge power; release), **chip** (modifier).
 - Goal detection (ball fully over line, under bar) → score + reset to kickoff.
+- Ball contact in **height bands** (D-010) from day one: feet/body/head; a ball overhead can't be trapped.
+- Turn rate in the sim (no instant facing snaps); avatar pose for dribble touches.
 - Debug overlay (F3): fps, sim ms/tick, ball height/speed.
 - Cap presentation at 60 fps even on 120/144 Hz monitors (thermal budget); camera easing time-based.
 - **Playtest:** does dribbling feel responsive? Do shots/chips feel weighty? Is the camera/tilt
@@ -42,6 +50,7 @@ Not playable; invisible plumbing every later CP depends on.
   into space (power by hold time). Lofted pass.
 - Switch player (auto + manual), receiving/first touch, ball control errors at speed.
 - Teammates hold simple formation shape and make basic runs (placeholder logic, replaced in CP0.3).
+- **Headers playable:** lofted pass/cross → contextual jump-header (pass/shoot while the ball is in the air).
 - HUD: score, clock, controlled-player marker, pass power bar.
 - **Playtest:** do passes go where you expect? Is switching intuitive?
 
@@ -51,12 +60,13 @@ Not playable; invisible plumbing every later CP depends on.
   (this is the exact interface the learned brain plugs into in Phase 1 — not a state machine).
 - Actions: hold shape, support, run into space, press, mark, intercept, tackle/shoulder challenge,
   pass/shoot/dribble decisions for AI on the ball.
-- Goalkeepers: positioning, dives, catches/parries, distribution.
+- Goalkeepers: positioning, dives, catches/parries, distribution (dive/catch avatar poses).
+- Aerial duels: AI jumps for headers; timing beats height.
 - Simple stats per player (pace, control, passing, shooting, tackling, stamina) feeding utility.
 - **Playtest:** do AI teammates feel helpful? Is the opponent beatable but not dumb?
 
 ### CP0.4 — "A real match" ⬜ 🟡
-- Rules: out of play (kick-ins/throw-ins, corners, goal kicks), basic fouls (late tackles) → free kicks,
+- Rules: out of play (kick-ins/throw-ins, corners with headed chances, goal kicks), basic fouls (late tackles) → free kicks,
   kickoff after goals, halves (~2×4–6 min configurable), half-time, full-time screen.
 - Gamepad support (hotplug), remappable keys, pause menu.
 - Stamina + sprint cost; the **shout** button (v1: "press!" / "drop back").

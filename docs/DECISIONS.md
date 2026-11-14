@@ -30,6 +30,24 @@ The renderer may use floats (presentation only, never fed back into the sim).
 The instinct layer scores candidate actions from an observation vector; Phase 1's learned brain adds to the
 same scores. No hard-coded state machines for decisions.
 
+**D-009 · 2026-11-14 · Players are procedural 3D-skeleton avatars, not hand-drawn sprites** (Claude, after owner
+feedback asking for more human avatars, inspired by Sensible Soccer / Google Research Football; we copy no art).
+17 joints posed procedurally (run cycle driven by distance travelled, kick, jump-header, keeper stance; later
+tackle/slide/dive/celebrate), drawn as soft-edged outlined capsules through the tabletop camera.
+Why: any new action is a pose function, not new art; poses come from sim `action`/`action_timer` so replays animate
+exactly; perspective-correct in the tilted view; appearance (skin, hair, height, build) is seeded per player, which
+will later come from the player genome. Three presets (owner picks): **Modern**, **Arcade** (bigger heads, chunkier),
+**Retro pixel** (same figures rendered at 1/3 res, nearest upscale). Cost: ~5% of one core for 10 players at 60 fps.
+Cosmetic state (stride phase, smoothed facing, looks) is presentation-only, never in SimState.
+
+**D-010 · 2026-11-14 · Headers: contextual jump, height-band ball contact** (Claude; owner asked that jumping for
+headers be guaranteed). No extra button (keeps "simple to play"): pressing pass/shoot while a reachable ball is in
+the air triggers `WP_ACT_JUMP_HEADER` (or `WP_ACT_STAND_HEADER` at head height). Players have `z/vz` in the sim
+(jump apex ≈ 0.59 m). ALL ball contact is resolved in height bands — feet ≤ 0.55 m, body ≤ 1.45 m, head ≤ 2.05 m
++ jump height — never by 2D distance alone (a ball flying overhead must not be "controlled"). Delivery plan:
+jump physics + avatar poses now (CP0.0b); contact bands in CP0.1 dribble/kick code; playable headers from lofted
+passes/crosses in CP0.2; AI aerial duels CP0.3; corners CP0.4. Owner may still ask for a dedicated jump button.
+
 ## Open (owner to decide later)
 - Name: keep WILDPITCH? (working title in use)
 - Business model: one-time purchase vs open-source core.
