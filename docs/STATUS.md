@@ -34,7 +34,7 @@ _Last updated: 2026-11-14 by Claude session #1_
   `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build` (needed by CP0.4/CP0.5).
 - ImageMagick not installed; view screenshots by converting BMP→PNG with Python PIL.
 - Avatar nits for later: eyes only drawn on large heads; torso is a capsule blend (fine at match scale);
-  header-rise pose legs could be tidier; no shirt numbers yet.
+  header-rise pose legs could be tidier; back number is a generic "11" (real numbers later).
 
 ## Playtest guide (current build)
 - `./build/wildpitch --demo` — 8 players walk/jog/sprint/stand, kick and jump. Press **P** to cycle looks
