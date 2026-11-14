@@ -26,6 +26,10 @@ Golden hash changes are only OK when sim behaviour changed on purpose:
 ## Hard rules
 - **`src/sim/` is deterministic:** no SDL, no float/double at runtime, no libm, no malloc, no pointers in
   `SimState`, RNG only from `SimState.rng`. Use `fx` (Q16.16) from `sim/fixed.h`. `FX()` only on literals.
+- **Never put two side-effecting calls (RNG draws, etc.) in one expression or argument list** — evaluation
+  order is unspecified and gcc/clang differ (this bit us in CP0.0). One RNG draw per statement.
+- **Adding a field to SimState/WpPlayer/WpBall?** Hash it in `sim_hash()` and update
+  `WP_SIMSTATE_SIZE_EXPECTED` in `sim.c` (a `_Static_assert` enforces this).
 - **Presentation never writes to the sim.** Rendering/audio read `SimState`; input enters only via `WpInput`.
 - **AI = candidate actions × utility scores** (DECISIONS D-008) — this is where learned brains plug in later.
 - **Runs cool:** the frame loop must never busy-wait; menus redraw only on change. Measure, don't guess.

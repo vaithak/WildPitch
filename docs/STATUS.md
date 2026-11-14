@@ -12,8 +12,13 @@ _Last updated: 2026-11-14 by Claude session #1_
   kickable yet).
 - Game window: tilted 2.5D tabletop pitch, goals with nets, players (team colours, keepers distinct),
   ball + shadows, camera easing, F3 debug overlay, `--screenshot` flag.
-- Tests: `test_fixed` (maths accuracy), `test_determinism` (golden hash `a15c4b03f2e1d3a2`, snapshot/resume);
-  `tools/check_determinism.sh` gives the same hash under gcc/clang at -O0 and -O2. `bench_sim`: ~58,000× real time.
+- Tests (3, all passing): `test_fixed` (maths accuracy), `test_sim` (movement speeds/stop/facing; lobbed ball
+  never below ground, decaying bounces, comes to rest), `test_determinism` (golden hash `c5cdc2d8ec209d89`,
+  snapshot/resume; script launches the ball every 3 s and drives one player per team so physics is covered).
+  `tools/check_determinism.sh`: identical under gcc/clang × -O0/-O2.
+- `bench_sim`: ~38,000× real time — but the sim has no AI yet, so this is NOT a training-headroom figure.
+- Lesson recorded in CLAUDE.md: gcc/clang evaluate function arguments in different orders; never do two
+  RNG draws in one expression (this caused a real cross-compiler hash mismatch, now fixed).
 
 ## Next step (exact)
 Once the owner OKs the roadmap, start CP0.1 per `docs/ROADMAP.md`:

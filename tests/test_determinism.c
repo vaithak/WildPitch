@@ -9,35 +9,42 @@
 
 #define TICKS (60 * 60 * 10)
 
-static uint64_t run(SimState *s, uint32_t ticks, uint64_t *mid_hash, SimState *mid_snap) {
+typedef struct { SimState sim; WpRng script; } Snapshot;
+
+static void advance(SimState *s, WpRng *script, uint32_t from, uint32_t to) {
+    WpInput in;
+    for (uint32_t t = from; t < to; t++) {
+        scripted_input(script, t, &in);
+        scripted_poke(script, t, s);
+        sim_step(s, &in);
+    }
+}
+
+static uint64_t run(SimState *s, Snapshot *mid) {
     WpMatchConfig cfg = sim_default_config();
     cfg.seed = 12345;
     sim_init(s, &cfg);
+    scripted_setup(s);
     WpRng script; wp_rng_seed(&script, 777, 3);
-    WpInput in;
-    for (uint32_t t = 0; t < ticks; t++) {
-        if (t == ticks / 2) { if (mid_hash) *mid_hash = sim_hash(s); if (mid_snap) *mid_snap = *s; }
-        scripted_input(&script, t, &in);
-        sim_step(s, &in);
-    }
+    advance(s, &script, 0, TICKS / 2);
+    if (mid) { mid->sim = *s; mid->script = script; }
+    advance(s, &script, TICKS / 2, TICKS);
     return sim_hash(s);
 }
 
 int main(void) {
-    static SimState a, b, snap;
-    uint64_t mid = 0;
-    uint64_t ha = run(&a, TICKS, &mid, &snap);
-    uint64_t hb = run(&b, TICKS, NULL, NULL);
+    static SimState a, b;
+    static Snapshot snap;
+    uint64_t ha = run(&a, &snap);
+    uint64_t hb = run(&b, NULL);
     CHECK(ha == hb);
-    CHECK(sim_hash(&snap) == mid);  /* struct copy preserves hash */
-
-    /* resume from snapshot: replay second half of the script on the copy */
-    {
-        WpRng script; wp_rng_seed(&script, 777, 3);
-        WpInput in;
-        for (uint32_t t = 0; t < TICKS; t++) { scripted_input(&script, t, &in); if (t >= TICKS / 2) sim_step(&snap, &in); }
-        CHECK(sim_hash(&snap) == ha);
-    }
+    /* resume from a mid-match snapshot (struct copy) must reach the identical final state.
+     * Note: scripted_input keeps held stick state in a static that is identical at the snapshot point
+     * because intents change on tick%30 boundaries and TICKS/2 is one. */
+    advance(&snap.sim, &snap.script, TICKS / 2, TICKS);
+    CHECK(sim_hash(&snap.sim) == ha);
+    /* the ball must actually have moved (guards against a vacuous golden hash) */
+    CHECK(a.ball.pos.x != 0 || a.ball.pos.y != 0);
 
     const char *path = "tests/golden/determinism.txt";
     if (getenv("WP_UPDATE_GOLDEN")) {

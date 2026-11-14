@@ -3,6 +3,8 @@
 #include "sim/sim.h"
 #include <string.h>
 
+#define WP_SIMSTATE_SIZE_EXPECTED 728  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+
 /* ---- tuning (metres, seconds) ---- */
 #define GRAVITY          FX(9.81)
 #define BALL_RADIUS      FX(0.11)
@@ -127,7 +129,9 @@ void sim_step(SimState *s, const WpInput *in) {
     s->tick++;
 }
 
-/* ---- hashing: explicit fields so struct padding never leaks in ---- */
+/* ---- hashing: explicit fields so struct padding never leaks in ----
+ * If this assert fires you changed SimState/WpPlayer/WpBall: hash the new fields in sim_hash(), then update the sizes. */
+_Static_assert(sizeof(SimState) == WP_SIMSTATE_SIZE_EXPECTED, "SimState changed: update sim_hash() and the size");
 typedef struct { uint64_t h; } Fnv;
 static void fnv_u64(Fnv *f, uint64_t v) {
     for (int i = 0; i < 8; i++) { f->h ^= (v >> (i * 8)) & 0xFF; f->h *= 1099511628211ULL; }

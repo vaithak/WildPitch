@@ -28,7 +28,9 @@ endif()
 file(GLOB WP_SIM_SRC CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/sim/*.c)
 add_library(wp_sim STATIC ${WP_SIM_SRC})
 target_include_directories(wp_sim PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_compile_options(wp_sim PRIVATE ${WP_WARN} -fwrapv)
+target_compile_options(wp_sim PRIVATE ${WP_WARN})
+# PUBLIC: inline maths in sim headers must wrap identically in every target that includes them.
+target_compile_options(wp_sim PUBLIC -fwrapv)
 
 # ---------------------------------------------------------------------------
 # Game executable (SDL3 vendored + static)

@@ -19,7 +19,7 @@ trimmed copy or tarball) before packaging so offline clones build.
 
 **D-006 · 2026-11-14 · Renderer starts on SDL_Renderer (SDL_RenderGeometry), not SDL_GPU** (Claude).
 Why: far less code for a 2D-first tabletop view; SDL_Renderer itself uses GPU backends. All drawing goes
-through `src/game/render.*` so it can be swapped for SDL_GPU later if profiling demands. Owner informed.
+through `src/game/render.*` so it can be swapped for SDL_GPU later if profiling demands. Owner informed at end of session #1 (2026-11-14).
 
 **D-007 · 2026-11-14 · Simulation numeric model** (Claude).
 Q16.16 fixed point (`fx` = int32), 64-bit intermediates; units: 1.0 = 1 metre, time step 1/60 s.

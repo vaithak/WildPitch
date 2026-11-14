@@ -14,7 +14,7 @@ Status legend: ✅ done · 🚧 in progress · ⏭ next · ⬜ later
 
 ## Phase 0 — FEEL  (gate: a stranger enjoys a 5-minute 5v5 kickabout; laptop stays cool)
 
-### CP0.0 — Foundations ✅/🚧 🔵
+### CP0.0 — Foundations ✅ 🔵
 Not playable; invisible plumbing every later CP depends on.
 - CMake + vendored static SDL3 (3.4.8), `tools/fetch_deps.sh`.
 - `src/sim/` deterministic core: Q16.16 fixed-point maths, integer sqrt, trig tables, seeded RNG,
@@ -32,6 +32,7 @@ Not playable; invisible plumbing every later CP depends on.
   **sprint**, **shoot** (hold to charge power; release), **chip** (modifier).
 - Goal detection (ball fully over line, under bar) → score + reset to kickoff.
 - Debug overlay (F3): fps, sim ms/tick, ball height/speed.
+- Cap presentation at 60 fps even on 120/144 Hz monitors (thermal budget); camera easing time-based.
 - **Playtest:** does dribbling feel responsive? Do shots/chips feel weighty? Is the camera/tilt
   readable? Does the laptop stay quiet?
 

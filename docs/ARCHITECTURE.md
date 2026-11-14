@@ -44,8 +44,8 @@ depth (y) is foreshortened by `tilt` and scaled by a mild perspective factor; he
 Sprites are depth-sorted by y (far first). Ball height reads via its ground shadow shrinking/fading.
 
 ## Performance notes
-- `bench_sim` (CP0.0, Ryzen-class desktop): ~3.5 M ticks/s (~58,000× real time) for the 5v5 skeleton.
-  Expect this to drop as AI arrives; keep ≥ 500× real time for Phase 1 training.
+- `bench_sim` (CP0.0, dev desktop): ~2.3 M ticks/s (~38,000× real time) for the AI-less 5v5 skeleton.
+  Meaningless for training headroom until AI exists; keep ≥ 500× real time for Phase 1 training.
 - Frame loop sleeps in vsync; fallback `SDL_DelayNS` if vsync unavailable.
 
 ## Planned modules (not yet written)
