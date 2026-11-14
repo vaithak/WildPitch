@@ -17,6 +17,7 @@ typedef struct {
     uint64_t      look_seed;
     bool          looks_ready;
     int           style;                 /* index into wp_avatar_styles */
+    bool          hide_markers;          /* --demo: no 'controlled player' arrows */
     float         time;
 } WpRenderCtx;
 

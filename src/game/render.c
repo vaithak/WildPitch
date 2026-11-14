@@ -171,7 +171,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 .keeper = p->role == WP_ROLE_KEEPER,
             };
             wp_avatar_draw(r, ctx->soft, cam, px[i], py[i], &pose, &ctx->look[i], style);
-            for (int s = 0; s < WP_MAX_SEATS; s++)
+            for (int s = 0; s < WP_MAX_SEATS && !ctx->hide_markers; s++)
                 if (cur->seat_player[s] == i) {
                     WpScreenPt m = wp_project(cam, px[i], py[i], pz[i] + 2.25f * ctx->look[i].height / 1.8f);
                     float rad = 0.32f * cam->ppm * m.s;

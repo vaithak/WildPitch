@@ -12,11 +12,14 @@ _Last updated: 2026-11-14 by Claude session #1_
 - Deterministic sim core (`src/sim/`): Q16.16 maths, PCG32, `SimState`/`WpInput`, 5v5 kickoff layout, player
   movement from seat input (WASD/arrows, Shift sprint), basic ball flight/bounce/roll (ball not kickable yet),
   **player jump state for headers** (`z/vz/action/action_timer`, `sim_player_jump`; no gameplay trigger yet).
-- Avatars (D-009): procedural skeleton footballers — run cycle, kick, jump-header, keeper stance; seeded
-  skin/hair/height/build; kits per team; 3 look presets (P), 3 zoom levels (Z). ~5% of one core at 60 fps.
+- Avatars (D-009): procedural skeleton footballers — run cycle, kick, jump-header, keeper stance; action poses
+  blend in/out (no popping; verified with frame strips); seeded skin/hair/height/build; kits per team; back
+  number + front crest so facing reads at match scale; 3 look presets (P), 3 zoom levels (Z). ~5% of one core.
+- Visual-check recipe for agents: `--screenshot F.bmp --frames N` prints `seat0_screen x y` → crop that player
+  across consecutive N to make a motion strip (PIL). Gallery renders Retro through the low-res target too.
 - Flags: `--demo`, `--gallery`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - Tests (3, passing): `test_fixed`, `test_sim` (movement, jump apex/airtime/landing, ball bounce/rest),
-  `test_determinism` (golden `9c15a05267885e09`); `tools/check_determinism.sh` identical across gcc/clang × -O0/-O2.
+  `test_determinism` (golden `632e624d8c1b6fc0`; script now includes jumps); `tools/check_determinism.sh` identical across gcc/clang × -O0/-O2.
 
 ## Next step (exact)
 1. Record the owner's answers (look preset → `WpRenderCtx.style` default in `main.c`; zoom → `start_zoom`;
@@ -36,5 +39,6 @@ _Last updated: 2026-11-14 by Claude session #1_
 ## Playtest guide (current build)
 - `./build/wildpitch --demo` — 8 players walk/jog/sprint/stand, kick and jump. Press **P** to cycle looks
   (Modern / Arcade / Retro pixel) and **Z** to cycle zoom. Judge: do they look and move like footballers? Which look?
-- `./build/wildpitch --gallery` (P/Z also work… press a key to redraw) — every pose up close + at match scale.
+- `./build/wildpitch --gallery --style 0|1|2` — every pose up close + at match scale (static sheet).
+- Jumping is visible only in `--demo` for now; you can't trigger it yourself until headers land in CP0.2.
 - `./build/wildpitch` — move the marked player yourself (WASD/arrows, Shift sprint).

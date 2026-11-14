@@ -107,14 +107,33 @@ static void draw_gallery(Game *g, int w, int h) {
             int cellw = pass < 2 ? cw : w / np, cellh = pass < 2 ? (int)((float)h * 0.36f) : (int)((float)h * 0.28f);
             SDL_Rect vp = {pass < 2 ? i * cw : i * cellw, pass < 2 ? pass * cellh : 2 * (int)((float)h * 0.36f), cellw, cellh};
             SDL_SetRenderViewport(g->ren, &vp);
-            WpCamera cam = {0, 0, pass < 2 ? (float)cellh / 2.6f : (float)w / view, 0.62f, 0.0f, cellw, cellh};
+            int f = st->pixel_factor;
+            WpCamera cam = {0, 0, (pass < 2 ? (float)cellh / 3.1f : (float)w / view) / (float)f, 0.62f, 0.0f, cellw / f, cellh / f};
             WpAvatarLook look;
-            wp_avatar_make_look(&look, 7, pi * 3 + 1, pi & 1, p->keeper);
+            int look_id = pi < 4 ? 1 : pi * 3 + 1;           /* idle views share one look (front vs back) */
+            wp_avatar_make_look(&look, 7, look_id, pi < 4 ? 0 : (pi & 1), p->keeper);
             WpAvatarPose pose = {p->facing, p->speed, p->phase, p->z, p->action, p->at, 0, p->keeper};
-            float yoff = -(float)cellh * 0.30f / (cam.ppm * cam.tilt);   /* move feet down the cell */
+            float yoff = -(float)cam.h * 0.36f / (cam.ppm * cam.tilt);   /* feet near the bottom: headroom for jumps */
+            if (f > 1) {
+                if (!g->lowres || g->lowres_w != cam.w || g->lowres_h != cam.h) {
+                    if (g->lowres) SDL_DestroyTexture(g->lowres);
+                    g->lowres = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, cam.w, cam.h);
+                    SDL_SetTextureScaleMode(g->lowres, SDL_SCALEMODE_NEAREST);
+                    g->lowres_w = cam.w; g->lowres_h = cam.h;
+                }
+                SDL_SetRenderViewport(g->ren, NULL);
+                SDL_SetRenderTarget(g->ren, g->lowres);
+                SDL_SetRenderDrawColor(g->ren, 64, 140, 70, 255);
+                SDL_RenderClear(g->ren);
+            }
             WpScreenPt sh = wp_project(&cam, 0.1f, yoff - 0.06f, 0);
             wp_soft_disc(g->ren, g->rctx.soft, sh.x, sh.y, 0.4f * cam.ppm, 0.4f * cam.ppm * cam.tilt, (SDL_FColor){0, 0, 0, 0.3f});
             wp_avatar_draw(g->ren, g->rctx.soft, &cam, 0, yoff, &pose, &look, st);
+            if (f > 1) {
+                SDL_SetRenderTarget(g->ren, NULL);
+                SDL_SetRenderViewport(g->ren, &vp);
+                SDL_RenderTexture(g->ren, g->lowres, NULL, NULL);
+            }
             SDL_SetRenderDrawColor(g->ren, 255, 255, 255, 255);
             if (pass < 2) SDL_RenderDebugText(g->ren, 6, 6, p->label);
         }
@@ -168,6 +187,7 @@ int main(int argc, char **argv) {
     g.prev = g.cur;
     wp_render_ctx_init(&g.rctx, g.ren, cfg.seed);
     g.rctx.style = start_style;
+    g.rctx.hide_markers = demo;
     g.zoom = start_zoom;
     g.cam = (WpCamera){0, -2.0f, 30.0f, 0.62f, 0.010f, 1280, 720};
 
@@ -259,6 +279,12 @@ int main(int argc, char **argv) {
         if (shot_path && ++frames == shot_frame) {
             SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
             if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
+            int me = g.cur.seat_player[0];       /* for agents cropping a player out of the frame */
+            if (me >= 0 && !gallery) {
+                WpCamera c = g.cam; c.w = w; c.h = h; c.ppm = (float)w / ZOOM_VIEW_M[g.zoom];
+                WpScreenPt sp = wp_project(&c, (float)g.cur.players[me].pos.x / 65536.0f, (float)g.cur.players[me].pos.y / 65536.0f, 0);
+                printf("seat0_screen %d %d\n", (int)sp.x, (int)sp.y);
+            }
             running = false;
         }
         SDL_RenderPresent(g.ren);

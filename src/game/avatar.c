@@ -133,7 +133,7 @@ static V3 mul(V3 a, float s) { return v3(a.x * s, a.y * s, a.z * s); }
 enum { J_PELVIS, J_CHEST, J_HEAD, J_HIP_L, J_KNEE_L, J_ANK_L, J_TOE_L, J_HIP_R, J_KNEE_R, J_ANK_R, J_TOE_R,
        J_SH_L, J_ELB_L, J_HAND_L, J_SH_R, J_ELB_R, J_HAND_R, J_COUNT };
 
-typedef struct {
+typedef struct {             /* floats only: blended field-by-field */
     float lean;                 /* torso pitch forward (rad) */
     float hip[2], knee[2];      /* leg swing (fwd +), knee bend (>=0); [0]=left [1]=right */
     float leg_out[2];           /* lateral splay (rad) */
@@ -167,33 +167,41 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         }
         o->lean = 0.38f;
     }
-    float t = P->action_t;
+    if (P->action == WP_ACT_NONE) return;
+    /* Action poses are computed separately and blended over the locomotion pose with a weight that ramps in
+     * (~0.06 s) and out before the sim clears the action, so nothing pops. */
+    Pose a = *o;
+    float t = P->action_t, w = 0;
     switch (P->action) {
-    case WP_ACT_KICK: {          /* right-footed strike over ~0.5 s */
-        float back = smooth01(t / 0.18f), strike = smooth01((t - 0.18f) / 0.12f), rec = smooth01((t - 0.38f) / 0.2f);
-        o->hip[1] = (-0.8f * back + 2.1f * strike) * (1 - rec) + 0.0f * rec;
-        o->knee[1] = (0.15f + 1.35f * back * (1 - strike) + 0.1f * strike) * (1 - rec) + 0.15f * rec;
-        o->hip[0] = 0.25f * (1 - rec); o->knee[0] = 0.35f * (1 - rec) + 0.12f * rec;
-        o->sh[0] = 0.5f; o->ab[0] = 0.9f * (1 - rec) + 0.1f; o->elb[0] = 0.5f;
-        o->sh[1] = -0.6f * strike * (1 - rec); o->ab[1] = 0.6f * (1 - rec) + 0.1f;
-        o->lean = 0.10f - 0.12f * strike * (1 - rec);
+    case WP_ACT_KICK: {          /* right-footed strike; sim clears the action after 0.5 s */
+        float back = smooth01(t / 0.16f), strike = smooth01((t - 0.16f) / 0.11f), rec = smooth01((t - 0.32f) / 0.12f);
+        a.hip[1] = (-0.8f * back + 2.1f * strike) * (1 - rec) + 0.1f * rec;
+        a.knee[1] = (0.15f + 1.35f * back * (1 - strike) + 0.1f * strike) * (1 - rec) + 0.2f * rec;
+        a.hip[0] = 0.25f; a.knee[0] = 0.35f;
+        a.sh[0] = 0.5f; a.ab[0] = 0.9f; a.elb[0] = 0.5f;
+        a.sh[1] = -0.6f * strike; a.ab[1] = 0.6f;
+        a.lean = 0.10f - 0.12f * strike * (1 - rec);
+        w = smooth01(t / 0.06f) * (1 - smooth01((t - 0.36f) / 0.12f));
         break;
     }
     case WP_ACT_JUMP_HEADER:
-    case WP_ACT_STAND_HEADER: {
-        float up = smooth01(t / 0.12f), land = smooth01((t - 0.55f) / 0.15f), k = up * (1 - land);
+    case WP_ACT_STAND_HEADER: {  /* lasts until landing (~0.69 s for a full jump) */
         for (int s = 0; s < 2; s++) {
-            o->hip[s] = (s ? 0.55f : -0.15f) * k;
-            o->knee[s] = 0.12f + (s ? 1.0f : 1.3f) * k;
-            o->sh[s] = 1.1f * k; o->ab[s] = 0.15f + 0.85f * k; o->elb[s] = 0.35f + 0.6f * k;
+            a.hip[s] = s ? 0.55f : -0.15f;
+            a.knee[s] = s ? 1.1f : 1.4f;
+            a.sh[s] = 1.1f; a.ab[s] = 1.0f; a.elb[s] = 0.95f;
         }
         float nod = t < 0.28f ? -0.35f * smooth01(t / 0.2f) : -0.35f + 0.95f * smooth01((t - 0.28f) / 0.08f);
-        o->lean = 0.05f + nod * k * 0.8f;
-        o->nod = nod * k * 0.6f;
+        a.lean = 0.05f + nod * 0.8f;
+        a.nod = nod * 0.6f;
+        w = smooth01(t / 0.06f) * (1 - smooth01((t - 0.50f) / 0.17f));
         break;
     }
     default: break;
     }
+    float *dst = (float *)o;
+    const float *src = (const float *)&a;
+    for (size_t i = 0; i < sizeof(Pose) / sizeof(float); i++) dst[i] += (src[i] - dst[i]) * w;
 }
 
 static void solve(const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarStyle *S, float x, float y,
@@ -258,7 +266,7 @@ static V3 lerp3(V3 a, V3 b, float t) { return v3(a.x + (b.x - a.x) * t, a.y + (b
 
 void wp_avatar_draw(SDL_Renderer *r, SDL_Texture *soft, const WpCamera *cam, float x, float y,
                     const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarStyle *S) {
-    V3 J[J_COUNT];
+    V3 J[J_COUNT + 4];
     float head_r;
     solve(P, L, S, x, y, J, &head_r);
     float k = L->height / 1.80f, ls = S->limb_scale * L->build;
@@ -287,6 +295,26 @@ void wp_avatar_draw(SDL_Renderer *r, SDL_Texture *soft, const WpCamera *cam, flo
     SEG(J_CHEST, J_HEAD, 0.05f * ls * k, 0.05f * ls * k, 0.0f, 0.5f, L->skin, false);        /* neck */
 #undef SEG
     int torso_first = n - 5;
+    int neck_idx = n - 1;
+    /* shirt number patch on the back: makes front vs back readable at match scale */
+    float cf0 = cosf(P->facing), sf0 = sinf(P->facing);
+    if (sf0 > 0.15f) {
+        int extra = J_COUNT;                         /* virtual joints appended after the skeleton */
+        V3 back = add(J[J_CHEST], v3(-cf0 * 0.15f * k * ls, -sf0 * 0.15f * k * ls, -0.08f * k));
+        V3 lat = v3(-sf0 * 0.04f * k, cf0 * 0.04f * k, 0);
+        J[extra] = add(back, lat);      J[extra + 1] = add(J[extra], v3(0, 0, -0.16f * k));
+        J[extra + 2] = add(back, mul(lat, -1)); J[extra + 3] = add(J[extra + 2], v3(0, 0, -0.16f * k));
+        SDL_FColor num = P->keeper ? (SDL_FColor){0.1f, 0.1f, 0.1f, 1} : (SDL_FColor){0.97f, 0.97f, 0.95f, 1};
+        parts[n++] = (Part){extra, extra + 1, 0.022f * k, 0.022f * k, 0, 1, num, 0, false};
+        parts[n++] = (Part){extra + 2, extra + 3, 0.022f * k, 0.022f * k, 0, 1, num, 0, false};
+        parts[n - 1].depth = parts[n - 2].depth = -1;   /* marker: always just above the shirt (set below) */
+    } else if (sf0 < -0.15f) {                          /* club crest on the front-left chest */
+        int extra = J_COUNT;
+        V3 lat = v3(-sf0, cf0, 0);
+        J[extra] = add(add(J[J_CHEST], v3(cf0 * 0.15f * k * ls, sf0 * 0.15f * k * ls, -0.13f * k)), mul(lat, 0.07f * k));
+        SDL_FColor crest = P->keeper ? (SDL_FColor){0.1f, 0.1f, 0.1f, 1} : (SDL_FColor){0.98f, 0.86f, 0.25f, 1};
+        parts[n++] = (Part){extra, -1, 0.035f * k, 0, 0, 0, crest, 0, false};
+    }
 
     /* depth along the camera's view direction: farther = larger. Raised points are nearer the camera. */
     float body_depth = 0;
@@ -295,9 +323,10 @@ void wp_avatar_draw(SDL_Renderer *r, SDL_Texture *soft, const WpCamera *cam, flo
         V3 a = J[p->a], b = p->b >= 0 ? J[p->b] : a;
         V3 m = lerp3(a, b, (p->t0 + p->t1) * 0.5f);
         p->depth = m.y - cam->tilt * m.z;
-        if (i >= torso_first) body_depth += p->depth / 5.0f;
+        if (i >= torso_first && i <= neck_idx) body_depth += p->depth / 5.0f;
     }
-    parts[n - 1].depth += 1.0f;   /* neck always behind shirt and head (else it shows as a strip on the chest) */
+    parts[neck_idx].depth += 1.0f;   /* neck always behind shirt and head (else it shows as a strip on the chest) */
+    for (int i = neck_idx + 1; i < n; i++) parts[i].depth = body_depth - 0.2f;   /* number patch: on top of shirt */
     for (int i = 1; i < n; i++) {                     /* far first */
         Part t = parts[i]; int j = i - 1;
         while (j >= 0 && parts[j].depth < t.depth) { parts[j + 1] = parts[j]; j--; }

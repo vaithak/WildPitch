@@ -20,6 +20,7 @@ static void scripted_input(WpRng *r, uint32_t tick, WpInput *in) {
  * seat 1 drives a team-1 player, so flight/bounce/roll and two movers are covered by the golden hash. */
 static void scripted_setup(SimState *s) { s->seat_player[1] = (int8_t)(2 * s->n_per_side - 1); }
 static void scripted_poke(WpRng *r, uint32_t tick, SimState *s) {
+    if (tick % 97 == 0) sim_player_jump(s, (int)(tick / 97) % (2 * s->n_per_side), WP_ACT_JUMP_HEADER);
     if (tick % 180 != 0) return;
     /* Sequence RNG calls in separate statements: C leaves argument evaluation order unspecified
      * (gcc and clang differ), which would silently break cross-compiler determinism. */
