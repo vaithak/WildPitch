@@ -143,7 +143,7 @@ uint64_t sim_hash(const SimState *s) {
     const WpBall *b = &s->ball;
     fnv_i(&f, b->pos.x); fnv_i(&f, b->pos.y); fnv_i(&f, b->z);
     fnv_i(&f, b->vel.x); fnv_i(&f, b->vel.y); fnv_i(&f, b->vz); fnv_i(&f, b->spin);
-    fnv_i(&f, b->owner); fnv_i(&f, b->last_touch);
+    fnv_i(&f, b->owner); fnv_i(&f, b->last_touch); fnv_i(&f, b->held); fnv_i(&f, b->held_ticks);
     fnv_i(&f, s->n_per_side); fnv_i(&f, s->phase); fnv_i(&f, s->phase_timer);
     fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->ai_level[0]); fnv_i(&f, s->ai_level[1]); fnv_i(&f, s->events);
     for (int k = 0; k < WP_MAX_SEATS; k++) {

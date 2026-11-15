@@ -215,6 +215,12 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         w = smooth01(t / 0.04f) * (1 - smooth01((t - (tc + 0.18f)) / 0.12f));
         break;
     }
+    case WP_ACT_NONE:
+        if (P->holding) {                                 /* ball in the hands: forearms up, cradling it */
+            for (int s = 0; s < 2; s++) { a.sh[s] = 1.0f; a.elb[s] = 1.2f; a.ab[s] = 0.15f; }
+            w = 1.0f;
+        }
+        break;
     case WP_ACT_KEEPER_DIVE: {   /* sideways dive: stretched, arms overhead, rolled down onto his side, then up */
         float side = P->kick_foot ? -1.0f : 1.0f;      /* sim: foot 1 = dive toward +y; the pose rolls toward its left */
         for (int s = 0; s < 2; s++) {

@@ -53,6 +53,8 @@ typedef struct {
     fx  spin;                    /* sidespin, rad/s-ish; curls the ball (Q16.16) */
     int8_t owner;                /* player index dribbling it, or -1 */
     int8_t last_touch;           /* player index, or -1 */
+    uint8_t held;                /* 1 = in the owner's (keeper's) hands: carried at chest height, can't be tackled */
+    uint16_t held_ticks;         /* how long he has held it (release limit) */
 } WpBall;
 
 /* Player actions drive both gameplay timing and the avatar's animation pose (so replays animate exactly).
@@ -77,7 +79,9 @@ enum {
 
 /* A kick is a parametric move (DECISIONS D-012): what it does to the ball + when contact happens.
  * The avatar reads the same fields (foot, windup) so the visible strike lands on the contact tick. */
-enum { WP_KICK_PASS = 0, WP_KICK_SHOT, WP_KICK_CHIP, WP_KICK_HEADER, WP_KICK_THROUGH, WP_KICK_LOB };
+enum { WP_KICK_PASS = 0, WP_KICK_SHOT, WP_KICK_CHIP, WP_KICK_HEADER, WP_KICK_THROUGH, WP_KICK_LOB,
+       WP_KICK_THROW,        /* keeper's throw / roll out from the hands (and throw-ins) */
+       WP_KICK_PUNT };       /* keeper's kick from the hands, long and high */
 typedef struct {
     fx       power;              /* horizontal ball speed at contact, m/s */
     fx       vz;                 /* vertical ball speed at contact, m/s */

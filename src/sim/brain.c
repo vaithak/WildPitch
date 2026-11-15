@@ -177,7 +177,7 @@ static void gen_off_ball(Ctx *x) {
                 c->f[F_FIRST] = rank == 0 ? FX_ONE : 0;
             }
         } else {                                          /* they have it: press, cover, mark */
-            if ((c = add(x, AI_PRESS, -1, fv2_add(b->pos, fv2_scale(goal_dir, FX(0.9)))))) {
+            if (!b->held && (c = add(x, AI_PRESS, -1, fv2_add(b->pos, fv2_scale(goal_dir, FX(0.9)))))) {
                 c->f[F_COST] = dist(c->at, p->pos);
                 c->f[F_FIRST] = rank == 0 ? FX_ONE : 0;
             }
@@ -405,6 +405,35 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     p->ai_hold = owner ? (uint8_t)(p->ai_hold < 255 ? p->ai_hold + 1 : 255) : 0;
 
     if (p->role == WP_ROLE_KEEPER && !owner) { keeper(&x, out); return; }
+    if (owner && b->held) {                              /* keeper with it in his hands: look up, then distribute */
+        if (p->ai_hold < T_AI_KEEPER_HOLD || p->action != WP_ACT_NONE) return;
+        int best = -1; fx bs = 0;
+        for (int j = x.team * s->n_per_side; j < (x.team + 1) * s->n_per_side; j++) {
+            const WpPlayer *q = &s->players[j];
+            if (j == i) continue;
+            fx d = dist(q->pos, b->pos);
+            if (d < FX(5.0) || d > FX(22.0)) continue;
+            fx open = nearest_opp(&x, q->pos), lane = fx_min(pass_lane_clear(s, x.team, b->pos, q->pos), FX(4.0));
+            fx sc = open + fx_mul(lane, FX(1.5)) + fx_mul((q->pos.x - b->pos.x) * x.sg, FX(0.1));
+            if (open < FX(4.0) || lane < FX(2.0)) continue;
+            if (best < 0 || sc > bs) { best = j; bs = sc; }
+        }
+        WpKick k = {0};
+        k.foot = 1;
+        if (best >= 0) {                                 /* throw it to a free man */
+            fv2 d = fv2_sub(s->players[best].pos, b->pos);
+            k.kind = WP_KICK_THROW; k.dir = fx_atan2(d.y, d.x); k.to = (uint8_t)(best + 1);
+            k.power = T_THROW_SPEED; k.windup = T_KICK_WINDUP_CHIP;
+        } else {                                         /* nobody free: punt it toward the furthest-forward mate */
+            int fwd = -1; fx fx_best = 0;
+            for (int j = x.team * s->n_per_side; j < (x.team + 1) * s->n_per_side; j++)
+                if (j != i && (fwd < 0 || s->players[j].pos.x * x.sg > fx_best)) { fwd = j; fx_best = s->players[j].pos.x * x.sg; }
+            fv2 d = fv2_sub(s->players[fwd].pos, b->pos);
+            k.kind = WP_KICK_PUNT; k.dir = fx_atan2(d.y, d.x); k.power = T_PUNT_SPEED; k.vz = T_PUNT_VZ; k.windup = 8;
+        }
+        sim_player_kick(s, i, &k);
+        return;
+    }
     /* kickoff: the team not kicking off holds its shape until the ball is first touched */
     if (b->last_touch < 0 && b->owner < 0 && b->pos.x == 0 && b->pos.y == 0 && p->team != s->kickoff_team) {
         fv2 at = home_spot(&x, 0);

@@ -272,6 +272,7 @@ fx ball_lob_speed_for(fx d, fx vz) {
 
 void ball_step(SimState *s) {
     WpBall *b = &s->ball;
+    if (b->held) return;                                  /* in a keeper's hands: carried by control_owner, no physics */
     fx move = fx_mul(ball_speed3(b), WP_DT);
     int n = 1 + (int)(move / T_SUBSTEP_MAX_MOVE);
     if (n > 12) n = 12;

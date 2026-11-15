@@ -93,7 +93,8 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
     const WpPlayer *p = &s->players[i];
     wp_angle dir = has_aim ? fx_atan2(aim.y, aim.x) : p->facing;
     int seat = seat_of(s, i);
-    if ((kind == WP_KICK_PASS || kind == WP_KICK_THROUGH || kind == WP_KICK_LOB) && seat >= 0)
+    if ((kind == WP_KICK_PASS || kind == WP_KICK_THROUGH || kind == WP_KICK_LOB || kind == WP_KICK_THROW ||
+         kind == WP_KICK_PUNT) && seat >= 0)
         dir = s->pick_dir[seat];                          /* stick, latched diagonal, memory, facing (D-021) */
     k->kind = kind;
     k->spin = 0;
@@ -105,6 +106,18 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
             fv2 d = fv2_sub(s->players[r].pos, p->pos);
             dir = fx_atan2(d.y, d.x);
             k->to = (uint8_t)(r + 1);
+        }
+    } else if (kind == WP_KICK_THROW || kind == WP_KICK_PUNT) {
+        k->power = kind == WP_KICK_THROW ? T_THROW_SPEED : T_PUNT_SPEED;
+        k->vz = kind == WP_KICK_PUNT ? T_PUNT_VZ : 0;
+        k->windup = kind == WP_KICK_THROW ? T_KICK_WINDUP_CHIP : 8;
+        if (kind == WP_KICK_THROW) {
+            int r = kick_receiver(s, i, seat, WP_KICK_PASS, dir);
+            if (r >= 0 && s->players[r].role != WP_ROLE_KEEPER) {
+                fv2 d = fv2_sub(s->players[r].pos, p->pos);
+                dir = fx_atan2(d.y, d.x);
+                k->to = (uint8_t)(r + 1);
+            }
         }
     } else if (kind == WP_KICK_THROUGH || kind == WP_KICK_LOB) {
         /* power field = the hold h (0..1): through ball = how deep/soft (D-020); lob: unused */
@@ -265,11 +278,19 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     fv2 spot = fv2_add(p->pos, fv2_from_angle(cd, FOOT_SPOT));
     fx off = fx_min(fx_div(fv2_len(fv2_sub(b->pos, spot)), KICK_REACH), FX_ONE);
     fx q = fx_max(FX_ONE - across / 4 - off / 4, FX(0.75));
+    int from_hands = b->held;
+    if (from_hands) { b->held = 0; b->held_ticks = 0; }
     fx vz = p->kick.vz, t_meet = FX(1.5);
     int r = (int)p->kick.to - 1;
     fv2 meet = r >= 0 ? s->players[r].pos : b->pos;
     uint8_t plan = WP_PLAN_CLOSEST;
-    if (p->kick.kind == WP_KICK_LOB) b->vel = lob_velocity(s, r, p->kick.dir, &vz);
+    if (p->kick.kind == WP_KICK_THROW) {                  /* thrown / rolled out: like a pass, from the hands */
+        if (r >= 0) b->vel = pass_solve(s, r, &meet, &t_meet, &plan);
+        else b->vel = fv2_from_angle(p->kick.dir, T_THROW_SPEED);
+        vz = FX(1.0);
+    }
+    else if (p->kick.kind == WP_KICK_PUNT) b->vel = fv2_from_angle(p->kick.dir, T_PUNT_SPEED);
+    else if (p->kick.kind == WP_KICK_LOB) b->vel = lob_velocity(s, r, p->kick.dir, &vz);
     else if (p->kick.kind == WP_KICK_THROUGH && r >= 0) b->vel = through_solve(s, r, p->kick.power, &meet, &t_meet, &plan);
     else if (r >= 0) b->vel = pass_solve(s, r, &meet, &t_meet, &plan);
     else if (p->kick.kind == WP_KICK_PASS || p->kick.kind == WP_KICK_THROUGH) {
@@ -310,6 +331,17 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     fv2 aim = stick_dir(in, &has);
     if (s->phase != WP_PHASE_PLAY) { p->kick_charge = 0; p->charge_kind = 0xFF; return; }
 
+    /* keeper with the ball in his hands: S throw (to the ringed mate), A throw it high, D/W punt */
+    if (s->ball.held && s->ball.owner == i) {
+        if (p->action == WP_ACT_NONE && (pressed & (WP_BTN_PASS | WP_BTN_LOB | WP_BTN_SHOOT | WP_BTN_CHIP))) {
+            WpKick k;
+            uint8_t kind = (pressed & WP_BTN_PASS) ? WP_KICK_THROW : (pressed & WP_BTN_LOB) ? WP_KICK_LOB : WP_KICK_PUNT;
+            make_kick(s, i, kind, 0, aim, has, &k);
+            sim_player_kick(s, i, &k);
+        }
+        p->kick_charge = 0; p->charge_kind = 0xFF;
+        return;
+    }
     /* contextual tackle: J pressed while an opponent has the ball close by */
     if ((pressed & WP_BTN_PASS) && p->action == WP_ACT_NONE && tackle_wanted(s, i)) {
         tackle_start(s, i);
@@ -408,6 +440,16 @@ static void control_owner(SimState *s, int i, const WpSeatInput *in) {
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
     if (s->phase != WP_PHASE_PLAY) return;
+    if (b->held) {                                        /* in the keeper's hands: carried, can't be lost */
+        ball_to_hands(s, i);
+        if (b->held_ticks < 65535) b->held_ticks++;
+        if (b->held_ticks > T_KEEPER_HOLD_MAX && p->action == WP_ACT_NONE) {   /* time's up: he must release it */
+            WpKick k = {0};
+            k.kind = WP_KICK_PUNT; k.dir = p->facing; k.windup = T_KICK_WINDUP_CHIP;
+            sim_player_kick(s, i, &k);
+        }
+        return;
+    }
     fv2 d = fv2_sub(b->pos, p->pos);
     fx dist = fv2_len(d);
     int has;
@@ -482,7 +524,7 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
     const WpBall *b = &s->ball;
     if (s->phase != WP_PHASE_PLAY || !player_can_control(s, i)) return -1;
     if (b->owner >= 0 || p->touch_cooldown || p->action != WP_ACT_NONE || p->z > 0) return -1;
-    int gk = p->role == WP_ROLE_KEEPER;
+    int gk = p->role == WP_ROLE_KEEPER && in_own_box(s, p->team, p->pos);   /* hands only in his own box */
     if (b->z > (gk ? T_KEEPER_HANDS_Z : WP_BAND_BODY_MAX)) return -1;
     /* reach is SWEPT over the coming tick (ball.pos .. ball.pos + vel*dt): a ball passing between ticks counts.
      * The pass's receiver may also stretch beyond clean reach, with a heavier touch. */
@@ -533,6 +575,10 @@ static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const
     b->last_touch = (int8_t)i;
     p->touch_cooldown = 6;
     s->events |= WP_EV_TOUCH;
+    if (p->role == WP_ROLE_KEEPER && in_own_box(s, p->team, p->pos)) {   /* gathered into his hands */
+        ball_to_hands(s, i);
+        b->held_ticks = 0;
+    }
     seats_on_gain(s, i, all);                             /* our AI team-mate / keeper won it: control jumps */
 }
 
@@ -618,6 +664,7 @@ void players_step(SimState *s, const WpInput *in) {
         move(s, i, &mv[i]);
         WpPlayer *p = &s->players[i];
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
+        if (s->ball.held && s->ball.owner == i) p->pos = clamp_own_box(s, p->team, p->pos);   /* can't carry it out */
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
         header_step(s, i);
         tackle_step(s, i);

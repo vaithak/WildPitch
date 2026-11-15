@@ -28,6 +28,7 @@ typedef struct {
     float kick_windup;   /* seconds from action start to ball contact (0 -> default) */
     float kick_power01;  /* 0..1 strength of the strike */
     float charge01;      /* 0..1 while charging a shot/chip near the ball (leg drawn back), else 0 */
+    bool  holding;       /* keeper with the ball in his hands: arms cradle it */
     float touch01;       /* 1 right after a dribble touch, decays to 0 (forward leg flicks the ball) */
 } WpAvatarPose;
 

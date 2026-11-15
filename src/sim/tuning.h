@@ -170,6 +170,11 @@
 #define T_DIVE_MIN_GAP     FX(0.7)    /* he only dives for shots crossing this far from him ... */
 #define T_DIVE_WHEN        FX(0.55)   /* ... arriving within this (s) */
 #define T_AIM_POST_MARGIN  FX(0.6)    /* aim-assisted shots go this far inside the post (scales with the goal) */
+#define T_KEEPER_HOLD_MAX  360        /* a keeper may hold the ball in his hands this long (6 s), then it's released */
+#define T_AI_KEEPER_HOLD   50         /* the AI keeper looks up for this long before distributing */
+#define T_THROW_SPEED      FX(11.0)   /* keeper's throw with nobody targeted */
+#define T_PUNT_SPEED       FX(21.0)   /* keeper's punt from the hands ... */
+#define T_PUNT_VZ          FX(8.0)    /* ... and its loft */
 #define T_KEEPER_RUSH_V    FX(8.0)    /* he only comes out for loose balls slower than this (never to cut out a shot) */
 
 /* ---- kicks ---- */

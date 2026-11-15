@@ -219,6 +219,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 .keeper = p->role == WP_ROLE_KEEPER,
                 .touch01 = 1.0f - ctx->anim[i].since_touch / 0.16f,
                 .kick_foot = p->kick.foot,
+                .holding = cur->ball.held && cur->ball.owner == i,
                 .kick_kind = p->kick.kind == WP_KICK_THROUGH ? WP_KICK_PASS     /* same strike, different weight */
                            : p->kick.kind == WP_KICK_LOB ? WP_KICK_CHIP : p->kick.kind,
                 .kick_windup = (float)p->kick.windup / (float)WP_TICK_HZ,

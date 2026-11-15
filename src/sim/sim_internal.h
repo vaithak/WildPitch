@@ -84,6 +84,28 @@ void team_input(const SimState *s, int i, WpSeatInput *out);
 void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSeatInput *out);
 void team_steer_speed(const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed */
 
+/* Is `at` inside `team`'s own penalty area? (depth 15% of the length, half-width 24% of the width; render matches) */
+static inline int in_own_box(const SimState *s, int team, fv2 at) {
+    fx hl = s->pitch.length / 2, depth = fx_mul(s->pitch.length, FX(0.15)), hw = fx_mul(s->pitch.width, FX(0.24));
+    fx x = team == 0 ? at.x : -at.x;
+    return x <= -hl + depth && x >= -hl - FX(0.5) && at.y >= -hw && at.y <= hw;
+}
+static inline fv2 clamp_own_box(const SimState *s, int team, fv2 at) {
+    fx hl = s->pitch.length / 2, depth = fx_mul(s->pitch.length, FX(0.15)), hw = fx_mul(s->pitch.width, FX(0.24));
+    fx x = team == 0 ? at.x : -at.x;
+    x = fx_clamp(x, -hl + FX(0.3), -hl + depth - FX(0.2));
+    return fv2_make(team == 0 ? x : -x, fx_clamp(at.y, -hw + FX(0.2), hw - FX(0.2)));
+}
+
+/* put the ball in keeper i's hands (chest height, in front of him); ball physics skips a held ball */
+static inline void ball_to_hands(SimState *s, int i) {
+    WpBall *b = &s->ball;
+    const WpPlayer *p = &s->players[i];
+    b->held = 1;
+    b->pos = fv2_add(p->pos, fv2_from_angle(p->facing, FX(0.25)));
+    b->z = FX(1.0); b->vz = 0; b->vel = p->vel; b->spin = 0;
+}
+
 /* Can player i take control of a loose ball? Everyone in a real match (AI included, CP0.3); with
  * WP_SIMF_STATIC_OTHERS (drills / isolation tests) only seat players - the others are statues. */
 static inline int player_can_control(const SimState *s, int i) {

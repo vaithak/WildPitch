@@ -36,6 +36,8 @@ void keeper_step(SimState *s, int i, const WpInput *in) {
         b->vz = 0;
         if (b->z > WP_BAND_FEET_MAX) b->z = WP_BAND_FEET_MAX;
         b->owner = (int8_t)i;
+        if (in_own_box(s, p->team, p->pos)) ball_to_hands(s, i);
+        b->held_ticks = 0;
         p->touch_cooldown = 0;
         s->events |= WP_EV_TOUCH;
         seats_on_gain(s, i, in);                          /* our keeper caught it: control jumps to him (D-022) */

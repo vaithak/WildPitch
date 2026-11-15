@@ -143,5 +143,39 @@ int main(void) {
         CHECKF(now != me && s.players[now].role != WP_ROLE_KEEPER, "no switch to a defender");
         CHECK(fv2_len(fv2_sub(s.ball.pos, s.players[now].pos)) < FX(10.0));
     }
+    /* 7. keeper hands (7v7): a soft shot he catches in his box is HELD (chest height, can't be tackled); the AI
+     *    keeper distributes it within ~2 s; outside his box a keeper has no hands */
+    {
+        WpMatchConfig c7 = sim_config_7v7();
+        sim_init(&s, &c7);
+        s.seat_player[0] = -1;
+        int kp = s.n_per_side;                                       /* their keeper, at +x */
+        int striker = s.n_per_side - 1;                              /* ours */
+        s.players[kp].pos = fv2_make(FX(25.5), 0);
+        s.players[striker].pos = fv2_make(FX(24.0), FX(5.0));        /* near him (after the catch), not first to it */
+        for (int j = 0; j < 2 * s.n_per_side; j++) if (j != kp && j != striker) s.players[j].pos = fv2_make(-FX(20.0) + FX_INT(j), FX(15.0));
+        s.ball.pos = fv2_make(FX(18.0), 0); s.ball.owner = -1; s.ball.vel = fv2_make(FX(10.0), 0);
+        int held_t = -1, released = -1; uint16_t ev = 0;
+        for (int t = 0; t < 240; t++) {
+            ev = step1(NOIN);
+            if (held_t < 0 && s.ball.held && s.ball.owner == kp) held_t = t;
+            if (held_t >= 0 && released < 0) {
+                CHECK(s.ball.z > FX(0.8));
+                CHECK(!tackle_wanted(&s, striker));
+            }
+            if (held_t >= 0 && released < 0 && (ev & WP_EV_KICK)) released = t;
+        }
+        printf("keeper hands: held after %d ticks, distributed %.2f s later (%s)\n", held_t,
+               (released - held_t) / 60.0, s.players[kp].kick.kind == WP_KICK_THROW ? "throw" : "punt");
+        CHECKF(held_t >= 0, "keeper didn't hold the ball");
+        CHECKF(released > held_t && released - held_t < 150, "keeper didn't distribute in time (%d)", released - held_t);
+        /* outside his box: no hands (a ball at chest height isn't caught) */
+        sim_init(&s, &c7);
+        s.seat_player[0] = -1;
+        s.players[kp].pos = fv2_make(FX(10.0), 0);
+        s.ball.pos = fv2_make(FX(7.0), 0); s.ball.z = FX(1.2); s.ball.vz = 0; s.ball.owner = -1; s.ball.vel = fv2_make(FX(9.0), 0);
+        for (int t = 0; t < 30; t++) step1(NOIN);
+        CHECKF(!(s.ball.owner == kp && s.ball.held), "keeper held it outside his box");
+    }
     return TEST_DONE();
 }

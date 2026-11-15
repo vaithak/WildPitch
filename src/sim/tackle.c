@@ -10,7 +10,7 @@
 int tackle_wanted(const SimState *s, int i) {
     const WpBall *b = &s->ball;
     const WpPlayer *p = &s->players[i];
-    if (b->owner < 0 || s->players[b->owner].team == p->team || p->z > 0 || b->z > WP_BAND_FEET_MAX) return 0;
+    if (b->owner < 0 || b->held || s->players[b->owner].team == p->team || p->z > 0 || b->z > WP_BAND_FEET_MAX) return 0;
     return fv2_len(fv2_sub(b->pos, p->pos)) <= T_TACKLE_START;
 }
 
