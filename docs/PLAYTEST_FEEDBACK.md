@@ -112,3 +112,9 @@ Format:
 - **Action:** pitches x~1.5 with the real 105:68 (1.54) ratio: 7v7 80 x 52 m (goal 6 x 2.1), game 5v5 60 x 39 m
   (goal 5 x 2); formation / marking / pass-range distances scale with the pitch; the 40 x 25 m 5v5 stays as the
   regression-test format.
+  Goals later set to the real goal-to-width ratio: 7v7 5.6 m, 5v5 4.2 m (D-031).
+
+## 2026-11-15 — CP0.3b+ (team play D-030, bigger pitches D-031)
+- **Feedback (verbatim):** "this is really good"
+- **Action:** CP0.3b+ accepted. Next: CP0.3c player stats. Open (no complaint yet): AI shot conversion ~50%, pass
+  completion 62%.

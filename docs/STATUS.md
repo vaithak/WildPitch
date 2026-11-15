@@ -3,7 +3,7 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3b+ — Team play + bigger pitches (D-030/D-031): ✅ done, waiting for the owner's playtest.**
+**CP0.3b+ — Team play + bigger pitches (D-030/D-031): ✅ done, owner: "this is really good".**
 Next: **CP0.3c player stats** (own hand-over: it shifts calibrated numbers). Open polish from the team-shape report:
 slot swaps (players exchanging positions on runs), an F3 overlay of plan roles, shape thresholds as CI checks,
 AI shot conversion is high (~45-50% of AI shots score, mostly 1v1s under 10 m; arcade games ~30-40%) - tune the
