@@ -22,6 +22,10 @@ static inline fx ball_speed3(const WpBall *b) { return fv2_len(fv2_make(fv2_len(
 /* rolling deceleration (m/s^2) of a ground ball at speed v (shared by ball physics and dribble touch sizing) */
 static inline fx ball_roll_decel(fx v) { return T_ROLL_DECEL + fx_mul(T_ROLL_LIN, v) + fx_mul(T_AIR_DRAG, fx_mul(v, v)); }
 
+/* Ground ball: launch speed that makes it roll exactly distance d before stopping (inverse of the roll model,
+ * by bisection over the same per-tick integration ball.c uses). Used for stopping touches; passes later (CP0.2). */
+fx ball_roll_speed_for(fx d);
+
 /* Can player i take control of a loose ball? (CP0.1: only human-controlled players; AI joins in CP0.3) */
 static inline int player_can_control(const SimState *s, int i) {
     for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == i) return 1;

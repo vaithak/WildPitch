@@ -178,5 +178,70 @@ int main(void) {
             prev_carry = carry;
             if (c == T_CHARGE_MAX_TICKS) prev_carry = 0;
         }
+    /* no magnet (D-016, owner: "ball physics looks weird"): possession never moves the ball through the body,
+     * never brakes it from beyond foot reach, never reels it back, never teleports its height */
+    for (int sp = 0; sp <= 1; sp++) {
+        uint16_t b = sp ? WP_BTN_SPRINT : 0;
+        fx mind = FX(9.0), far_brake = 0, reel = 0;
+        for (int off = 0; off < 20; off++) {
+            with_ball(&s);
+            run_seat(&s, (WpSeatInput){127, 0, b}, 60 + off);
+            fv2 pv = s.ball.vel;
+            for (int t = 0; t < 120; t++) {
+                fx d0 = ball_dist(&s);
+                run_seat(&s, NOIN, 1);
+                fx d = ball_dist(&s), br = fv2_len(pv) - fv2_len(s.ball.vel);
+                if (d0 > T_TOUCH_REACH && br > FX(0.2) && br > far_brake) far_brake = br;
+                if (fv2_len(s.players[ME].vel) < FX(0.1) && d0 - d > fx_mul(reel, WP_DT)) reel = fx_div(d0 - d, WP_DT);
+                if (d < mind) mind = d;
+                pv = s.ball.vel;
+            }
+            CHECKF(s.ball.owner == ME, "release off %d: lost the ball", off);
+        }
+        printf("%-6s release: closest to body %.2f m, braking from beyond reach %.2f m/s, reel-back %.2f m/s\n",
+               sp ? "sprint" : "jog", tod(mind), tod(far_brake), tod(reel));
+        CHECKF(mind > FX(0.35), "release: ball %.2f m from the player's centre (through the body)", tod(mind));
+        CHECKF(far_brake == 0, "release: ball braked by %.2f m/s from beyond reach", tod(far_brake));
+        CHECKF(reel < FX(0.35), "release: ball reeled back at %.2f m/s", tod(reel));
+    }
+    {   /* sprint + pass forward / sideways / back: the gather keeps the ball outside the body */
+        static const int8_t ax[3] = {127, 0, -127}, ay[3] = {0, 127, 0};
+        for (int k = 0; k < 3; k++) {
+            fx mind = FX(9.0);
+            for (int off = 0; off < 20; off += 2) {
+                with_ball(&s);
+                run_seat(&s, (WpSeatInput){127, 0, WP_BTN_SPRINT}, 60 + off);
+                run_seat(&s, (WpSeatInput){ax[k], ay[k], WP_BTN_SPRINT | WP_BTN_PASS}, 1);
+                int kicked = 0;
+                for (int t = 0; t < 10 && !kicked; t++) {
+                    kicked = (run_seat(&s, (WpSeatInput){ax[k], ay[k], WP_BTN_SPRINT}, 1) & WP_EV_KICK) != 0;
+                    if (!kicked && ball_dist(&s) < mind) mind = ball_dist(&s);
+                }
+                CHECKF(kicked, "sprint pass dir %d off %d: no kick", k, off);
+            }
+            CHECKF(mind > FX(0.35), "sprint pass dir %d: gathered ball came %.2f m from the centre", k, tod(mind));
+        }
+    }
+    {   /* a received pass with no stick is trapped on the receiver's side, not pulled through him */
+        setup_empty(&s, ME); s.seat_player[0] = ME; s.players[ME].pos = fv2_make(0, 0);
+        s.ball.pos = fv2_make(FX(8.0), FX(0.1)); s.ball.vel = fv2_make(-FX(8.0), 0); s.ball.owner = -1;
+        fx mind = FX(9.0);
+        for (int t = 0; t < 150; t++) { run_seat(&s, NOIN, 1); if (ball_dist(&s) < mind) mind = ball_dist(&s); }
+        CHECKF(s.ball.owner == ME && mind > FX(0.35), "received pass: owner %d, closest %.2f m", s.ball.owner, tod(mind));
+    }
+    {   /* chest control then an instant shot: the ball falls under gravity, no height teleport */
+        setup_empty(&s, ME); s.seat_player[0] = ME; s.players[ME].pos = fv2_make(0, 0);
+        s.ball.pos = fv2_make(FX(3.0), 0); s.ball.z = FX(1.0); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1;
+        fx pz = s.ball.z, maxdrop = 0; int own = -1;
+        for (int t = 0; t < 60; t++) {
+            WpSeatInput in = {127, 0, 0};
+            if (own >= 0 && t < own + 4) in.buttons = WP_BTN_SHOOT;
+            run_seat(&s, in, 1);
+            if (own < 0 && s.ball.owner == ME) own = t;
+            if (pz - s.ball.z > maxdrop) maxdrop = pz - s.ball.z;
+            pz = s.ball.z;
+        }
+        CHECKF(own >= 0 && maxdrop < FX(0.08), "chest+shot: controlled %d, max height drop %.2f m in one tick", own, tod(maxdrop));
+    }
     return TEST_DONE();
 }

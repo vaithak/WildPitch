@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "test_util.h"
 #include "sim_test_helpers.h"
+#include "sim/sim_internal.h"
 
 static void launch(SimState *s, fx x, fx y, fx z, fx vx, fx vy, fx vz) {
     s->ball.pos = fv2_make(x, y); s->ball.z = z;
@@ -33,6 +34,52 @@ int main(void) {
             CHECKF(d > lo[k] && d < hi[k], "%d m/s roll %.1f m (want %.0f..%.0f)", speeds[k], d, lo[k], hi[k]);
             CHECKF(t < 60 * 7, "%d m/s ball still rolling after %.1f s", speeds[k], t / 60.0);
         }
+    }
+
+    /* inverse roll model (stopping touches now, weighted passes in CP0.2) agrees with the forward sim */
+    for (int d = 2; d <= 30; d += 7) {
+        setup_empty(&s, -1); s.seat_player[0] = -1;
+        launch(&s, FX(-18.0), FX(8.0), 0, ball_roll_speed_for(FX_INT(d)), 0, 0);
+        run_seat(&s, NOIN, 600);
+        double got = tod(s.ball.pos.x) + 18.0;
+        CHECKF(got > d * 0.99 - 0.05 && got < d * 1.01 + 0.05, "roll_speed_for(%d m) rolled %.2f m", d, got);
+    }
+
+    /* grass bounce (D-016): a 2 m drop rebounds into FIFA's 0.6-1.0 m window */
+    {
+        setup_empty(&s, -1); s.seat_player[0] = -1;
+        launch(&s, 0, FX(8.0), FX(2.0), 0, 0, 0);
+        run_seat(&s, NOIN, 45);                                     /* falls 0.64 s, lands */
+        fx peak = 0;
+        for (int t = 0; t < 60; t++) { run_seat(&s, NOIN, 1); if (s.ball.z > peak) peak = s.ball.z; }
+        printf("bounce: 2 m drop rebounds %.2f m\n", tod(peak));
+        CHECKF(peak > FX(0.6) && peak < FX(1.0), "2 m drop rebound %.2f m", tod(peak));
+    }
+    /* landing friction is continuous: no cliff as the landing speed crosses any threshold (the old model lost 0 vs
+     * 1.65 m/s either side of 0.6 m/s). Small dips (<0.05) are real: a ball that bounces skips the rest-of-tick roll. */
+    {
+        fx prev_loss = -1, max_jump = 0;
+        for (int k = 30; k <= 100; k++) {
+            setup_empty(&s, -1); s.seat_player[0] = -1;
+            launch(&s, 0, FX(8.0), FX(0.001), FX(11.0), 0, -(FX_INT(k) / 100));
+            fx v0 = s.ball.vel.x;
+            run_seat(&s, NOIN, 1);
+            fx loss = v0 - s.ball.vel.x;
+            if (prev_loss >= 0 && fx_abs(loss - prev_loss) > max_jump) max_jump = fx_abs(loss - prev_loss);
+            CHECKF(prev_loss < 0 || loss >= prev_loss - FX(0.05), "landing loss not monotonic at vz -%d cm/s", k);
+            prev_loss = loss;
+        }
+        CHECKF(max_jump < FX(0.06), "landing loss jumps %.3f m/s between 1 cm/s steps", tod(max_jump));
+    }
+    /* full-power chip sits down: first bounce ~21 m, stops well short of rolling the length of the pitch */
+    {
+        setup_empty(&s, -1); s.seat_player[0] = -1;
+        launch(&s, FX(-19.0), FX(8.0), 0, FX(15.0), 0, FX(8.5));
+        int t = 0;
+        while ((s.ball.vel.x || s.ball.vz || s.ball.z) && t < 1200 && s.phase == WP_PHASE_PLAY) { run_seat(&s, NOIN, 1); t++; }
+        double d = tod(s.ball.pos.x) + 19.0;
+        printf("full chip stops after %.1f m\n", d);
+        CHECKF(d > 24.0 && d < 36.0, "full chip stops at %.1f m", d);
     }
 
     /* full-power ground shots dead at a post from several distances: must bounce out, never tunnel/score */

@@ -2,7 +2,11 @@
  *
  * Feel rules (see tests/test_ball_control.c):
  *  - Dribble touches follow the STICK direction, not the slower-turning body, so cuts feel immediate.
- *  - An owned ball is "gathered" during a kick wind-up: a kick by the owner can never whiff.
+ *  - An owned ball is "gathered" during a kick wind-up: a kick by the owner can never whiff. The foot only drags
+ *    it a limited speed and never through the body (contact point = ball side, turned toward the kick by
+ *    <= T_GATHER_MAX_DEG); an awkward contact (ball off the spot, kicked across the body) gives a weaker kick.
+ *  - Releasing the stick: the player steps up to the ball if it is out of reach, then sole-traps it (reach-limited,
+ *    capped, on the ball's own side). No remote braking, no reeling back, never through the body.
  *  - Inaccuracy comes from visible causes only (no dice): the ball inherits part of the kicker's own
  *    velocity, and harder strikes rise more.
  *  - Ball contact uses height bands (WP_BAND_*): a ball above body height can't be controlled. */
@@ -30,6 +34,19 @@ static int ball_reachable(const SimState *s, int i, fx reach) {
     if (b->z > WP_BAND_FEET_MAX) return 0;
     fv2 d = fv2_sub(b->pos, s->players[i].pos);
     return fv2_len(d) <= reach;
+}
+
+/* Where the foot meets the ball during a kick: on the ball's side of the body, turned toward the kick direction
+ * by at most T_GATHER_MAX_DEG (so a gathered ball never crosses the body). Recomputed each tick: no state. */
+static wp_angle contact_dir(const SimState *s, int i) {
+    const WpPlayer *p = &s->players[i];
+    fv2 d = fv2_sub(s->ball.pos, p->pos);
+    if (fx_abs(d.x) + fx_abs(d.y) < FX(0.05)) return p->kick.dir;
+    wp_angle a = fx_atan2(d.y, d.x);
+    int32_t diff = ang_diff(p->kick.dir, a), lim = DEG_TO_ANG(T_GATHER_MAX_DEG);
+    if (diff > lim) diff = lim;
+    if (diff < -lim) diff = -lim;
+    return (wp_angle)(a + diff);
 }
 
 void sim_player_kick(SimState *s, int i, const WpKick *k) {
@@ -94,7 +111,14 @@ static void contact(SimState *s, int i) {
     if (s->phase != WP_PHASE_PLAY || !ball_reachable(s, i, KICK_REACH)) return;   /* whiff */
     /* no teleport to the foot: the wind-up gather already brought the ball there, and moving it here could
      * skip it across a line without ball.c seeing the crossing */
-    b->vel = fv2_add(fv2_from_angle(p->kick.dir, p->kick.power), fv2_scale(p->vel, INHERIT_VEL));
+    /* contact quality (visible cause, no dice): striking across the body and the ball being off the ideal spot
+     * each cost up to 25% of the power */
+    wp_angle cd = contact_dir(s, i);
+    fx across = FX_INT(ang_diff(p->kick.dir, cd) < 0 ? -ang_diff(p->kick.dir, cd) : ang_diff(p->kick.dir, cd)) / 32768;
+    fv2 spot = fv2_add(p->pos, fv2_from_angle(cd, FOOT_SPOT));
+    fx off = fx_min(fx_div(fv2_len(fv2_sub(b->pos, spot)), KICK_REACH), FX_ONE);
+    fx q = fx_max(FX_ONE - across / 4 - off / 4, FX(0.75));
+    b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(p->kick.power, q)), fv2_scale(p->vel, INHERIT_VEL));
     b->vz = p->kick.vz;
     b->spin = p->kick.spin;
     b->owner = -1;
@@ -147,12 +171,20 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     }
     int winding = p->action == WP_ACT_KICK && !p->kick.done;
     if (winding) top = fx_mul(top, T_KICK_SPEED_MUL);
-    if (has && s->ball.owner == i) {
+    int step_up = 0;
+    if (!has && s->ball.owner == i && p->action == WP_ACT_NONE &&
+        fv2_len(fv2_sub(s->ball.pos, p->pos)) > T_TOUCH_REACH - FX(0.15)) {
+        /* stick released with the ball out of foot reach: step up to it (at most jogging), then stop it */
+        dir = fv2_norm(fv2_sub(s->ball.pos, p->pos));
+        top = fx_min(top, T_WALK_SPEED);
+        has = step_up = 1;
+    }
+    if (has && !step_up && s->ball.owner == i) {
         /* the ball got out of foot reach: go and get it first, then carry on the way the stick says */
         fv2 to_ball = fv2_sub(s->ball.pos, p->pos);
         if (fv2_len(to_ball) > T_TOUCH_REACH) dir = fv2_norm(to_ball);
     }
-    if (has) {                                            /* analogue magnitude scales speed */
+    if (has && !step_up) {                                /* analogue magnitude scales speed */
         fx mag = fx_min(fv2_len(fv2_make((fx)in->move_x * (FX_ONE / 127), (fx)in->move_y * (FX_ONE / 127))), FX_ONE);
         top = fx_mul(top, mag);
     }
@@ -161,7 +193,7 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
 
     /* body turn rate (the ball follows the stick; the body catches up) */
     wp_angle want = p->facing;
-    if (winding) want = p->kick.dir;
+    if (winding) want = s->ball.owner == i ? contact_dir(s, i) : p->kick.dir;   /* turn to meet the ball */
     else if (has) want = fx_atan2(dir.y, dir.x);
     int deg = (in->buttons & WP_BTN_SPRINT) && fv2_len(p->vel) > FX(6.5) ? T_TURN_DEG_S_SPRINT
             : (s->ball.owner == i ? T_TURN_DEG_S_BALL : T_TURN_DEG_S);
@@ -182,25 +214,38 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
 
     if (b->owner == i) {
         if (dist > T_LOSE_DIST || b->z > WP_BAND_BODY_MAX) { b->owner = -1; return; }
-        if (p->action == WP_ACT_KICK && !p->kick.done) {   /* gather: settle ball at the foot for contact */
-            fv2 spot = fv2_add(p->pos, fv2_from_angle(p->kick.dir, FOOT_SPOT));
-            /* arrive exactly on the contact tick (moved by ball physics, so line crossings are still seen) */
+        if (p->action == WP_ACT_KICK && !p->kick.done) {   /* gather: the foot brings the ball to the contact point */
+            if (b->z > WP_BAND_FEET_MAX) return;            /* a dropping ball falls by itself (volley) */
+            fv2 spot = fv2_add(p->pos, fv2_from_angle(contact_dir(s, i), FOOT_SPOT));
+            /* aim to arrive on the contact tick (moved by ball physics, so line crossings are still seen), but the
+             * foot can only drag it so fast; whatever is left shows up as a weaker contact */
             int remaining = (int)p->kick.windup - (int)p->action_timer;
             if (remaining < 1) remaining = 1;
-            b->vel = fv2_add(p->vel, fv2_scale(fv2_sub(spot, b->pos), FX_INT(WP_TICK_HZ) / remaining));
-            b->vz = 0; b->z = 0;
+            fv2 rel = fv2_clamp_len(fv2_scale(fv2_sub(spot, b->pos), FX_INT(WP_TICK_HZ) / remaining), T_GATHER_MAX_REL);
+            b->vel = fv2_add(p->vel, rel);
+            if (b->vz > 0) b->vz = 0;
             return;
         }
         if (b->z > WP_BAND_FEET_MAX || p->action != WP_ACT_NONE) return;
-        if (!has) {                                        /* no stick: stop the ball under the sole / at the feet */
-            if (p->touch_cooldown) return;
-            fv2 spot = fv2_add(p->pos, fv2_from_angle(p->facing, FX(0.4)));
-            b->vel = fv2_add(p->vel, fv2_scale(fv2_sub(spot, b->pos), FX(3.0)));
+        if (dist > T_TOUCH_REACH) return;                  /* must actually reach the ball with a foot */
+        if (!has) {
+            /* No stick: sole trap. The ball slows WITH the player, steered toward a spot T_STOP_SPOT out on the
+             * side it is already on (never through the body), at a capped speed. Only within foot reach (out of
+             * reach, move() steps up to it first). May cut a dribble rhythm short, like a direction change. */
+            if (p->touch_cooldown > T_TOUCH_GAP_SPRINT - T_TOUCH_MIN_GAP) return;
+            fv2 side = fv2_sub(b->pos, p->pos);
+            fv2 sdn = fx_abs(side.x) + fx_abs(side.y) < FX(0.02) ? fv2_from_angle(p->facing, FX_ONE) : fv2_norm(side);
+            fv2 rel = fv2_scale(fv2_sub(fv2_add(p->pos, fv2_scale(sdn, T_STOP_SPOT)), b->pos), T_TRAP_GAIN);
+            fv2 nv = fv2_add(p->vel, fv2_clamp_len(rel, T_TRAP_MAX_REL));
+            if (fv2_len(fv2_sub(nv, b->vel)) > FX(0.6)) {          /* a visible touch, not just the sole riding it */
+                b->last_touch = (int8_t)i;
+                s->events |= WP_EV_TOUCH;
+            }
+            b->vel = nv;
             b->spin = 0;
-            p->touch_cooldown = 4;
+            if (b->vz > 0) b->vz = 0;
             return;
         }
-        if (dist > T_TOUCH_REACH) return;                  /* must actually reach the ball with a foot */
         fv2 mdir = sdir;
         int wrong_way = fv2_dot(fv2_norm(b->vel), mdir) < FX(0.8);
         int sprint = (in->buttons & WP_BTN_SPRINT) != 0;

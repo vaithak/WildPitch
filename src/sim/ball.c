@@ -36,12 +36,15 @@ static void integrate(SimState *s, fx dt) {
     b->z += fx_mul(b->vz, dt);
     if (b->z <= 0 && airborne) {
         b->z = 0;
-        if (b->vz < -T_BOUNCE_MIN_VZ) {
-            if (b->vz < -FX(1.5)) s->events |= WP_EV_BOUNCE;
-            b->vz = -fx_mul(b->vz, T_BOUNCE_REST);
-            b->vel = fv2_scale(b->vel, T_BOUNCE_KEEP);
-        } else {
-            b->vz = 0;
+        fx vin = -b->vz;                                  /* impact speed */
+        if (vin > FX(1.5)) s->events |= WP_EV_BOUNCE;
+        b->vz = fx_mul(vin, T_BOUNCE_REST) - T_BOUNCE_LIN;
+        if (b->vz < T_BOUNCE_CUT) b->vz = 0;
+        /* impact friction: continuous in vin (no threshold cliff), harder landings lose more, capped (grip) */
+        fx hsp = fv2_len(b->vel);
+        if (hsp > 0) {
+            fx loss = fx_min(fx_mul(fx_mul(T_BOUNCE_MU, FX_ONE + T_BOUNCE_REST), vin), fx_mul(T_BOUNCE_GRIP, hsp));
+            b->vel = fv2_scale(b->vel, fx_div(hsp - loss, hsp));
         }
     }
     if (b->z < 0) b->z = 0;
@@ -110,7 +113,7 @@ static void collide_bodies(SimState *s) {
 }
 
 /* ---- goal line crossing (interpolated), touchline, and the net box behind each goal line ---- */
-static void lines_and_net(SimState *s, fv2 prev, fx prev_z) {
+static void lines_and_net(SimState *s, fv2 prev, fx prev_z, fx dt) {
     WpBall *b = &s->ball;
     fx hl = s->pitch.length / 2, hw = s->pitch.width / 2;
     fx gw2 = s->pitch.goal_width / 2, gh = s->pitch.goal_height, gd = s->pitch.goal_depth, R = T_BALL_R;
@@ -138,7 +141,7 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z) {
         /* net box: hl..hl+gd behind the line, |y| < gw2, z < gh. Soft walls from both sides. */
         int was_in = sg * prev.x > hl && fx_abs(prev.y) < gw2 && prev_z < gh;
         if (was_in) {
-            fx k = FX_ONE - fx_min(fx_mul(T_NET_DRAG, WP_DT / 4), FX_ONE);   /* net drag (per substep, approx.) */
+            fx k = FX_ONE - fx_min(fx_mul(T_NET_DRAG, dt), FX_ONE);          /* net drag, per substep */
             b->vel = fv2_scale(b->vel, k);
             if (x1 > hl + gd - R) { b->pos.x = sg * (hl + gd - R); b->vel.x = -fx_mul(b->vel.x, T_NET_KEEP);
                                     b->vel.y = fx_mul(b->vel.y, FX(0.5)); b->vz = fx_mul(b->vz, FX(0.5)); s->events |= WP_EV_NET; }
@@ -166,6 +169,32 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z) {
     }
 }
 
+/* distance a ground ball launched at v rolls before stopping (mirrors integrate()'s ground branch + substeps) */
+static fx roll_distance(fx v) {
+    fx x = 0;
+    for (int t = 0; t < 1200 && v > 0; t++) {
+        int n = 1 + (int)(fx_mul(v, WP_DT) / T_SUBSTEP_MAX_MOVE);
+        if (n > 12) n = 12;
+        fx dt = WP_DT / n;
+        for (int k = 0; k < n && v > 0; k++) {
+            fx dec = fx_mul(ball_roll_decel(v), dt);
+            v = v > dec ? v - dec : 0;
+            x += fx_mul(v, dt);
+        }
+    }
+    return x;
+}
+
+fx ball_roll_speed_for(fx d) {
+    if (d <= 0) return 0;
+    fx lo = 0, hi = FX(30.0);
+    for (int it = 0; it < 18; it++) {
+        fx mid = (lo + hi) / 2;
+        if (roll_distance(mid) < d) lo = mid; else hi = mid;
+    }
+    return hi;
+}
+
 void ball_step(SimState *s) {
     WpBall *b = &s->ball;
     fx move = fx_mul(ball_speed3(b), WP_DT);
@@ -178,6 +207,6 @@ void ball_step(SimState *s) {
         integrate(s, dt);
         collide_frame(s);
         collide_bodies(s);
-        lines_and_net(s, prev, prev_z);
+        lines_and_net(s, prev, prev_z, dt);
     }
 }

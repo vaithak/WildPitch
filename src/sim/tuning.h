@@ -7,9 +7,13 @@
 /* ---- ball ---- */
 #define T_GRAVITY          FX(9.81)
 #define T_BALL_R           FX(0.11)
-#define T_BOUNCE_REST      FX(0.55)   /* vertical speed kept on a grass bounce */
-#define T_BOUNCE_KEEP      FX(0.85)   /* horizontal speed kept on a bounce */
-#define T_BOUNCE_MIN_VZ    FX(0.6)    /* below this the ball stops bouncing and rolls */
+/* Grass bounce (D-016, impulse model): vz' = REST*vin - LIN (0 below CUT); horizontal speed loses
+ * min(MU*(1+REST)*vin, GRIP*|v|) - friction during contact, capped where the ball would start to roll. */
+#define T_BOUNCE_REST      FX(0.62)   /* normal restitution (FIFA turf 0.55-0.71) -> 2 m drop rebounds ~0.7 m */
+#define T_BOUNCE_LIN       FX(0.06)   /* m/s lost per bounce (kills endless micro-hops) */
+#define T_BOUNCE_CUT       FX(0.5)    /* rebound slower than this -> the ball just rolls (apex 1.3 cm) */
+#define T_BOUNCE_MU        FX(0.45)   /* ball-grass sliding friction during the impact */
+#define T_BOUNCE_GRIP      FX(0.39)   /* max share of horizontal speed one bounce can take (shell: a/(1+a), a=2/3) */
 /* Rolling on grass: decel = ROLL_DECEL + ROLL_LIN*v + AIR_DRAG*v^2. Fast balls bleed speed quickly, slow balls
  * creep to a stop (a constant-only model made a 12 m/s pass roll 55 m / 9 s). 12 m/s pass -> ~18 m, ~5 s. */
 #define T_ROLL_DECEL       FX(0.9)    /* m/s^2 constant part (rolling resistance) */
@@ -55,6 +59,11 @@
 #define T_TOUCH_GAP_SPRINT 20         /* 0.33 s */
 #define T_TOUCH_REACH      FX(1.0)    /* a dribble touch needs the ball within foot reach */
 #define T_TOUCH_MIN_GAP    4          /* fastest re-touch when changing direction (ticks) */
+#define T_STOP_SPOT        FX(0.4)    /* releasing the stick: the ball is trapped this far out from the player */
+#define T_TRAP_GAIN        FX(8.0)    /* 1/s: how firmly the sole steers the ball to that spot */
+#define T_TRAP_MAX_REL     FX(2.5)    /* m/s: max speed the sole moves the ball relative to the player */
+#define T_GATHER_MAX_REL   FX(6.0)    /* kick wind-up: max speed the foot can drag the ball into position (m/s) */
+#define T_GATHER_MAX_DEG   75         /* contact point: at most this far round the body from where the ball is */
 #define T_BODY_HIT_COOLDOWN 12        /* after a ball smacks into you, you can't control it for this long */
 
 /* ---- kicks ---- */
