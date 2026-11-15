@@ -4,17 +4,29 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 1952  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 2040  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
-/* 7-a-side (CP0.3a, owner request): bigger pitch and goals, keeper + 2-3-1 */
+/* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
+ * 6 x 2.1 m goals (close to the 9-a-side standard) */
 WpMatchConfig sim_config_7v7(void) {
     WpMatchConfig c = sim_default_config();
     c.n_per_side = 7;
-    c.pitch.length = FX(55.0);
-    c.pitch.width = FX(35.0);
+    c.pitch.length = FX(80.0);
+    c.pitch.width = FX(52.0);
+    c.pitch.goal_width = FX(6.0);
+    c.pitch.goal_height = FX(2.1);
+    c.pitch.goal_depth = FX(1.5);
+    return c;
+}
+
+/* the game's 5-a-side: 60 x 39 m (1.54), 5 x 2 m goals. sim_default_config() keeps the 40 x 25 m regression format. */
+WpMatchConfig sim_config_5v5(void) {
+    WpMatchConfig c = sim_default_config();
+    c.pitch.length = FX(60.0);
+    c.pitch.width = FX(39.0);
     c.pitch.goal_width = FX(5.0);
     c.pitch.goal_height = FX(2.0);
-    c.pitch.goal_depth = FX(1.5);
+    c.pitch.goal_depth = FX(1.3);
     return c;
 }
 
@@ -74,6 +86,7 @@ void match_place_kickoff(SimState *s) {
     s->pass_from = -1;
     s->restart_kind = 0;
     s->restart_taker = -1;
+    team_plan_reset(s);
     memset(&s->ball, 0, sizeof s->ball);
     s->ball.owner = -1;
     s->ball.last_touch = -1;
@@ -141,7 +154,14 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, s->n_per_side); fnv_i(&f, s->phase); fnv_i(&f, s->phase_timer);
     fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->ai_level[0]); fnv_i(&f, s->ai_level[1]);
     fnv_i(&f, s->restart_kind); fnv_i(&f, s->restart_team); fnv_i(&f, s->restart_taker); fnv_i(&f, s->restart_ticks);
-    fnv_i(&f, s->restart_spot.x); fnv_i(&f, s->restart_spot.y); fnv_i(&f, s->events);
+    fnv_i(&f, s->restart_spot.x); fnv_i(&f, s->restart_spot.y);
+    for (int t = 0; t < 2; t++) {
+        const WpTeamPlan *pl = &s->plan[t];
+        fnv_i(&f, pl->focus.x); fnv_i(&f, pl->focus.y); fnv_i(&f, pl->poss_fade); fnv_i(&f, pl->trans_ticks);
+        fnv_i(&f, pl->last_poss); fnv_i(&f, pl->winner); fnv_i(&f, pl->cover); fnv_i(&f, pl->near_sup);
+        fnv_i(&f, pl->runner); fnv_i(&f, pl->sup_timer);
+        for (int k = 0; k < WP_MAX_PER_SIDE; k++) { fnv_i(&f, pl->role[k]); fnv_i(&f, pl->mark[k]); }
+    } fnv_i(&f, s->events);
     for (int k = 0; k < WP_MAX_SEATS; k++) {
         fnv_i(&f, s->seat_player[k]); fnv_i(&f, s->prev_buttons[k]); fnv_i(&f, s->switch_cool[k]);
     }

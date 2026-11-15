@@ -653,6 +653,7 @@ void players_step(SimState *s, const WpInput *in) {
      * the legs only - aim and buttons always come from the human's real stick) */
     WpSeatInput pin[WP_MAX_PLAYERS], mv[WP_MAX_PLAYERS];
     seats_update(s, in);                                  /* switching first: this tick's inputs go to the new player */
+    team_plan_update(s);                                  /* the team layer (D-030), before anyone decides */
     for (int i = 0; i < np; i++) {
         int seat = seat_of(s, i);
         if (seat >= 0) {

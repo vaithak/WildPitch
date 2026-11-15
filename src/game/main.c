@@ -311,7 +311,7 @@ int main(int argc, char **argv) {
     bool vsync = SDL_GetRenderVSync(g.ren, &vs) && vs != 0;
 
     /* the match format: 7-a-side by default (owner, CP0.3a); harness modes keep the 5v5 their scripts were made for */
-    WpMatchConfig cfg = (five || autoplay || demo || gallery) ? sim_default_config() : sim_config_7v7();
+    WpMatchConfig cfg = (autoplay || demo || gallery) ? sim_default_config() : five ? sim_config_5v5() : sim_config_7v7();
     g.menu.difficulty = (shot_path || autoplay || demo || gallery) ? WP_AI_NORMAL : wp_settings_load_difficulty();
     cfg.ai_level[1] = (uint8_t)g.menu.difficulty;          /* the opposition; our AI team-mates stay NORMAL */
     sim_init(&g.cur, &cfg);

@@ -74,7 +74,7 @@ int main(void) {
                               (int8_t)(d.y > FX(0.3) ? 127 : d.y < -FX(0.3) ? -127 : 0),
                               (uint16_t)((t % 50) < 2 ? WP_BTN_PASS : 0)};
             step1(in);
-            if (s.phase != WP_PHASE_PLAY) continue;
+            if (s.phase != WP_PHASE_PLAY || (s.events & WP_EV_RESET)) continue;   /* teleports separate next tick */
             for (int i = 0; i < 10; i++) {
                 /* skip: the owner, the kicker's own foot just after a kick (immune), and a player about to take a
                  * loose ball he may control (the body steps aside for control - he takes it next tick) */
@@ -84,6 +84,7 @@ int main(void) {
                     if (db < min_ball) min_ball = db;
                 }
                 for (int j = i + 1; j < 10; j++) {
+                    if (s.players[i].z > FX(0.5) || s.players[j].z > FX(0.5)) continue;   /* airborne: bodies don't block */
                     fx g = fv2_len(fv2_sub(s.players[i].pos, s.players[j].pos));
                     if (g < min_gap) min_gap = g;
                 }
@@ -99,7 +100,7 @@ int main(void) {
      *    into the corner beats him; a soft one at him is caught */
     {
         static const struct { fx speed, aim_y; int want_goal; const char *name; } cases[3] = {
-            {FX(18.0), FX(1.6), 0, "medium, 1.6 m to his side"}, {FX(30.0), FX(2.1), 1, "hard, into the corner"},
+            {FX(18.0), FX(1.6), 0, "medium, 1.6 m to his side"}, {FX(30.0), FX(2.6), 1, "hard, into the corner"},
             {FX(12.0), FX(0.3), 0, "soft, at him"}};
         for (int c = 0; c < 3; c++) {
             WpMatchConfig c7 = sim_config_7v7();
@@ -109,10 +110,10 @@ int main(void) {
             for (int j = 0; j < 14; j++) if (j != kp) s.players[j].pos = fv2_make(FX_INT(j * 2 - 14), FX(40.0));
             for (int t = 0; t < 30; t++) {                               /* let him settle on his line */
                 for (int j = 0; j < 14; j++) if (j != kp) s.players[j].pos = fv2_make(FX_INT(j * 2 - 14), FX(40.0));
-                s.ball.pos = fv2_make(FX(16.5), 0); s.ball.vel = fv2_make(0, 0); s.ball.owner = -1;
+                s.ball.pos = fv2_make((s.pitch.length / 2) - FX(11.0), 0); s.ball.vel = fv2_make(0, 0); s.ball.owner = -1;
                 step1(NOIN);
             }
-            fv2 from = fv2_make(FX(16.5), 0), to = fv2_make(FX(27.6), cases[c].aim_y);
+            fv2 from = fv2_make((s.pitch.length / 2) - FX(11.0), 0), to = fv2_make((s.pitch.length / 2) + FX(0.1), cases[c].aim_y);
             s.ball.pos = from; s.ball.z = FX(0.2); s.ball.vz = FX(1.0); s.ball.owner = -1; s.ball.last_touch = 3;
             s.ball.vel = fv2_scale(fv2_norm(fv2_sub(to, from)), cases[c].speed);
             int dived = 0; uint16_t ev = 0;
@@ -151,10 +152,10 @@ int main(void) {
         s.seat_player[0] = -1;
         int kp = s.n_per_side;                                       /* their keeper, at +x */
         int striker = s.n_per_side - 1;                              /* ours */
-        s.players[kp].pos = fv2_make(FX(25.5), 0);
-        s.players[striker].pos = fv2_make(FX(24.0), FX(5.0));        /* near him (after the catch), not first to it */
+        s.players[kp].pos = fv2_make((s.pitch.length / 2) - FX(2.0), 0);
+        s.players[striker].pos = fv2_make((s.pitch.length / 2) - FX(3.5), FX(5.0));        /* near him (after the catch), not first to it */
         for (int j = 0; j < 2 * s.n_per_side; j++) if (j != kp && j != striker) s.players[j].pos = fv2_make(-FX(20.0) + FX_INT(j), FX(15.0));
-        s.ball.pos = fv2_make(FX(18.0), 0); s.ball.owner = -1; s.ball.vel = fv2_make(FX(10.0), 0);
+        s.ball.pos = fv2_make((s.pitch.length / 2) - FX(9.5), 0); s.ball.owner = -1; s.ball.vel = fv2_make(FX(10.0), 0);
         int held_t = -1, released = -1; uint16_t ev = 0;
         for (int t = 0; t < 240; t++) {
             ev = step1(NOIN);
@@ -184,7 +185,7 @@ int main(void) {
          *    line, blue held 4 m off; S throws it to a team-mate */
         sim_init(&s, &c7);
         int blue = 2 * s.n_per_side - 2;
-        s.ball.pos = fv2_make(FX(3.0), FX(16.0)); s.ball.vel = fv2_make(0, FX(4.0)); s.ball.owner = -1;
+        s.ball.pos = fv2_make(FX(3.0), (s.pitch.width / 2) - FX(1.5)); s.ball.vel = fv2_make(0, FX(4.0)); s.ball.owner = -1;
         s.ball.last_touch = (int8_t)blue;
         for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
         int taker = s.restart_taker;
@@ -201,16 +202,26 @@ int main(void) {
         CHECK(s.restart_kind == WP_RS_THROW && s.restart_team == 0 && taker >= 0 && s.players[taker].team == 0);
         CHECK(s.seat_player[0] == taker && s.ball.held && s.ball.owner == taker);
         CHECKF(closest_blue >= T_RESTART_DIST - FX(0.1), "blue %.1f m from the throw", tod(closest_blue));
-        step1((WpSeatInput){0, -127, WP_BTN_PASS});
+        {   /* aim the throw at the nearest team-mate (8-way keys, like a human) */
+            int best = -1; fx bd = 0;
+            for (int j = 1; j < s.n_per_side; j++) {
+                if (j == taker) continue;
+                fx d = fv2_len(fv2_sub(s.players[j].pos, s.ball.pos));
+                if (best < 0 || d < bd) { best = j; bd = d; }
+            }
+            fv2 d = fv2_norm(fv2_sub(s.players[best].pos, s.ball.pos));
+            int8_t sx = (int8_t)(d.x > FX(0.38) ? 127 : d.x < -FX(0.38) ? -127 : 0), sy = (int8_t)(d.y > FX(0.38) ? 127 : d.y < -FX(0.38) ? -127 : 0);
+            step1((WpSeatInput){sx, sy, WP_BTN_PASS});
+        }
         int got = -1;
         for (int t = 0; t < 180 && got < 0; t++) { step1(NOIN); if (s.ball.owner >= 0 && s.ball.owner != taker) got = s.ball.owner; }
         printf("  thrown to %d (team %d)\n", got, got >= 0 ? s.players[got].team : -1);
         CHECKF(got >= 0 && s.players[got].team == 0, "throw-in didn't reach a team-mate (%d)", got);
         /* b) we put it behind OUR goal line -> THEIR corner, their AI crosses it */
         sim_init(&s, &c7);
-        s.ball.pos = fv2_make(-FX(26.5), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1; s.ball.last_touch = 2;
+        s.ball.pos = fv2_make(-((s.pitch.length / 2) - FX(1.0)), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1; s.ball.last_touch = 2;
         int crossed = 0;
-        for (int t = 0; t < 300 && !crossed; t++) {
+        for (int t = 0; t < 600 && !crossed; t++) {
             uint16_t ev = step1(NOIN);
             if ((ev & WP_EV_KICK) && s.ball.last_touch >= s.n_per_side && s.players[s.ball.last_touch].kick.kind == WP_KICK_LOB) crossed = 1;
         }
@@ -218,7 +229,7 @@ int main(void) {
         CHECK(crossed);
         /* c) blue puts it behind our goal line -> OUR goal kick by our keeper */
         sim_init(&s, &c7);
-        s.ball.pos = fv2_make(-FX(26.5), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1;
+        s.ball.pos = fv2_make(-((s.pitch.length / 2) - FX(1.0)), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1;
         s.ball.last_touch = (int8_t)blue;
         for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
         printf("goal kick: kind %d team %d taker %d (keeper %d)\n", s.restart_kind, s.restart_team, s.restart_taker,

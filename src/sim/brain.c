@@ -18,7 +18,7 @@
 #include "sim/sim_internal.h"
 
 enum { AI_NONE = 0, AI_SHAPE, AI_SUPPORT, AI_RUN, AI_CHASE, AI_PRESS, AI_COVER, AI_MARK, AI_RECEIVE,
-       AI_DRIBBLE, AI_PASS, AI_THROUGH, AI_SHOOT, AI_KEEP, AI_CROSS, AI_HEAD, AI_N };
+       AI_DRIBBLE, AI_PASS, AI_THROUGH, AI_SHOOT, AI_KEEP, AI_CROSS, AI_HEAD, AI_REST, AI_N };
 
 /* candidate features (fx). F_BIAS is always 1. */
 enum { F_FWD = 0,    /* metres gained toward the opponent goal (target vs ball) */
@@ -26,28 +26,31 @@ enum { F_FWD = 0,    /* metres gained toward the opponent goal (target vs ball) 
        F_LANE,       /* clearance of the ball's lane to the target, m (capped 4) */
        F_COST,       /* metres I must travel / pass length */
        F_THREAT,     /* 0..1: shot quality, or danger of the opponent I'd mark */
-       F_FIRST,      /* 0..1: I'm the team's first (1) / second (0.5) man to the ball */
+       F_ROLE,       /* 1: this is the job the team plan gave me (D-030) */
        F_CROWD,      /* team-mates already heading within 4 m of the target */
+       F_HOME,       /* metres from my formation spot x leash (0 when it's my plan role) */
        F_BIAS, NF };
 
-/* instinct weights per action (x feature). Units: utility points per feature unit. */
+/* instinct weights per action (x feature). Units: utility points per feature unit. The anchor (SHAPE) is now
+ * competitive and every off-ball target pays F_HOME, so players hold a shape and refine around it (D-030). */
 static const fx W[AI_N][NF] = {
-    /*            FWD        OPEN       LANE       COST        THREAT     FIRST      CROWD       BIAS */
-    [AI_SHAPE]   = {0,        0,         0,         -FX(0.15),  0,         0,         -FX(1.0),   FX(1.0)},
-    [AI_SUPPORT] = {FX(0.10), FX(0.35),  FX(0.45),  -FX(0.20),  0,         0,         -FX(1.5),   FX(0.6)},
-    [AI_RUN]     = {FX(0.15), FX(0.25),  FX(0.30),  -FX(0.10),  FX(1.0),   0,         -FX(1.5),   FX(0.2)},
-    [AI_CHASE]   = {0,        0,         0,         -FX(0.10),  0,         FX(4.0),   0,          FX(0.5)},
-    [AI_PRESS]   = {0,        0,         0,         -FX(0.10),  0,         FX(4.0),   0,          FX(0.5)},
-    [AI_COVER]   = {0,        0,         0,         -FX(0.10),  0,         FX(2.4),   -FX(1.0),   FX(0.5)},
-    [AI_MARK]    = {0,        0,         0,         -FX(0.12),  FX(2.0),   0,         -FX(2.0),   FX(0.4)},
-    [AI_RECEIVE] = {0,        0,         0,         0,          0,         0,         0,          FX(20.0)},
-    [AI_DRIBBLE] = {FX(0.30), FX(0.40),  FX(0.30),  0,          0,         0,         0,          -FX(0.6)},
-    [AI_PASS]    = {FX(0.16), FX(0.30),  FX(0.80),  -FX(0.06),  0,         0,         0,          -FX(0.4)},
-    [AI_THROUGH] = {FX(0.20), FX(0.30),  FX(0.80),  -FX(0.06),  FX(1.0),   0,         0,          -FX(1.2)},
-    [AI_SHOOT]   = {0,        0,         FX(0.30),  0,          FX(14.0),  0,         0,          -FX(1.0)},
-    [AI_KEEP]    = {0,        0,         0,         0,          0,         0,         0,          FX(1.0)},
-    [AI_CROSS]   = {FX(0.10), FX(0.30),  0,         -FX(0.04),  FX(6.0),   0,         0,          -FX(1.2)},
-    [AI_HEAD]    = {0,        0,         0,         0,          0,         0,         0,          FX(1.0)},
+    /*            FWD        OPEN       LANE       COST        THREAT     ROLE       CROWD       HOME        BIAS */
+    [AI_SHAPE]   = {0,        0,         0,         -FX(0.05),  0,         0,         -FX(1.0),   0,          FX(1.5)},
+    [AI_SUPPORT] = {FX(0.10), FX(0.35),  FX(0.45),  -FX(0.20),  0,         FX(2.5),   -FX(1.5),   -FX(0.25),  FX(0.6)},
+    [AI_RUN]     = {FX(0.15), FX(0.25),  FX(0.30),  -FX(0.10),  FX(1.0),   FX(1.0),   -FX(1.5),   -FX(0.15),  FX(0.2)},
+    [AI_CHASE]   = {0,        0,         0,         -FX(0.10),  0,         FX(4.0),   0,          0,          FX(0.5)},
+    [AI_PRESS]   = {0,        0,         0,         -FX(0.10),  0,         FX(4.0),   0,          0,          FX(0.5)},
+    [AI_COVER]   = {0,        0,         0,         -FX(0.10),  0,         FX(2.4),   -FX(1.0),   0,          FX(0.5)},
+    [AI_MARK]    = {0,        0,         0,         -FX(0.12),  FX(2.0),   FX(2.0),   -FX(2.0),   -FX(0.25),  FX(0.4)},
+    [AI_RECEIVE] = {0,        0,         0,         0,          0,         0,         0,          0,          FX(20.0)},
+    [AI_DRIBBLE] = {FX(0.30), FX(0.40),  FX(0.30),  0,          0,         0,         0,          0,          -FX(0.6)},
+    [AI_PASS]    = {FX(0.16), FX(0.30),  FX(0.80),  -FX(0.06),  0,         0,         0,          0,          -FX(0.4)},
+    [AI_THROUGH] = {FX(0.20), FX(0.30),  FX(0.80),  -FX(0.06),  FX(1.0),   0,         0,          0,          -FX(1.2)},
+    [AI_SHOOT]   = {0,        0,         FX(0.30),  0,          FX(24.0),  0,         0,          0,          -FX(1.0)},
+    [AI_KEEP]    = {0,        0,         0,         0,          0,         0,         0,          0,          FX(1.0)},
+    [AI_CROSS]   = {FX(0.10), FX(0.30),  0,         -FX(0.04),  FX(6.0),   0,         0,          0,          -FX(1.2)},
+    [AI_HEAD]    = {0,        0,         0,         0,          0,         0,         0,          0,          FX(1.0)},
+    [AI_REST]    = {0,        0,         0,         -FX(0.05),  0,         FX(2.0),   0,          0,          FX(1.5)},
 };
 
 typedef struct { uint8_t act; int8_t mate; fv2 at; fx f[NF]; fx score; } Cand;
@@ -107,42 +110,24 @@ static Cand *add(Ctx *x, uint8_t act, int8_t mate, fv2 at) {
     return c;
 }
 
-/* the formation spot (team 0 orientation) shifted with the ball; in possession pushed up */
+/* my formation spot (team plan + formation table, D-030) */
 static fv2 home_spot(const Ctx *x, int attacking) {
-    const SimState *s = x->s;
-    int k = x->i % s->n_per_side;
-    fx fxl, fyl;
-    formation_frac(s->n_per_side, k, &fxl, &fyl);
-    fx bxa = s->ball.pos.x * x->sg;                       /* ball x in attack terms */
-    fx hx = fx_mul(fxl, x->hl) + fx_mul(bxa, FX(0.55)) + (attacking ? FX(4.0) : -FX(1.0));
-    fx hy = fx_mul(fyl, x->hw) + fx_mul(s->ball.pos.y * x->sg, FX(0.3));
-    return in_pitch(x, fv2_make(hx * x->sg, hy * x->sg), FX(1.5));
+    (void)attacking;
+    return shape_spot(x->s, x->team, x->i % x->s->n_per_side);
 }
+static fx leash(const Ctx *x) { return FX(1.5) - slot_mindset(x->s, x->i % x->s->n_per_side); }
 
 /* 0..1 shot quality from point `at`: distance, angle to the goal mouth, a clear lane, keeper not in the way */
 static fx shot_quality(const Ctx *x, fv2 at) {
     fx d = dist(at, x->opp_goal);
-    if (d > FX(18.0)) return 0;
-    fx q = FX_ONE - fx_div(d, FX(18.0));
+    if (d > T_AI_SHOT_RANGE) return 0;
+    fx q = FX_ONE - fx_div(d, T_AI_SHOT_RANGE);
     fx ay = fx_abs(at.y), wide = fx_max(ay - x->s->pitch.goal_width, 0);
     q = fx_mul(q, FX_ONE - clampf(fx_div(wide, FX(6.0)), 0, FX_ONE));
     fx lane = fx_min(pass_lane_clear(x->s, x->team, at, x->opp_goal), FX(2.0));
     return fx_mul(q, FX(0.4) + fx_mul(FX(0.3), lane));
 }
 
-/* how many team-mates (incl. the human) reach the ball before me: 0 = I'm first */
-static int ball_rank(const Ctx *x) {
-    const SimState *s = x->s;
-    fv2 b = fv2_add(s->ball.pos, fv2_scale(s->ball.vel, FX(0.4)));
-    fx mine = dist(s->players[x->i].pos, b);
-    int r = 0;
-    for (int j = x->team * s->n_per_side; j < (x->team + 1) * s->n_per_side; j++) {
-        if (j == x->i || s->players[j].role == WP_ROLE_KEEPER) continue;
-        fx d = dist(s->players[j].pos, b);
-        if (d < mine || (d == mine && j < x->i)) r++;
-    }
-    return r;
-}
 
 static int possession(const SimState *s) {          /* team in possession, -1 loose/none */
     const WpBall *b = &s->ball;
@@ -151,12 +136,20 @@ static int possession(const SimState *s) {          /* team in possession, -1 lo
     return -1;
 }
 
-/* ---------------- candidates: off the ball ---------------- */
+/* ---------------- candidates: off the ball (D-030: the team plan gates the ball jobs) ---------------- */
+static void set_home(Ctx *x, Cand *c, fv2 spot) {
+    if (c && c->f[F_ROLE] == 0) c->f[F_HOME] = fx_mul(dist(c->at, spot), leash(x));
+}
+
 static void gen_off_ball(Ctx *x) {
     const SimState *s = x->s;
     const WpPlayer *p = &s->players[x->i];
     const WpBall *b = &s->ball;
-    int poss = possession(s), attacking = poss == x->team, rank = ball_rank(x);
+    const WpTeamPlan *pl = &s->plan[x->team];
+    int k = x->i % s->n_per_side;
+    int poss = possession(s), attacking = poss == x->team;
+    int role = pl->role[k];
+    fv2 spot = home_spot(x, attacking);
     Cand *c;
     if (s->pass_target == x->i) {                         /* a pass to me: run through the planned meet */
         Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
@@ -164,78 +157,127 @@ static void gen_off_ball(Ctx *x) {
         add(x, AI_RECEIVE, -1, at);
         return;
     }
-    if ((c = add(x, AI_SHAPE, -1, home_spot(x, attacking)))) {
+    if ((c = add(x, AI_SHAPE, -1, spot))) {
         c->f[F_COST] = dist(c->at, p->pos);
         c->f[F_CROWD] = crowd(x, c->at);
     }
+    /* the one escape from the plan: a ball right at my feet (~0.5 s away) is mine to take */
+    fx dball = dist(b->pos, p->pos);
+    int escape = b->owner < 0 && dball < FX(2.5);
     if (!attacking) {
         fv2 goal_dir = fv2_norm(fv2_sub(x->own_goal, b->pos));
-        if (b->owner < 0) {                               /* loose: go and get it */
-            Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
-            if ((c = add(x, AI_CHASE, -1, m.pos))) {
-                c->f[F_COST] = dist(m.pos, p->pos);
-                c->f[F_FIRST] = rank == 0 ? FX_ONE : 0;
+        int counterpress = pl->trans_ticks < T_PLAN_COUNTERPRESS && pl->last_poss == 0;
+        if (b->owner < 0) {                               /* loose: the winner goes; the cover drops goal-side */
+            if (role == WP_PR_WIN || escape) {
+                Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
+                if ((c = add(x, AI_CHASE, -1, m.pos))) {
+                    c->f[F_COST] = dist(m.pos, p->pos);
+                    c->f[F_ROLE] = role == WP_PR_WIN ? FX_ONE : 0;
+                }
             }
-        } else {                                          /* they have it: press, cover, mark */
-            if (!b->held && !s->restart_kind && (c = add(x, AI_PRESS, -1, fv2_add(b->pos, fv2_scale(goal_dir, FX(0.9)))))) {
-                c->f[F_COST] = dist(c->at, p->pos);
-                c->f[F_FIRST] = rank == 0 ? FX_ONE : 0;
+        } else if (!b->held && !s->restart_kind) {        /* they have it: winner presses (and the cover, briefly) */
+            if (role == WP_PR_WIN || (role == WP_PR_COVER && counterpress) || dball < FX(2.0)) {
+                if ((c = add(x, AI_PRESS, -1, fv2_add(b->pos, fv2_scale(goal_dir, FX(0.9)))))) {
+                    c->f[F_COST] = dist(c->at, p->pos);
+                    c->f[F_ROLE] = role == WP_PR_WIN || role == WP_PR_COVER ? FX_ONE : 0;
+                }
             }
-            if ((c = add(x, AI_COVER, -1, in_pitch(x, fv2_add(b->pos, fv2_scale(goal_dir, FX(5.0))), FX(1.0))))) {
+        }
+        if (role == WP_PR_COVER) {
+            fv2 cp = fv2_add(b->pos, fv2_scale(goal_dir, FX(5.0)));
+            if ((c = add(x, AI_COVER, -1, in_pitch(x, cp, FX(1.0))))) {
                 c->f[F_COST] = dist(c->at, p->pos);
-                c->f[F_FIRST] = rank == 1 ? FX_ONE : 0;
+                c->f[F_ROLE] = FX_ONE;
                 c->f[F_CROWD] = crowd(x, c->at);
             }
         }
         int o0 = (1 - x->team) * s->n_per_side;
-        for (int j = o0; j < o0 + s->n_per_side; j++) {   /* mark the dangerous ones */
+        for (int j = o0; j < o0 + s->n_per_side; j++) {   /* marking: my assigned man, or someone in my zone */
             const WpPlayer *o = &s->players[j];
             if (o->role == WP_ROLE_KEEPER || j == b->owner) continue;
+            int mine = pl->mark[k] == j;
+            if (!mine && dist(o->pos, spot) > fx_mul(FX(6.0), fx_div(s->pitch.length, FX(55.0)))) continue;
             fv2 at = fv2_add(o->pos, fv2_scale(fv2_norm(fv2_sub(x->own_goal, o->pos)), FX(1.5)));
             if (!(c = add(x, AI_MARK, (int8_t)j, at))) break;
             c->f[F_COST] = dist(at, p->pos);
             c->f[F_THREAT] = FX_ONE - clampf(fx_div(dist(o->pos, x->own_goal), FX(30.0)), 0, FX_ONE);
-            fx others = 0;                                /* someone already marking him? */
-            for (int k = x->team * s->n_per_side; k < (x->team + 1) * s->n_per_side; k++)
-                if (k != x->i && s->players[k].ai_act == AI_MARK && s->players[k].ai_mate == j) others += FX(2.0);
+            c->f[F_ROLE] = mine ? FX_ONE : 0;
+            fx others = 0;
+            for (int q = x->team * s->n_per_side; q < (x->team + 1) * s->n_per_side; q++)
+                if (q != x->i && s->players[q].ai_act == AI_MARK && s->players[q].ai_mate == j) others += FX(2.0);
             c->f[F_CROWD] = others;
+            set_home(x, c, spot);
         }
         return;
     }
+    if (escape && (c = add(x, AI_CHASE, -1, b->pos))) c->f[F_COST] = dball;
     /* our corner: attack the box - near post, penalty spot, far post (the cross is aimed at whoever's there) */
     if (s->restart_kind == WP_RS_CORNER && s->restart_team == x->team && s->restart_taker != x->i) {
         fx gx = x->opp_goal.x, side = s->restart_spot.y > 0 ? FX_ONE : -FX_ONE;
-        static const fx spot[3][2] = {{FX(3.5), FX(1.6)}, {FX(6.0), FX(0.0)}, {FX(4.5), -FX(2.2)}};
-        for (int k = 0; k < 3; k++) {
-            fv2 at = fv2_make(gx - fx_mul(FX_INT(x->sg), spot[k][0]), fx_mul(side, spot[k][1]));
+        static const fx bspot[3][2] = {{FX(3.5), FX(1.6)}, {FX(6.0), FX(0.0)}, {FX(4.5), -FX(2.2)}};
+        for (int q = 0; q < 3; q++) {
+            fv2 at = fv2_make(gx - fx_mul(FX_INT(x->sg), bspot[q][0]), fx_mul(side, bspot[q][1]));
             if ((c = add(x, AI_RUN, -1, at))) {
                 c->f[F_FWD] = FX(6.0);
                 c->f[F_THREAT] = FX_ONE;
-                c->f[F_COST] = dist(at, p->pos);
+                c->f[F_ROLE] = FX_ONE;                   /* a set-piece job: no distance cost (big pitches) */
                 c->f[F_CROWD] = crowd(x, at);
             }
         }
     }
-    /* attacking: offer an open option; forwards also run beyond the last defender */
-    static const int16_t ang[7] = {0, 30, -30, 60, -60, 110, -110};
-    static const fx rad[2] = {FX(7.0), FX(12.0)};
-    fv2 fwd = fv2_make(FX_INT(x->sg), 0);
-    for (int a = 0; a < 7; a++)
-        for (int r = 0; r < 2; r++) {
-            fv2 at = in_pitch(x, fv2_add(b->pos, fv2_scale(fv2_from_angle((wp_angle)(fx_atan2(fwd.y, fwd.x) +
-                              DEG_TO_ANG(ang[a])), FX_ONE), rad[r])), FX(1.5));
+    /* rest defence: stay behind the ball, goal-side of their most advanced counter-attacker */
+    if (role == WP_PR_REST) {
+        fx sgx = FX_INT(x->sg);
+        fx deep = fx_min(fx_mul(spot.x, sgx), fx_mul(b->pos.x, sgx) - FX(8.0));
+        fv2 at = fv2_make(fx_mul(deep, sgx), spot.y);
+        if ((c = add(x, AI_REST, -1, in_pitch(x, at, FX(1.5))))) {
+            c->f[F_COST] = dist(c->at, p->pos);
+            c->f[F_ROLE] = FX_ONE;
+        }
+        return;                                           /* a rest defender doesn't wander off to support */
+    }
+    /* support: refine around MY spot (3 m / 6 m, 4 directions), plus the touchline for wide slots; the plan's
+     * near-support also gets points on a 9 m ring around the ball */
+    for (int r = 0; r < 2; r++)
+        for (int a = 0; a < 4; a++) {
+            fv2 at = in_pitch(x, fv2_add(spot, fv2_from_angle((wp_angle)(a * 16384), r ? FX(6.0) : FX(3.0))), FX(1.5));
             if (!(c = add(x, AI_SUPPORT, -1, at))) break;
             c->f[F_FWD] = (at.x - b->pos.x) * x->sg;
             c->f[F_OPEN] = nearest_opp(x, at);
             c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, at), FX(4.0));
-            c->f[F_COST] = fx_max(dist(at, p->pos), dist(at, home_spot(x, 1)) / 2);
+            c->f[F_COST] = dist(at, p->pos);
+            c->f[F_CROWD] = crowd(x, at);
+            set_home(x, c, spot);
+        }
+    if (slot_mindset(s, k) == FX(0.5) && fx_abs(spot.y) > fx_mul(x->hw, FX(0.3))) {
+        fv2 at = in_pitch(x, fv2_make(spot.x, spot.y > 0 ? x->hw - FX(1.5) : -(x->hw - FX(1.5))), FX(1.0));
+        if ((c = add(x, AI_SUPPORT, -1, at))) {
+            c->f[F_FWD] = (at.x - b->pos.x) * x->sg;
+            c->f[F_OPEN] = nearest_opp(x, at);
+            c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, at), FX(4.0));
+            c->f[F_COST] = dist(at, p->pos);
+            c->f[F_CROWD] = crowd(x, at);
+            set_home(x, c, spot);
+        }
+    }
+    if (role == WP_PR_SUPPORT) {
+        static const int16_t ang[3] = {0, 45, -45};
+        fv2 fwd = fv2_make(FX_INT(x->sg), 0);
+        for (int a = 0; a < 3; a++) {
+            fv2 at = in_pitch(x, fv2_add(b->pos, fv2_scale(fv2_from_angle((wp_angle)(fx_atan2(fwd.y, fwd.x) +
+                              DEG_TO_ANG(ang[a])), FX_ONE), fx_mul(FX(9.0), fx_div(s->pitch.length, FX(55.0))))), FX(1.5));
+            if (!(c = add(x, AI_SUPPORT, -1, at))) break;
+            c->f[F_FWD] = (at.x - b->pos.x) * x->sg;
+            c->f[F_OPEN] = nearest_opp(x, at);
+            c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, at), FX(4.0));
+            c->f[F_COST] = dist(at, p->pos);
+            c->f[F_ROLE] = FX_ONE;
             c->f[F_CROWD] = crowd(x, at);
         }
-    fx fxk, fyk;
-    formation_frac(s->n_per_side, x->i % s->n_per_side, &fxk, &fyk);
-    (void)fyk;
-    if (fxk > -FX(0.40)) {                                /* midfielders / striker: run in behind */
-        fx last = -x->hl;                                 /* deepest outfield opponent, attack terms */
+    }
+    /* runs in behind: the striker always may; one designated runner from midfield */
+    if (slot_mindset(s, k) >= FX_ONE || role == WP_PR_RUN) {
+        fx last = -x->hl;
         int o0 = (1 - x->team) * s->n_per_side;
         for (int j = o0; j < o0 + s->n_per_side; j++)
             if (s->players[j].role != WP_ROLE_KEEPER && s->players[j].pos.x * x->sg > last) last = s->players[j].pos.x * x->sg;
@@ -247,6 +289,7 @@ static void gen_off_ball(Ctx *x) {
             c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, at), FX(4.0));
             c->f[F_COST] = dist(at, p->pos);
             c->f[F_THREAT] = shot_quality(x, at);
+            c->f[F_ROLE] = FX_ONE;
             c->f[F_CROWD] = crowd(x, at);
         }
     }
@@ -297,12 +340,12 @@ static void gen_on_ball(Ctx *x) {
             const WpPlayer *q2 = &s->players[j];
             if (j == x->i || q2->role == WP_ROLE_KEEPER) continue;
             fx dq = dist(q2->pos, x->opp_goal);
-            if (dq > FX(13.0) || dist(q2->pos, b->pos) < FX(6.0)) continue;
+            if (dq > T_AI_CROSS_ZONE || dist(q2->pos, b->pos) < FX(6.0)) continue;
             if ((c = add(x, AI_CROSS, (int8_t)j, q2->pos))) {
                 c->f[F_FWD] = (q2->pos.x - b->pos.x) * x->sg;
                 c->f[F_OPEN] = nearest_opp(x, q2->pos);
                 c->f[F_COST] = dist(q2->pos, b->pos);
-                c->f[F_THREAT] = FX_ONE - fx_div(dq, FX(13.0));
+                c->f[F_THREAT] = FX_ONE - fx_div(dq, T_AI_CROSS_ZONE);
             }
         }
     fx q = shot_quality(x, b->pos);
@@ -437,7 +480,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
             if (d < FX(3.0) || d > (throw_in ? FX(16.0) : FX(26.0))) continue;
             fx open = nearest_opp(&x, q->pos), lane = fx_min(pass_lane_clear(s, x.team, b->pos, q->pos), FX(4.0));
             fx sc = open + fx_mul(lane, FX(1.2)) + fx_mul((q->pos.x - b->pos.x) * x.sg, FX(0.15));
-            if (corner) sc = fx_max(FX(13.0) - dist(q->pos, x.opp_goal), 0) * 2 + open;   /* someone in the box */
+            if (corner) sc = fx_max(T_AI_CROSS_ZONE - dist(q->pos, x.opp_goal), 0) * 2 + open;   /* someone in the box */
             if (best < 0 || sc > bs) { best = j; bs = sc; }
         }
         if (best < 0) {                                   /* nobody: the nearest team-mate */
@@ -447,7 +490,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         }
         if (best < 0) return;
         uint8_t kind = throw_in ? WP_KICK_THROW
-                     : corner ? (dist(s->players[best].pos, x.opp_goal) < FX(13.0) ? WP_KICK_LOB : WP_KICK_PASS)
+                     : corner ? (dist(s->players[best].pos, x.opp_goal) < T_AI_CROSS_ZONE ? WP_KICK_LOB : WP_KICK_PASS)
                      : (dist(s->players[best].pos, b->pos) > FX(20.0) ? WP_KICK_LOB : WP_KICK_PASS);
         WpKick k = {0};
         fv2 d = fv2_sub(s->players[best].pos, b->pos);
@@ -504,7 +547,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
      * their box, a clearance near ours, otherwise nod it on to a team-mate. The aim target is ai_goal. */
     int jump;
     if ((decide || s->pass_target == i) && p->action == WP_ACT_NONE && b->owner < 0 && !owner &&
-        ball_rank(&x) == 0 && header_wanted(s, i, &jump)) {
+        (s->plan[x.team].winner == i || dist(b->pos, p->pos) < FX(3.0)) && header_wanted(s, i, &jump)) {
         fx to_goal = dist(p->pos, x.opp_goal);
         int at_goal = to_goal < FX(14.0) && shot_quality(&x, p->pos) > 0;
         header_start(s, i, at_goal, jump);

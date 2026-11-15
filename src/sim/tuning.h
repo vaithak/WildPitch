@@ -35,7 +35,7 @@
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */
 #define T_AI_RESTART_DELAY 40         /* AI takers line it up this long first ... */
-#define T_AI_CORNER_WAIT   180        /* ... and on a corner wait (up to 3 s) for two team-mates in the box */
+#define T_AI_CORNER_WAIT   240        /* ... and on a corner wait (up to 4 s; ai_hold is 8-bit) for two team-mates in the box */
 
 /* ---- players ---- */
 #define T_ACCEL            FX(18.0)
@@ -103,8 +103,8 @@
 #define T_FREE_MARGIN_Y    FX(1.5)    /* ... the goal lines / touchlines */
 #define T_FREE_MIN_ROLL    FX(6.0)    /* ... but rolls at least this far */
 #define T_FREE_MAX_ROLL    FX(18.0)
-#define T_PASS_PENALTY_M   FX(18.0)   /* receivers further than this are scored down ... */
-#define T_PASS_MAX_DIST    FX(26.0)   /* ... and beyond this not picked at all */
+#define T_PASS_PENALTY_M   FX(24.0)   /* receivers further than this are scored down ... (bigger pitches) */
+#define T_PASS_MAX_DIST    FX(32.0)   /* ... and beyond this not picked at all */
 #define T_PASS_RUNNER_MS   FX(2.0)    /* receiver moving away from the passer faster than this = a runner */
 #define T_SPRINT_SPILL     FX(0.12)   /* extra first-touch spill when receiving at a sprint */
 #define T_PASS_TAP_TICKS   12         /* J released within this (200 ms) = tap pass; held longer = through ball */
@@ -142,6 +142,13 @@
 #define T_TACKLE_TICKS     30         /* whole tackle action (recovery included) */
 #define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
 
+/* ---- team plan (team_plan.c, D-030) ---- */
+#define T_PLAN_EVERY       3          /* the plan's heavy part (winner/cover/marks) refreshes every N ticks */
+#define T_PLAN_FOCUS_RATE  FX(0.07)   /* shape follows a smoothed ball (per-tick blend, ~0.25 s) */
+#define T_PLAN_MARK_ZONE   FX(9.0)    /* a marker only takes an opponent within this of his own spot */
+#define T_PLAN_SUPPORT_TICKS 90       /* near-support / runner re-chosen at most every 1.5 s */
+#define T_PLAN_COUNTERPRESS 150       /* after losing it, the cover presses too for 2.5 s */
+
 /* ---- instinct AI (brain.c, D-023) ---- */
 #define T_AI_DECIDE        6          /* each AI player re-decides every this many ticks (staggered) [NORMAL] */
 /* difficulty (per team, WP_AI_EASY / NORMAL / HARD): decision beat, reaction to a struck pass, keeper reaction to a
@@ -153,6 +160,8 @@
 #define T_AI_COMMIT        FX(0.8)    /* utility bonus for sticking with the current action/target */
 #define T_AI_FIRST_TOUCH   10         /* an AI carrier controls the ball this long before passing/shooting */
 #define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
+#define T_AI_SHOT_RANGE    FX(22.0)   /* AI considers shooting within this of goal */
+#define T_AI_CROSS_ZONE    FX(16.0)   /* crosses / corner targets: team-mates within this of goal */
 #define T_AI_TACKLE_DIST   FX(0.95)    /* AI tackles when the ball is this close ... */
 #define T_AI_TACKLE_EXPOSED FX(0.6)  /* ... and this far from the carrier's feet (between touches) ... */
 #define T_AI_TACKLE_SHIELD FX(0.3)    /* ... or (carrier slow < 2 m/s, holding it) this far */

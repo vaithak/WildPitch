@@ -94,6 +94,8 @@ Not playable; invisible plumbing every later CP depends on.
 
 ### CP0.3b — Keeper dives, AI aerial duels, difficulty ✅ 🟡  (D-026..D-028)
 
+### CP0.3b+ — Team play (formation + roles) and 1.5× real-proportion pitches ✅ 🟡  (D-030/D-031)
+
 ### CP0.3c — Player stats (pace, control, passing, shooting, tackling, stamina) ⏭ 🟡
 
 ### CP0.3 — "Instinct AI" (original plan, now CP0.3a + CP0.3b) 🟡

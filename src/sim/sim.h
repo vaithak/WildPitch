@@ -139,7 +139,21 @@ enum {
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };
 enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };
-enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK };   /* players no seat controls stand still (statues / cones) */
+enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK };
+
+/* Team plan (D-030): computed once per tick for both teams before anyone decides - a shared observation that says
+ * who goes for the ball, who covers, who marks whom, who stays back - so the brain stops swarming the ball. */
+enum { WP_PR_ZONE = 0, WP_PR_WIN, WP_PR_COVER, WP_PR_MARK, WP_PR_REST, WP_PR_SUPPORT, WP_PR_RUN };
+typedef struct {
+    fv2      focus;                  /* smoothed ball position the shape follows */
+    fx       poss_fade;              /* 0 = out-of-possession shape .. 1 = in-possession shape */
+    uint16_t trans_ticks;            /* ticks since our possession state last changed */
+    int8_t   last_poss;              /* 1 us, 0 them, -1 nobody yet */
+    int8_t   winner, cover, near_sup, runner;   /* player indices or -1 */
+    uint16_t sup_timer;              /* near-support / runner re-chosen when this runs out */
+    uint8_t  role[WP_MAX_PER_SIDE];  /* WP_PR_* per formation slot */
+    int8_t   mark[WP_MAX_PER_SIDE];  /* per slot: opponent index marked, -1 */
+} WpTeamPlan;   /* players no seat controls stand still (statues / cones) */
 /* how an assisted receiver plays a pass: step to the closest reachable point (standing/checking receivers, lofts),
  * run through a planned meet at just-in-time speed (runners; in-stride through balls keep >= 4.5 m/s) */
 enum { WP_PLAN_CLOSEST = 0, WP_PLAN_RUN = 1, WP_PLAN_STRIDE = 2 };
@@ -161,6 +175,7 @@ typedef struct {
     int8_t   restart_taker;
     uint16_t restart_ticks;
     fv2      restart_spot;
+    WpTeamPlan plan[2];
     uint16_t events;                 /* WP_EV_* raised during the last sim_step */
     int8_t   seat_player[WP_MAX_SEATS]; /* player index each seat controls, -1 = none */
     uint16_t prev_buttons[WP_MAX_SEATS];/* for edge detection inside the sim */
@@ -197,7 +212,8 @@ typedef struct {
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */
-WpMatchConfig sim_config_7v7(void);       /* 7-a-side, 55 x 35 m, 5 m goals (the game's default) */
+WpMatchConfig sim_config_7v7(void);       /* 7-a-side, 80 x 52 m, 6 m goals (the game's default) */
+WpMatchConfig sim_config_5v5(void);       /* the game's 5-a-side, 60 x 39 m, 5 m goals */
 /* Start a jump for player i (no-op if already airborne). Gameplay triggers come in CP0.2. */
 void     sim_player_jump(SimState *s, int i, uint8_t action);
 /* Start a kick action with explicit parameters (used by AI later, tests and --demo). No-op if busy. */

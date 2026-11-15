@@ -107,3 +107,8 @@ Format:
 - **Action:** (1) auto-switch to the best defender when they have the ball; (2) keeper holds the ball in his hands
   after a save in his box, distributes (throw / punt), time limit; (3) real restarts: throw-ins, corners, goal
   kicks with takers and distance rules; (4) then deep research on team shape / collaborative play (both teams).
+- **Feedback (verbatim):** "also, the size if small, I would say increase both for all formats by some factor (1.5) but
+  ensuring proportiuon matches that of actual soccer fields,"
+- **Action:** pitches x~1.5 with the real 105:68 (1.54) ratio: 7v7 80 x 52 m (goal 6 x 2.1), game 5v5 60 x 39 m
+  (goal 5 x 2); formation / marking / pass-range distances scale with the pitch; the 40 x 25 m 5v5 stays as the
+  regression-test format.

@@ -22,6 +22,9 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
   header.c              contextual headers (D-010/D-019): trigger on J/K at a high ball, legs step under it while
                         the stick aims, jump timed so the apex meets it, head-band contact, header pass/shot
   brain.c               INSTINCT AI (D-023): candidates x feature utility -> input/kick/tackle for every non-seat player
+  team_plan.c           per-team roles each tick (D-030): ball-winner (hysteresis), cover, capped markers, rest
+                        defence, near-support, runner -> SimState.plan[2]; read by brain.c
+  formation.c           ball-dependent formation blocks in/out of possession, blended by poss_fade -> shape_spot()
   tackle.c              standing tackles (J near an opponent's ball; AI when the ball is exposed)
   team.c                steering helpers (team_steer*, used by seats/brain) + the old CP0.2 placeholder positioning movement for non-human players (shape, runs, keepers, passive cones) ->
                         WpSeatInput; replaced by the CP0.3 instinct AI. SimState.flags WP_SIMF_STATIC_OTHERS = statues

@@ -8,6 +8,8 @@
  *   restart.c throw-ins, corners, goal kicks: spot, taker, distance rule
  *   keeper.c  goalkeeper dives: catch / parry along the outstretched body
  *   tackle.c  standing tackles (human J when they have the ball nearby; AI later)
+ *   team_plan.c  team layer: ball-winner, cover, capped zonal markers, rest defence, support, runner
+ *   formation.c  ball-dependent formation spots (in / out of possession blocks)
  *   brain.c   instinct AI (D-008): observation -> candidate actions x utility -> input / kicks / tackles
  *   team.c    steering helpers (+ the old CP0.2 placeholder positioning) movement for non-human players (shape, runs, keepers) -> WpSeatInput (CP0.3: AI)
  */
@@ -53,6 +55,11 @@ fx       pass_lane_clear(const SimState *s, int team, fv2 from, fv2 to);   /* ne
 /* seats.c: where can p meet the ball (closest reachable point, or the stick-preferred one) */
 typedef struct { fv2 pos; fx t; int found; } Meet;
 Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref);
+/* team_plan.c / formation.c (D-030) */
+void team_plan_reset(SimState *s);
+void team_plan_update(SimState *s);
+fv2  shape_spot(const SimState *s, int team, int k);   /* where formation slot k should stand now */
+fx   slot_mindset(const SimState *s, int k);          /* 0 = stays back .. 1 = attacks */
 /* brain.c (CP0.3 instinct AI, D-008): input + actions for a player no seat controls */
 void brain_input(SimState *s, int i, WpSeatInput *out);
 wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim);

@@ -313,3 +313,32 @@ separate from `controls.cfg`), applied by "Restart match". EASY vs HARD AI (7v7)
   shows THROW-IN / CORNER / GOAL KICK and the team. Replaces the temporary "placed back inside" rule.
 - **Defender auto-switch:** when they have the ball (or their pass is travelling) control moves to the team-mate
   nearest a spot just goal-side of the ball if he's > 3 m closer than the current man (0.75 s cooldown).
+
+## D-030 — Team plan + ball-dependent formation: both teams play as a unit (2026-11-15, owner request)
+Owner: "right now it is like everyone going towards the ball". Research: `reports/Team shape and collaborative AI.md`.
+- **Team plan** (`team_plan.c`, `WpTeamPlan plan[2]` in SimState, hashed): once per tick each team assigns roles
+  BEFORE any player decides — exactly ONE ball-winner (fastest time-to-ball, 15% hysteresis, frozen while reading
+  their pass; a human seat counts only if he is fastest and engaging), one cover (behind the winner, goal-side),
+  capped zonal markers (5v5: 1; 7v7: 2, 3 near our goal) for men inside a zone around their spot, rest defenders
+  (counter-risk 1..3 stay behind the ball when we attack), one near-support and one far-side runner. Heavy part every
+  3 ticks; a counter-press window (2.5 s) lets the cover press too after losing it.
+- **Formation** (`formation.c`): two parametric blocks (in / out of possession: back-line height from the ball,
+  length, width, lateral shift toward the ball side, clamps) with slots (u, v, mindset), blended by `poss_fade`
+  (+1/60 per tick when we have it, −1/30 when they do, holds on a loose ball) — the shape slides and breathes with
+  the ball. Out of possession non-strikers are clamped goal-side of the ball. Distances scale with the pitch.
+- **Brain:** the plan gates candidates — only the winner may CHASE/PRESS (plus a 2.5 m escape), only the cover
+  COVERs, MARK only the assigned man or men near my spot, new REST action, SUPPORT points around my shape spot + a
+  near-support ring, RUN for the striker and the runner. New features F_ROLE (does this action match my plan role)
+  and F_HOME (distance from my shape spot). D-008 holds: the plan only picks which candidates exist and adds
+  features; utility still chooses.
+- **Measured (7v7, AI vs AI, `shape_metrics.h`, printed by test_ai_match):** on the old 55 m pitch team length
+  11 → 19 m, area 89 → 223 m² in possession / 172 out, players within 10 m of the ball 4.0 → 2.3, def–mid gap
+  1.5 → 7.9 m, goal-side 2.0 → 2.65. On the new 80 m pitch: length ~25 m, width ~28 m, area ~430 / 380 m²,
+  near-ball 1.7 / 2.0, goal-side 2.8 of 6. Goals ~0.9/min, shots ~0.9/min, 63% of passes arrive.
+
+## D-031 — Pitches 1.5× bigger, real proportions (2026-11-15, owner request)
+Owner: "increase both for all formats by some factor (1.5) but ensuring proportion matches that of actual soccer
+fields". Real pitch 105 × 68 = 1.544. **7v7: 80 × 52 m** (was 55 × 35), goal 6 × 2.1 m. **5v5: 60 × 39 m** (was
+40 × 25), goal 5 × 2 m. Boxes, circle and markings scale with the pitch; zoom view scales with length. The 40 × 25
+`sim_default_config` stays ONLY as the regression/harness pitch (5v5 golden, scripted tests); test_ai_match now
+plays the real game formats. AI shooting range 22 m, cross zone 16 m, shot utility re-weighted for the longer field.

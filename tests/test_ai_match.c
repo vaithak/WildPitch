@@ -56,7 +56,7 @@ static int run_format(int seven, int matches) {
     long goals[2] = {0}, shots[2] = {0}, passes[2] = {0}, done[2] = {0}, tackles[2] = {0}, poss[2] = {0};
     long stuck = 0, ticks = 0, headers = 0, crosses = 0;
     for (int m = 0; m < matches; m++) {
-        WpMatchConfig cfg = seven ? sim_config_7v7() : sim_default_config();
+        WpMatchConfig cfg = seven ? sim_config_7v7() : sim_config_5v5();
         sim_init(&s, &cfg);
         for (int k = 0; k < WP_MAX_SEATS; k++) s.seat_player[k] = -1;
         s.ball.pos = fv2_make(FX_INT((m % 5) - 2), FX_INT((m % 3) - 1));

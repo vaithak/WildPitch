@@ -3,10 +3,26 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3b — Keeper dives, AI aerial duels, difficulty: ✅ done, waiting for the owner's playtest.** (Owner on 7v7:
-"it is a good game, keep going ahead".) Next: **CP0.3c player stats** (own hand-over: it shifts calibrated numbers).
+**CP0.3b+ — Team play + bigger pitches (D-030/D-031): ✅ done, waiting for the owner's playtest.**
+Next: **CP0.3c player stats** (own hand-over: it shifts calibrated numbers). Open polish from the team-shape report:
+slot swaps (players exchanging positions on runs), an F3 overlay of plan roles, shape thresholds as CI checks,
+the `tools/playtest/mirror.c` exact-mirror check diverges at tick 1-4 (tie-break asymmetry; shots/goals balance
+statistically, so low priority).
+
+### Playtest guide (CP0.3b+)
+1. `./build/wildpitch` — 7v7 on the new 80 × 52 m pitch (5v5: `--5v5`, 60 × 39 m). Is the size right? Zoom with C.
+2. Watch the blue team without the ball: ONE man presses, one covers behind him, the rest hold a block that slides
+   with the ball and stays between it and their goal — no swarm.
+3. When blue wins it: the block stretches (width, a runner, a man showing short), 1–3 stay back.
+4. Your red team-mates do the same: lose the ball and see who presses / who drops; with it, look for the far-side
+   runner and the short option.
+5. Does it feel like football? Too passive / too compact / too stretched? Do teams still score enough?
 
 ## What works now
+- **Team play (D-030):** both teams play from a team plan: one ball-winner, a cover, capped markers, rest defence,
+  near-support and a far-side runner; formation blocks for in/out of possession slide with the ball. AI vs AI 7v7:
+  team length ~25 m, ~2 players within 10 m of the ball (was 4 = the swarm), ~0.9 goals/min, 63% passes arrive.
+- **Pitches (D-031):** 7v7 80 × 52 m (goal 6 m), 5v5 60 × 39 m — real 1.54 proportions, markings scale.
 - **Owner's CP0.3b requests (D-029):** keepers hold the ball in their hands after a save in their box (throw S /
   high throw A / punt D, 6 s limit); real throw-ins, corners and goal kicks with takers and a 4 m distance rule;
   control auto-switches to the best defender when they have the ball.
@@ -56,7 +72,7 @@ _Last updated: 2026-11-15 by Claude session #1_
 - **Tests (12 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
   (golden `b536eddf99f2591c`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
-- Perf: full game loop ~5% of one core; `bench_sim` ~1,080× real time (15 µs/tick with 10 AI players; ~0.1% of a core in play). RL training will want a
+- Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
   receiver prediction ~4% → perf pass = a faster EXACT isqrt (bit-identical, golden unchanged); was 22,700× before team logic + pass solver — fine for play, revisit with a
   lookup table before RL training).
