@@ -3,19 +3,24 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3c — Player stats: 🚧 in progress** (CP0.3b++ committed 492bbc1, awaiting playtest).
-Plan (advisor-reviewed): (1) baseline ✅ (below); (2) plumbing with ALL configs neutral - `WpStats` in SimState
-(not wiped by kick-offs), one top-speed helper at every speed assumption - both goldens must stay unchanged; commit;
-(3) effects one at a time (pace, stamina + stamina-aware AI, control, AI passing/shooting scatter, tackling,
-keeping) - no random scatter on the HUMAN's passes/shots without asking the owner (D-021); update the 7v7 golden on
-purpose; (4) tune completion/conversion in mirrored mode vs the baseline; HUD stamina + stats; mirror.c swaps stats;
-D-020 reception cases re-run with slow/fast/tired receivers.
-**Baseline at 492bbc1** (`tools/playtest/passfail.c`, `goals.c`, 12 x 3 min, no jitter):
-- 7v7 passes: <10 m 83% complete, 10-20 m 66% (24% cut out in flight), >20 m 28% (61% cut out) - all 61%.
-  5v5: 83% / 65% / 7% (75% cut out) - all 69%. => completion is pass SELECTION (long balls through traffic).
-- 7v7 shots 46: 28 goals (61%); 17 with nobody within 3 m => conversion is mostly defending, not keeper stats.
-- 5v5 leans to team 0 with no jitter: goals 23-10, shots 54-34, tackles 42-76 (also seen in 4 earlier runs) -
-  pre-existing, not caused by stats.
+**CP0.3c — Player stats + AI passing (D-034/D-035): ✅ done, waiting for the owner's playtest.** (CP0.3b++ -
+back-pass, kick-off, boards - also still awaiting playtest.)
+Next: owner feedback; then **CP0.4 "A real match"** (halves alternate the kick-off, fouls, free kicks, offside).
+Open: AI conversion still ~45-50% in 7v7 (close-range 1v1s - keeper smother/rush); 5v5 leans to team 0 with
+no jitter (pre-existing); 5v5 tackles high (~2.2/min/team).
+Explainer: https://claude.ai/artifact/YT1ERDs2HvaMoz3udPpqT6
+
+### Playtest guide (CP0.3c)
+1. Bottom-left: your player's stats (PAC CTL PAS SHO TCK STA; keepers KEEP) and an ENERGY bar. Switch players (Q)
+   and see them change: strikers shoot harder/closer to the post, defenders tackle better, quick men are quicker.
+2. Hold sprint (E) for ~15 s: the bar drains and, once low, your sprint fades to a jog; ease off and it refills.
+3. Watch the AI: fewer hopeful long balls (more passes arrive), carriers pass when pressed instead of dribbling into
+   tackles, keepers come off their line when someone runs through.
+4. Is the stats spread noticeable but fair? Is scoring still fun (AI ~2-3 goals per 5 min between them)?
+
+Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20 m passes 47% (was 28%), goals
+~0.5/min, shots ~1/min, conversion ~45-50% (was ~60%); AI energy settles ~75%. Goldens: 5v5 `a034042ea9bdd9a8`,
+7v7 `800c7d4fe755cfb4`. bench_sim 17.7 us/tick.
 
 ### Playtest guide (CP0.3b++)
 1. Kick-off: you can't dribble off - press S (pass) to start; blue waits outside the circle. After a goal the team
@@ -27,6 +32,9 @@ D-020 reception cases re-run with slow/fast/tired receivers.
 5. Still in from CP0.3b+: does the team play feel right on the 80 x 52 m pitch?
 
 ## What works now
+- **CP0.3c (D-034/D-035):** player stats (pace, control, passing, shooting, tackling, stamina, keeping) generated per
+  slot with equal squad totals; energy that drains/recovers; HUD card; neutral mode = the old sim bit for bit. AI
+  judges pass lanes by time, passes under pressure, keepers narrow the angle: 78% of AI passes arrive (was 61%).
 - **D-032/D-033:** back-pass rule (keeper can't handle a team-mate's kicked pass), kick-off = pass-only set piece
   (own halves, opponents outside the circle), advertising boards players can't cross (ball rebounds), stands,
   corner flags; boards carry WILDPITCH + football and the dedication. `--boards --screenshot F.bmp`.
@@ -81,8 +89,8 @@ D-020 reception cases re-run with slow/fast/tired receivers.
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (12 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `5e4945c3aa0067a4`, 7v7 `262ed61eac28055a`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (13 ctest entries, all passing):** test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
+  (golden 5v5 `a034042ea9bdd9a8`, 7v7 `800c7d4fe755cfb4`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
@@ -132,7 +140,7 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 ## Known issues / environment notes
 - **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
   `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build` (needed by CP0.4/CP0.5).
-- No player stats yet (all equal). No fouls/offside/free kicks/halves yet (CP0.4).
+- No fouls/offside/free kicks/halves yet (CP0.4).
 - Headers: height bands exist; the trigger is CP0.2.
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".

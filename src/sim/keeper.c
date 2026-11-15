@@ -24,7 +24,8 @@ void keeper_step(SimState *s, int i, const WpInput *in) {
     fv2 a = p->pos, dir = fv2_make(0, p->kick.foot ? FX_ONE : -FX_ONE);
     fv2 rel = fv2_sub(b->pos, a);
     /* the body stretches out over the first T_DIVE_EXTEND ticks (no full reach the instant he goes) */
-    fx reach = fx_mul(T_DIVE_REACH, fx_min(FX_INT(p->action_timer) / T_DIVE_EXTEND, FX_ONE));
+    fx full = fx_mul(T_DIVE_REACH, FX_ONE + fx_mul(T_STAT_KEEP_REACH, stat_k(s, i, WP_STAT_KEEPING)));   /* D-034 */
+    fx reach = fx_mul(full, fx_min(FX_INT(p->action_timer) / T_DIVE_EXTEND, FX_ONE));
     fx u = fx_clamp(fv2_dot(rel, dir), 0, reach);
     fx d = fv2_len(fv2_sub(rel, fv2_scale(dir, u)));
     if (d > T_DIVE_HANDS || b->no_hands == p->team + 1) return;   /* a back-pass: no hands (D-032) */

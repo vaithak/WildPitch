@@ -1,3 +1,4 @@
+#include <stdlib.h>
 /* goals.c - AI vs AI goal attribution: what kick scored, from where, own goals / keeper touches, defenders near the
  * shooter and goal-side at each shot, shots and goals by distance band. usage: goals [7|5] (12 x 3 min, no seats) */
 #include <stdio.h>
@@ -8,7 +9,7 @@ int main(int argc,char**argv){
   int seven = argc>1 ? argv[1][0]=='7' : 1; int matches=12;
   static SimState s; double ndsum=0; long aheadsum=0, free3=0; long ownish=0,goals=0,shots=0,kinds[16]={0},kdist[4]={0},sdist[4]={0},gk_last=0,hdr=0;
   for(int m=0;m<matches;m++){
-    WpMatchConfig cfg = seven? sim_config_7v7(): sim_config_5v5(); sim_init(&s,&cfg);
+    WpMatchConfig cfg = seven? sim_config_7v7(): sim_config_5v5(); if (getenv("WP_STATS")) cfg.stats_mode = (uint8_t)atoi(getenv("WP_STATS")); sim_init(&s,&cfg);
     for(int k=0;k<WP_MAX_SEATS;k++) s.seat_player[k]=-1;
     s.ball.pos=fv2_make(FX_INT((m%5)-2),FX_INT((m%3)-1));
     WpInput in; memset(&in,0,sizeof in);

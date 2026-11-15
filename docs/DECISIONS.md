@@ -372,3 +372,33 @@ blow outward). Each board is panels of "WILDPITCH" + a football logo, and at its
 pitch) the owner's dedication, two lines in a smaller font with the red heart: the exact D-018 words. Board faces
 are two textures made once with the debug font (no new dependency); `--boards --screenshot F.bmp` captures them.
 At the wide zoom the far boards are small; the dedication reads best on the near board and at closer zooms.
+
+## D-034 — Player stats (2026-11-15, CP0.3c)
+- **Seven stats, 1..99, 50 = the old all-equal player:** pace, control, passing, shooting, tackling, stamina,
+  keeping. Stored in `SimState.stats[player][WP_STAT_*]` (kick-off resets don't touch them). `stat_k` = (s-50)/50.
+- **Modes (`WpMatchConfig.stats_mode`):** NEUTRAL (everyone 50, every effect off, no RNG draw: bit-identical to the
+  pre-stats sim; stats unhashed - verified, both goldens unchanged by the plumbing commit), MIRRORED (team 1 = team 0
+  slot by slot: the AI balance tests), OWN (each team generated; the game). Generation (`stats.c`): a slot template
+  (keeper / defender / midfielder / striker, equal outfield totals) +-10, zero-sum per stat over the squad, so both
+  squads total exactly the same. Difficulty still changes no stats (D-028).
+- **Effects:** pace = top speeds x (1 +- 7%); stamina = energy drains 4%/s sprinting (x(1-0.4k)), recovers 2%/s
+  jogging (x2 below 3 m/s), below 40% the sprint's extra pace fades to 25% (AI settles ~75% energy); control =
+  first-touch spill x(1-0.5k); passing = pass arrival pace x(1+0.1k) (good passers zip it); shooting = power x
+  (1+0.06k), the aim-assist target nearer the post (human: deterministic), AI aim error x(1-0.6k); tackling = reach
+  x(1+0.15k), the AI needs the ball less exposed; keeping = reaction -8k ticks, dive reach x(1+0.25k).
+- **No random scatter on the human's passes or shots** (D-021: the pass goes to the ringed man); the only random
+  draw remains the AI shot aim error. One `player_top_speed()` is used at every speed assumption (movement,
+  dribble predictor, steering, team plan, meet prediction, receive assist, AI caps).
+- **AI:** stamina-aware (below 55% energy it jogs unless pressing / chasing / covering; runs in behind cost legs);
+  good finishers value shots more. HUD: the controlled player's stats + energy bar (`hud.c`).
+
+## D-035 — AI pass choice by time, dribbling under pressure, keeper narrows the angle (2026-11-15, CP0.3c)
+Baseline (`passfail.c`): 61% of AI passes arrived; >20 m passes 28% (61% cut out in flight) - selection, not skill.
+- AI pass / through-ball lanes are judged by TIME (`lane_time`): clearance left after each opponent runs at the
+  ball's path (3 m/s after 0.3 s) for as long as the ball takes to get there. Pass utility: lane weight 0.8 -> 1.6,
+  forward weight 0.16 -> 0.13 (through 0.20 -> 0.18).
+- Dribbling under pressure costs utility (an opponent within 3 m), so carriers pass instead of running into tackles.
+- The keeper comes off his line to 30% of the distance (max 3.5 m) against an opponent carrying it within 16 m.
+- AI shot aim error base 0.3 -> 0.5 m, under pressure 0.6 -> 0.8 m.
+Result (7v7, 20 x 5 min, stats on): passes 61% -> 78% complete (>20 m 28% -> 47%), goals ~0.5/min, shots ~1/min,
+conversion ~60% -> ~45-50% in 7v7 (5v5 ~25%). Still high from close range: 1v1 smothers are follow-up work.

@@ -23,6 +23,7 @@
 #include "sim/tuning.h"
 #include "game/render.h"
 #include "game/dedication.h"
+#include "game/hud.h"
 #include "game/keymap.h"
 #include "game/menu.h"
 
@@ -474,6 +475,7 @@ int main(int argc, char **argv) {
                          wp_keymap_key_name(k, WP_KEY_SWITCH), wp_keymap_key_name(k, WP_KEY_ZOOM), wp_keymap_key_name(k, WP_KEY_LOOK));
             }
             SDL_RenderDebugText(g.ren, 12, (float)h - 20, buf);
+            wp_hud_player(g.ren, &g.cur, 0, w, h);             /* controlled player's stats + energy (D-034) */
             if (g.cur.phase == WP_PHASE_GOAL) {
                 const char *msg = "G O A L !";
                 float sc = 4.0f;

@@ -16,6 +16,7 @@ WpMatchConfig sim_config_7v7(void) {
     c.pitch.goal_width = FX(5.6);
     c.pitch.goal_height = FX(2.1);
     c.pitch.goal_depth = FX(1.5);
+    c.stats_mode = WP_STATS_OWN;                      /* generated squads, equal totals (D-034) */
     return c;
 }
 
@@ -27,6 +28,7 @@ WpMatchConfig sim_config_5v5(void) {
     c.pitch.goal_width = FX(4.2);
     c.pitch.goal_height = FX(2.0);
     c.pitch.goal_depth = FX(1.3);
+    c.stats_mode = WP_STATS_OWN;
     return c;
 }
 

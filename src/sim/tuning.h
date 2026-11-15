@@ -41,6 +41,32 @@
 /* player stats (D-034): 1..99, 50 = the old player; k = (stat - 50) / 50 */
 #define T_STAT_SPREAD      10         /* generated stats: slot template +- this (zero-sum per team) */
 #define T_STAT_PACE        FX(0.07)   /* top speeds x (1 + this * k) */
+#define T_STAMINA_DRAIN    FX(0.04)   /* energy (0..1) used per second of sprinting (25 s flat out) ... */
+#define T_STAMINA_RECOVER  FX(0.02)   /* ... regained per second jogging (x2 below 3 m/s) ... */
+#define T_STAMINA_TIRED    FX(0.40)   /* ... below this the sprint fades, to 25% of its extra pace at empty */
+#define T_STAT_STAMINA     FX(0.40)   /* drain x (1 - this * k) */
+#define T_STAT_CONTROL     FX(0.50)   /* first-touch spill x (1 - this * k) */
+#define T_STAT_PASS_PACE   FX(0.10)   /* pass arrival pace x (1 + this * k): good passers zip it */
+#define T_STAT_SHOT_POWER  FX(0.06)   /* shot power x (1 + this * k) */
+#define T_STAT_SHOT_AIM    FX(0.60)   /* AI shot aim error x (1 - this * k) */
+#define T_STAT_SHOT_MARGIN FX(0.50)   /* aim-assisted target this much nearer the post per k (deterministic) */
+#define T_STAT_TACKLE      FX(0.15)   /* tackle reach x (1 + this * k) ... */
+#define T_STAT_TACKLE_READ FX(0.20)   /* ... and the AI needs the ball x (1 - this * k) exposed */
+#define T_STAT_KEEP_REACT  8          /* keeper reaction ticks - this * k ... */
+#define T_STAT_KEEP_REACH  FX(0.25)   /* ... dive reach x (1 + this * k) */
+#define T_STAT_AI_SHOOT    FX(0.40)   /* AI: shot utility x (1 + this * k): good finishers shoot more */
+#define T_AI_LANE_V_PER_M  FX(0.15)   /* AI pass lanes (CP0.3c): the ball's mean pace = 8 + this/m ... */
+#define T_AI_LANE_V_MAX    FX(13.0)   /* ... capped */
+#define T_AI_LANE_REACH    FX(1.0)    /* an opponent within this of the path cuts it out ... */
+#define T_AI_LANE_RUN      FX(3.0)    /* ... after running at it this fast (m/s) ... */
+#define T_AI_LANE_REACT    FX(0.30)   /* ... once he's reacted */
+#define T_AI_LANE_CAP      FX(4.0)    /* the feature is clamped to +-this (m) */
+#define T_AI_PRESSURE_M    FX(3.0)    /* an opponent closer than this to the carrier counts as pressure on a dribble */
+#define T_KEEPER_NARROW_D  FX(16.0)   /* an opponent carrying it this close: the keeper comes off his line ... */
+#define T_KEEPER_NARROW_K  FX(0.30)   /* ... to this share of the distance ... */
+#define T_KEEPER_NARROW_MAX FX(3.5)   /* ... at most this far out */
+#define T_AI_SAVE_ENERGY   FX(0.55)   /* AI below this energy jogs unless the job is urgent (press/chase/cover) */
+#define T_AI_TIRED_RUN     FX(2.0)    /* ... and a run in behind costs this x (1 - energy) utility */
 #define T_KICKOFF_R_FRAC   FX(0.0871) /* centre-circle radius / pitch length (9.15 / 105, a real pitch) */
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */
@@ -171,9 +197,9 @@
 #define T_AI_TACKLE_EXPOSED_BY_LEVEL {FX(0.75), FX(0.6), FX(0.5)}
 #define T_AI_COMMIT        FX(0.8)    /* utility bonus for sticking with the current action/target */
 #define T_AI_FIRST_TOUCH   10         /* an AI carrier controls the ball this long before passing/shooting */
-#define T_AI_AIM_ERR       FX(0.3)    /* AI shot aim error (uniform +-, m at the goal line): base ... */
+#define T_AI_AIM_ERR       FX(0.5)    /* AI shot aim error (uniform +-, m at the goal line): base ... */
 #define T_AI_AIM_ERR_M     FX(0.05)   /* ... + this per metre of distance ... */
-#define T_AI_AIM_ERR_PRESS FX(0.6)    /* ... + this with a defender within 2 m */
+#define T_AI_AIM_ERR_PRESS FX(0.8)    /* ... + this with a defender within 2 m */
 #define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
 #define T_AI_SHOT_RANGE    FX(22.0)   /* AI considers shooting within this of goal */
 #define T_AI_CROSS_ZONE    FX(16.0)   /* crosses / corner targets: team-mates within this of goal */

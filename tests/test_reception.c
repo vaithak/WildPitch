@@ -105,6 +105,39 @@ int main(void) {
             CHECKF(maxclose < T_CONTROL_MAX_REL, "closing speed %.1f", tod(maxclose));
         }
 
+    /* ---- S. the same runner cases with stats on (D-034): a slow, a fast and a tired receiver, a poor passer ---- */
+    {
+        static const struct { const char *name; uint8_t pace, passing; fx energy; } prof[] = {
+            {"slow (pace 20)", 20, 50, FX_ONE}, {"fast (pace 85)", 85, 50, FX_ONE},
+            {"tired (energy 10%)", 50, 50, FX(0.10)}, {"poor passer (25)", 50, 25, FX_ONE},
+        };
+        for (int pr = 0; pr < 4; pr++)
+            for (int kind = 0; kind < 2; kind++)
+                for (int sp = 0; sp < 3; sp++) {
+                    fx v = sp ? FX(6.5) : FX(5.5);
+                    scene(fv2_make(-FX(15.0), 0), fv2_make(sp == 2 ? -FX(3.0) : -FX(9.0), FX(3.0)));
+                    s.stats_mode = WP_STATS_MIRRORED;
+                    memset(s.stats, 50, sizeof s.stats);
+                    s.stats[MATE][WP_STAT_PACE] = prof[pr].pace;
+                    s.stats[ME][WP_STAT_PASSING] = prof[pr].passing;
+                    for (int j = 0; j < WP_MAX_PLAYERS; j++) s.players[j].stamina = FX_ONE;
+                    s.players[MATE].stamina = prof[pr].energy;
+                    pass_to_mate(kind ? 24 : 6, NOIN, 1, fv2_make(v, 0));
+                    fx mind = FX(99.0); int got = -1, t = 0;
+                    for (; t < 300 && got < 0; t++) {
+                        if (s.ball.owner < 0 && fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos)) < mind)
+                            mind = fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos));
+                        step2(NOIN, NOIN);
+                        if (s.ball.owner >= 0) got = s.ball.owner;
+                    }
+                    printf("stats %-20s %s at %.1f m/s: received by %d after %.2f s, closest %.2f\n", prof[pr].name,
+                           kind ? "through" : "tap    ", tod(v), got, t / 60.0, tod(mind));
+                    CHECKF(got == MATE, "%s kind %d sp %d: not received (%d)", prof[pr].name, kind, sp, got);
+                    CHECKF(mind > FX(0.35), "%s kind %d sp %d: through the body", prof[pr].name, kind, sp);
+                }
+        s.stats_mode = WP_STATS_NEUTRAL;
+    }
+
     /* ---- D/E. keys pressed or released while the pass travels (finding 1, the owner's report) ---- */
     {
         static const int8_t dirs[4][2] = {{0, 0}, {0, 127}, {127, 0}, {-127, 0}};   /* release, sideways, forward, toward */

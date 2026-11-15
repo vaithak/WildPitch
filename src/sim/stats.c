@@ -6,12 +6,13 @@
 #include "sim/sim_internal.h"
 
 /* slot templates: keeper / defender / midfielder / striker (pace, control, passing, shooting, tackling, stamina,
- * keeping). Every outfield template sums to the same total, so no slot is "better", only different. */
+ * keeping). Outfield templates sum alike (no slot is "better"); every value >= 15 so +-(spread+1) never clamps and
+ * the squad totals stay exact. */
 static const uint8_t TEMPLATE[4][WP_STAT_N] = {
     {46, 50, 52, 25, 30, 55, 70},   /* keeper */
-    {56, 52, 56, 36, 70, 64, 10},   /* defender */
-    {60, 64, 68, 50, 50, 68, 10},   /* midfielder */
-    {68, 64, 54, 72, 34, 58, 10},   /* striker */
+    {56, 52, 56, 36, 70, 64, 15},   /* defender */
+    {60, 64, 68, 50, 50, 68, 15},   /* midfielder */
+    {68, 64, 54, 72, 34, 58, 15},   /* striker */
 };
 
 static int slot_kind(const SimState *s, int k) {
@@ -60,5 +61,30 @@ fx stat_k(const SimState *s, int i, int which) {
 fx player_top_speed(const SimState *s, int i, int sprint) {
     fx base = sprint ? T_SPRINT_SPEED : T_WALK_SPEED;
     if (!s->stats_mode) return base;
-    return fx_mul(base, FX_ONE + fx_mul(T_STAT_PACE, stat_k(s, i, WP_STAT_PACE)));
+    fx pace = FX_ONE + fx_mul(T_STAT_PACE, stat_k(s, i, WP_STAT_PACE));
+    fx top = fx_mul(base, pace);
+    fx e = s->players[i].stamina;
+    if (sprint && e < T_STAMINA_TIRED) {                  /* tired: the sprint's extra pace fades */
+        fx walk = fx_mul(T_WALK_SPEED, pace);
+        fx f = FX(0.25) + fx_mul(FX(0.75), fx_div(fx_max(e, 0), T_STAMINA_TIRED));
+        top = walk + fx_mul(top - walk, f);
+    }
+    return top;
+}
+
+/* energy: sprinting (faster than his jog) drains it, jogging and standing bring it back */
+void stamina_step(SimState *s, int i) {
+    if (!s->stats_mode) return;
+    WpPlayer *p = &s->players[i];
+    fx v = fv2_len(p->vel), walk = player_top_speed(s, i, 0);
+    fx e = p->stamina;
+    if (v > fx_mul(walk, FX(1.02))) {
+        fx d = fx_mul(T_STAMINA_DRAIN, FX_ONE - fx_mul(T_STAT_STAMINA, stat_k(s, i, WP_STAT_STAMINA)));
+        e -= d / WP_TICK_HZ;
+    } else {
+        fx r = fx_mul(T_STAMINA_RECOVER, FX_ONE + fx_mul(FX(0.3), stat_k(s, i, WP_STAT_STAMINA)));
+        if (v < FX(3.0)) r *= 2;
+        e += r / WP_TICK_HZ;
+    }
+    p->stamina = fx_clamp(e, 0, FX_ONE);
 }

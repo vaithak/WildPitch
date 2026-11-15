@@ -133,3 +133,7 @@ Format:
 - **Action:** AI conversion / pass completion moved into CP0.3c. Answered difficulty (D-028) and speed (same top
   speeds; AI sprints freely until stamina in CP0.3c). Explainer artifact: https://claude.ai/artifact/YT1ERDs2HvaMoz3udPpqT6.
   Back-pass rule + kick-off set piece (D-032); boards, stands, corner flags (D-033).
+
+## 2026-11-15 — go-ahead for CP0.3c
+- **Feedback (verbatim):** "continue with next checkpoint"
+- **Action:** CP0.3c player stats + AI pass choice (D-034/D-035); CP0.3b++ playtest still pending.

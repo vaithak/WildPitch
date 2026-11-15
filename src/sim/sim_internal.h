@@ -101,7 +101,8 @@ void team_steer_speed(const SimState *s, const WpPlayer *p, fv2 target, fx speed
 /* stats.c (D-034) */
 void stats_init(SimState *s, uint8_t mode);
 fx   stat_k(const SimState *s, int i, int which);           /* (stat - 50) / 50; 0 when stats are neutral */
-fx   player_top_speed(const SimState *s, int i, int sprint);  /* THE top speed (pace, later fatigue) */
+fx   player_top_speed(const SimState *s, int i, int sprint);  /* THE top speed (pace, fatigue) */
+void stamina_step(SimState *s, int i);                      /* energy drain / recovery (stats on) */
 
 /* Is `at` inside `team`'s own penalty area? (depth 15% of the length, half-width 24% of the width; render matches) */
 /* back-pass rule (D-032): a keeper uses his hands only in his own box and not on a ball his team-mate deliberately

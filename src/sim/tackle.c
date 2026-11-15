@@ -33,7 +33,8 @@ void tackle_step(SimState *s, int i) {
     p->kick.done = 1;
     fv2 foot = fv2_add(p->pos, fv2_from_angle(p->facing, TACKLE_FOOT));
     if (s->phase != WP_PHASE_PLAY || b->z > WP_BAND_FEET_MAX) return;
-    if (fv2_len(fv2_sub(b->pos, foot)) > T_TACKLE_REACH) return;          /* missed */
+    fx reach = fx_mul(T_TACKLE_REACH, FX_ONE + fx_mul(T_STAT_TACKLE, stat_k(s, i, WP_STAT_TACKLING)));   /* D-034 */
+    if (fv2_len(fv2_sub(b->pos, foot)) > reach) return;                    /* missed */
     int victim = b->owner;
     /* a block tackle: the ball is stopped by the tackler's foot and squirts back his way (he moves with it) */
     fv2 from = victim >= 0 ? s->players[victim].pos : b->pos;

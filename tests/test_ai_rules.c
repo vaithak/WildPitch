@@ -137,12 +137,15 @@ int main(void) {
         int theirs = 2 * s.n_per_side - 1;
         s.players[theirs].pos = fv2_make(-FX(8.0), FX(2.0));
         s.ball.pos = fv2_make(-FX(8.4), FX(2.0)); s.ball.owner = (int8_t)theirs; s.ball.last_touch = (int8_t)theirs;
-        for (int t = 0; t < 20; t++) step1(NOIN);
+        fx at_switch = FX(99.0);                                   /* distance to the ball when control moved */
+        for (int t = 0; t < 20; t++) {
+            step1(NOIN);
+            if (s.seat_player[0] != me && at_switch == FX(99.0)) at_switch = fv2_len(fv2_sub(s.ball.pos, s.players[s.seat_player[0]].pos));
+        }
         int now = s.seat_player[0];
-        printf("they attack: control moved from %d to %d (%.1f m from the ball)\n", me, now,
-               tod(fv2_len(fv2_sub(s.ball.pos, s.players[now].pos))));
+        printf("they attack: control moved from %d to %d (%.1f m from the ball at the switch)\n", me, now, tod(at_switch));
         CHECKF(now != me && s.players[now].role != WP_ROLE_KEEPER, "no switch to a defender");
-        CHECK(fv2_len(fv2_sub(s.ball.pos, s.players[now].pos)) < FX(10.0));
+        CHECK(at_switch < FX(10.0));
     }
     /* 7. keeper hands (7v7): a soft shot he catches in his box is HELD (chest height, can't be tackled); the AI
      *    keeper distributes it within ~2 s; outside his box a keeper has no hands */

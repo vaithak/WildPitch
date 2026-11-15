@@ -11,6 +11,7 @@ static fv2 neg(fv2 v) { return fv2_make(-v.x, -v.y); }
 int main(int argc, char **argv) {
     int seven = argc > 1 && atoi(argv[1]);
     WpMatchConfig cfg = seven ? sim_config_7v7() : sim_default_config();
+    if (getenv("WP_STATS")) cfg.stats_mode = (uint8_t)atoi(getenv("WP_STATS"));   /* 0 neutral, 1 mirrored, 2 own */
     sim_init(&A, &cfg);
     for (int k = 0; k < WP_MAX_SEATS; k++) A.seat_player[k] = -1;
     A.ball.pos = fv2_make(FX(1.0), FX(0.5));
@@ -24,6 +25,7 @@ int main(int argc, char **argv) {
     }
     B.ball.pos = neg(A.ball.pos);
     B.kickoff_team = (uint8_t)(1 - A.kickoff_team);
+    for (int i = 0; i < 2 * n; i++) memcpy(B.stats[mi(i, n)], A.stats[i], WP_STAT_N);   /* D-034 */
     for (int t = 0; t < 2; t++) {                    /* team-indexed plan (D-030): swap, rotate, remap indices */
         WpTeamPlan q = A.plan[t];
         q.focus = neg(q.focus);

@@ -25,11 +25,13 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
   team_plan.c           per-team roles each tick (D-030): ball-winner (hysteresis), cover, capped markers, rest
                         defence, near-support, runner -> SimState.plan[2]; read by brain.c
   formation.c           ball-dependent formation blocks in/out of possession, blended by poss_fade -> shape_spot()
+  stats.c               player stats (D-034): generation per slot, stat_k(), player_top_speed(), stamina_step()
   tackle.c              standing tackles (J near an opponent's ball; AI when the ball is exposed)
   team.c                steering helpers (team_steer*, used by seats/brain) + the old CP0.2 placeholder positioning movement for non-human players (shape, runs, keepers, passive cones) ->
                         WpSeatInput; replaced by the CP0.3 instinct AI. SimState.flags WP_SIMF_STATIC_OTHERS = statues
 src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   main.c                window, input -> WpInput, fixed-step loop, camera, HUD, flags (--demo --gallery
+  hud.c                 controlled player's stats + energy bar (D-034)
   stadium.c             stands, advertising boards (WILDPITCH + football, dedication at each board's right end), corner
                         flags (D-033); board positions from tuning.h T_BOARD_* (the sim's walls)
                         --style --zoom --screenshot --frames), retro low-res render target, 60 fps vsync pacing

@@ -26,6 +26,7 @@ static void run_levels(void) {
     for (int m = 0; m < 12; m++) {
         WpMatchConfig cfg = sim_config_7v7();
         cfg.ai_level[0] = WP_AI_EASY; cfg.ai_level[1] = WP_AI_HARD;
+        cfg.stats_mode = WP_STATS_MIRRORED;                  /* same squads: only the level differs (D-028) */
         sim_init(&s, &cfg);
         for (int k = 0; k < WP_MAX_SEATS; k++) s.seat_player[k] = -1;
         s.ball.pos = fv2_make(FX_INT((m % 5) - 2), FX_INT((m % 3) - 1));
@@ -57,6 +58,8 @@ static int run_format(int seven, int matches) {
     long stuck = 0, ticks = 0, headers = 0, crosses = 0;
     for (int m = 0; m < matches; m++) {
         WpMatchConfig cfg = seven ? sim_config_7v7() : sim_config_5v5();
+        cfg.stats_mode = WP_STATS_MIRRORED;                  /* balance checks need identical squads (D-034) */
+        cfg.seed = (uint64_t)(m + 1);                        /* a different pair of squads every match */
         sim_init(&s, &cfg);
         for (int k = 0; k < WP_MAX_SEATS; k++) s.seat_player[k] = -1;
         s.ball.pos = fv2_make(FX_INT((m % 5) - 2), FX_INT((m % 3) - 1));

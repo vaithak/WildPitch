@@ -43,9 +43,9 @@ static const fx W[AI_N][NF] = {
     [AI_COVER]   = {0,        0,         0,         -FX(0.10),  0,         FX(2.4),   -FX(1.0),   0,          FX(0.5)},
     [AI_MARK]    = {0,        0,         0,         -FX(0.12),  FX(2.0),   FX(2.0),   -FX(2.0),   -FX(0.25),  FX(0.4)},
     [AI_RECEIVE] = {0,        0,         0,         0,          0,         0,         0,          0,          FX(20.0)},
-    [AI_DRIBBLE] = {FX(0.30), FX(0.40),  FX(0.30),  0,          0,         0,         0,          0,          -FX(0.6)},
-    [AI_PASS]    = {FX(0.16), FX(0.30),  FX(0.80),  -FX(0.06),  0,         0,         0,          0,          -FX(0.4)},
-    [AI_THROUGH] = {FX(0.20), FX(0.30),  FX(0.80),  -FX(0.06),  FX(1.0),   0,         0,          0,          -FX(1.2)},
+    [AI_DRIBBLE] = {FX(0.30), FX(0.40),  FX(0.30),  0,          0,         0,         -FX(0.8),   0,          -FX(0.6)},
+    [AI_PASS]    = {FX(0.13), FX(0.30),  FX(1.60),  -FX(0.06),  0,         0,         0,          0,          -FX(0.4)},
+    [AI_THROUGH] = {FX(0.18), FX(0.30),  FX(1.60),  -FX(0.06),  FX(1.0),   0,         0,          0,          -FX(1.2)},
     [AI_SHOOT]   = {0,        0,         FX(0.30),  0,          FX(24.0),  0,         0,          0,          -FX(1.0)},
     [AI_KEEP]    = {0,        0,         0,         0,          0,         0,         0,          0,          FX(1.0)},
     [AI_CROSS]   = {FX(0.10), FX(0.30),  0,         -FX(0.04),  FX(6.0),   0,         0,          0,          -FX(1.2)},
@@ -296,6 +296,29 @@ static void gen_off_ball(Ctx *x) {
     }
 }
 
+/* time-aware lane (CP0.3c): the clearance left once each opponent has run at the ball's path for as long as the ball
+ * takes to get there (minus a reaction). Long balls are slow, so a lane that looks open often isn't. Metres; < 0 =
+ * someone gets there first. The last 1.5 m belong to the receiver. */
+static fx lane_time(const Ctx *x, fv2 a, fv2 t) {
+    const SimState *s = x->s;
+    fv2 seg = fv2_sub(t, a);
+    fx len = fv2_len(seg);
+    if (len < FX(1.0)) return T_AI_LANE_CAP;
+    fx umax = FX_ONE - fx_div(FX(1.5), len), len2 = fv2_dot(seg, seg);
+    fx v = fx_min(T_PASS_ARR_MIN + fx_mul(T_AI_LANE_V_PER_M, len), T_AI_LANE_V_MAX);   /* the ball's mean pace */
+    fx best = T_AI_LANE_CAP;
+    int o0 = (1 - x->team) * s->n_per_side;
+    for (int j = o0; j < o0 + s->n_per_side; j++) {
+        const WpPlayer *o = &s->players[j];
+        fx u = fx_clamp(fx_div(fv2_dot(fv2_sub(o->pos, a), seg), len2), 0, umax);
+        fx c = dist(o->pos, fv2_add(a, fv2_scale(seg, u)));
+        fx tb = fx_div(fx_mul(u, len), v);
+        fx e = c - T_AI_LANE_REACH - fx_mul(T_AI_LANE_RUN, fx_max(tb - T_AI_LANE_REACT, 0));
+        if (e < best) best = e;
+    }
+    return fx_max(best, -T_AI_LANE_CAP);
+}
+
 /* ---------------- candidates: on the ball ---------------- */
 static void gen_on_ball(Ctx *x) {
     const SimState *s = x->s;
@@ -310,6 +333,7 @@ static void gen_on_ball(Ctx *x) {
         c->f[F_FWD] = fx_mul(dir.x, FX_INT(x->sg)) * 4;
         c->f[F_OPEN] = nearest_opp(x, at);
         c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, at), FX(4.0));
+        c->f[F_CROWD] = fx_max(T_AI_PRESSURE_M - press, 0);   /* CP0.3c: a man on me makes dribbling costly */
     }
     for (int j = x->team * s->n_per_side; j < (x->team + 1) * s->n_per_side; j++) {
         if (j == x->i) continue;
@@ -320,7 +344,7 @@ static void gen_on_ball(Ctx *x) {
         if ((c = add(x, AI_PASS, (int8_t)j, at))) {
             c->f[F_FWD] = (at.x - b->pos.x) * x->sg;
             c->f[F_OPEN] = nearest_opp(x, at);
-            c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, at), FX(4.0));
+            c->f[F_LANE] = lane_time(x, b->pos, at);
             c->f[F_COST] = d0;
             if (q->role == WP_ROLE_KEEPER) c->f[F_BIAS] = FX(3.0);      /* back to the keeper: last resort */
         }
@@ -329,7 +353,7 @@ static void gen_on_ball(Ctx *x) {
             if ((c = add(x, AI_THROUGH, (int8_t)j, ahead))) {
                 c->f[F_FWD] = (ahead.x - b->pos.x) * x->sg;
                 c->f[F_OPEN] = nearest_opp(x, ahead);
-                c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, ahead), FX(4.0));
+                c->f[F_LANE] = lane_time(x, b->pos, ahead);
                 c->f[F_COST] = dist(ahead, b->pos);
                 c->f[F_THREAT] = shot_quality(x, ahead);
             }
@@ -351,16 +375,16 @@ static void gen_on_ball(Ctx *x) {
         }
     fx q = shot_quality(x, b->pos);
     if (q > 0 && (c = add(x, AI_SHOOT, -1, x->opp_goal))) {
-        c->f[F_THREAT] = q;
+        c->f[F_THREAT] = fx_mul(q, FX_ONE + fx_mul(T_STAT_AI_SHOOT, stat_k(s, x->i, WP_STAT_SHOOTING)));   /* D-034 */
         c->f[F_LANE] = fx_min(pass_lane_clear(s, x->team, b->pos, x->opp_goal), FX(4.0));
     }
-    (void)press;
 }
 
 static fx score(const Cand *c, const WpPlayer *p) {
     fx u = 0;
     for (int k = 0; k < NF; k++) u += fx_mul(W[c->act][k], c->f[k]);
     if (c->act == p->ai_act && dist(c->at, p->ai_goal) < FX(2.0) && c->mate == p->ai_mate) u += T_AI_COMMIT;
+    if (c->act == AI_RUN) u -= fx_mul(T_AI_TIRED_RUN, FX_ONE - p->stamina);   /* runs cost legs (0 when fresh) */
     return u;
 }
 
@@ -403,6 +427,8 @@ static void keeper(Ctx *x, WpSeatInput *out) {
     fv2 to_ball = fv2_sub(b->pos, g);
     fx db = fv2_len(to_ball);
     fx out_d = clampf(fx_mul(db, FX(0.12)), FX(0.6), FX(3.0));
+    if (b->owner >= 0 && s->players[b->owner].team != x->team && db < T_KEEPER_NARROW_D)   /* close carrier: come off */
+        out_d = clampf(fx_mul(db, T_KEEPER_NARROW_K), out_d, T_KEEPER_NARROW_MAX);          /* the line, narrow the angle */
     fv2 at = fv2_add(g, fv2_scale(fv2_norm(to_ball), out_d));
     fx gw = s->pitch.goal_width / 2;
     at.y = clampf(at.y, -gw, gw);
@@ -415,7 +441,9 @@ static void keeper(Ctx *x, WpSeatInput *out) {
         fx cy = b->pos.y + fx_mul(b->vel.y, t);
         if (t < FX(1.5) && fx_abs(cy) < gw + FX(1.0)) {
             shot = 1;
-            if (p->ai_wait < LV_KEEPER_REACT[lvl(s, x->team)]) { p->ai_wait++; at = p->ai_goal; }   /* reading it */
+            int react = (int)LV_KEEPER_REACT[lvl(s, x->team)]
+                      - (int)(fx_mul(FX_INT(T_STAT_KEEP_REACT), stat_k(s, x->i, WP_STAT_KEEPING)) / FX_ONE);   /* D-034 */
+            if (p->ai_wait < react) { p->ai_wait++; at = p->ai_goal; }   /* reading it */
             else {
                 at = fv2_make(p->pos.x, clampf(cy, -gw - FX(0.5), gw + FX(0.5)));
                 fx gap = cy - p->pos.y;
@@ -585,6 +613,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
             fv2 tgt = shot_target(&x);
             fx err = T_AI_AIM_ERR + fx_mul(dist(b->pos, x.opp_goal), T_AI_AIM_ERR_M);
             if (nearest_opp(&x, b->pos) < FX(2.0)) err += T_AI_AIM_ERR_PRESS;
+            err = fx_mul(err, FX_ONE - fx_mul(T_STAT_SHOT_AIM, stat_k(s, i, WP_STAT_SHOOTING)));   /* D-034 */
             fx dy = wp_rng_fx_signed(&s->rng, err);
             tgt.y += dy;
             do_kick(s, i, WP_KICK_SHOT, -1, tgt, T_AI_SHOT_POWER);
@@ -616,6 +645,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         fx db = dist(b->pos, p->pos), exposed = dist(b->pos, s->players[b->owner].pos);
         fv2 face = fv2_from_angle(p->facing, FX_ONE);
         fx need = fv2_len(s->players[b->owner].vel) < FX(2.0) ? T_AI_TACKLE_SHIELD : LV_EXPOSED[lv];
+        need = fx_mul(need, FX_ONE - fx_mul(T_STAT_TACKLE_READ, stat_k(s, i, WP_STAT_TACKLING)));   /* D-034 */
         if (decide && p->action == WP_ACT_NONE && db < T_AI_TACKLE_DIST && exposed > need &&   /* at his decision beat */
             fv2_dot(face, fv2_sub(b->pos, p->pos)) > 0) {
             tackle_start(s, i);
@@ -634,6 +664,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     if (p->ai_act == AI_NONE) return;
     fx d = dist(p->ai_goal, p->pos);
     fx top = player_top_speed(s, i, 1);
+    if (p->stamina < T_AI_SAVE_ENERGY && p->ai_act != AI_COVER) top = player_top_speed(s, i, 0);   /* tired: jog (D-034) */
     fx v = p->ai_act == AI_RUN || p->ai_act == AI_COVER ? top : fx_min(fx_mul(d, FX(2.0)), top);
     if (d < FX(0.4)) v = 0;
     team_steer_speed(s, p, p->ai_goal, v, out);

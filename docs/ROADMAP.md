@@ -96,7 +96,7 @@ Not playable; invisible plumbing every later CP depends on.
 
 ### CP0.3b+ — Team play (formation + roles) and 1.5× real-proportion pitches ✅ 🟡  (D-030/D-031)
 
-### CP0.3c — Player stats (pace, control, passing, shooting, tackling, stamina) ⏭ 🟡
+### CP0.3c — Player stats (pace, control, passing, shooting, tackling, stamina, keeping) + AI passing ✅ 🟡  (D-034/D-035)
 
 ### CP0.3 — "Instinct AI" (original plan, now CP0.3a + CP0.3b) 🟡
 **Playable:** first real 5v5 match vs AI.
