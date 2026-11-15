@@ -148,3 +148,5 @@ Format:
 - Clarified (AskUserQuestion): "extra time" = **stoppage time** (added minutes each half, e.g. 45+2').
 - **Action:** match clock at 9x (two 5-min halves), sides switch at half time, stoppage time (D-036). Deep research
   "Assisted movement toward the ball" (4 researchers), then implement.
+- Owner answers on the research (AskUserQuestion): AI-pass receive help "Yes, help"; released stick "No, stand still";
+  setting "Menu, default Normal". Implemented as D-037.

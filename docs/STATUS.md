@@ -3,13 +3,21 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3d — Match clock (D-036) ✅; assisted movement toward the ball: 🚧 deep research running** (report:
-`reports/Assisted movement toward the ball.md`, notes in `research_notes/Assisted movement toward the ball/`), then
-implement it. CP0.3b++ / CP0.3c await the owner's playtest.
+**CP0.3d — Match clock (D-036) + movement assist toward the ball (D-037): ✅ done, waiting for the owner's
+playtest.** (CP0.3b++ / CP0.3c also await playtest.) Research: `reports/Assisted movement toward the ball.md`.
+Next: owner feedback; then CP0.4 "A real match" (fouls, free kicks, offside). Follow-ups from the research: a
+cumulative "plays for me" guard (fraction of assisted ticks in a scripted match), the shared meet_choose height cap
+and bounces for the AI (own golden update), defenders' cone on opponents' passes (playtest question).
 
-### Playtest guide (CP0.3d clock)
-1. A match is two 5-minute halves (the clock runs 9x to 90'). At 45' the added minutes show (+N); the half ends
-   after them. HALF TIME: teams change ends, blue kicks off the second half. FULL TIME: Esc > Restart match.
+### Playtest guide (CP0.3d)
+1. Match clock: two 5-minute halves (90' at 9x); added minutes at 45'/90' (+N); half time: ends change, blue
+   kicks off; FULL TIME: Esc > Restart match.
+2. Movement assist (Esc > Movement assist, default Normal; applies on Restart): hold a direction roughly at a loose
+   ball (even the neighbouring arrow key) - he bends onto it; let go and he stops; point well away (> 55 deg) and
+   nothing changes. Try a long clearance, a ball at your feet, and an AI team-mate's pass to you (he meets it).
+3. Compare Off / Normal / High on the same drills: which one feels like your own player?
+4. Questions: should the defender also get bent onto an opponent's pass lane? Should AI passes to you still force
+   a sprint now that stamina exists?
 
 ### Playtest guide (CP0.3c)
 1. Bottom-left: your player's stats (PAC CTL PAS SHO TCK STA; keepers KEEP) and an ENERGY bar. Switch players (Q)
@@ -90,8 +98,8 @@ Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (14 ctest entries, all passing):** test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `a034042ea9bdd9a8`, 7v7 `a462a0410e97ee05`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (15 ctest entries, all passing):** test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
+  (golden 5v5 `a034042ea9bdd9a8`, 7v7 `0456aca621621227`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

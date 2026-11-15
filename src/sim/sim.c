@@ -18,6 +18,7 @@ WpMatchConfig sim_config_7v7(void) {
     c.pitch.goal_depth = FX(1.5);
     c.stats_mode = WP_STATS_OWN;                      /* generated squads, equal totals (D-034) */
     c.half_ticks = T_HALF_TICKS;                      /* two 5-minute halves, 90' at 9x (D-036) */
+    c.assist_level = WP_ASSIST_NORMAL;                /* movement assist toward the ball (D-037) */
     return c;
 }
 
@@ -31,6 +32,7 @@ WpMatchConfig sim_config_5v5(void) {
     c.pitch.goal_depth = FX(1.3);
     c.stats_mode = WP_STATS_OWN;
     c.half_ticks = T_HALF_TICKS;
+    c.assist_level = WP_ASSIST_NORMAL;
     return c;
 }
 

@@ -416,3 +416,21 @@ time thing" ("extra time" clarified = stoppage time).
   team plan, brain, keeper box, aim assist, through-ball solver, kick-off placement, restarts, goal crediting
   (refactor verified bit-identical before the clock was switched on).
 - HUD: `27:15   1ST HALF`, `45:00 (+3)` once announced, `45+1:12 (+3)` in stoppage; HALF TIME / FULL TIME banners.
+
+## D-037 — Movement assist toward the ball (2026-11-15, owner request + research)
+Research: `reports/Assisted movement toward the ball.md` (EA FC / eFootball settings, SWOS port, YSoccer and Google
+Research Football source, assist literature, WildPitch audit). Owner decisions (AskUserQuestion): AI team-mates'
+passes get the receive assist even with the stick released; a released stick never chases a loose ball; an Esc-menu
+setting Off / Low / Normal / High, default Normal.
+- **Chase cone** (`seats_chase_assist`, legs only, after the D-020 receive assist): a loose ball, a stick held past
+  48/127, no pass travelling to another team-mate, the ball is "his" (his earliest meeting time vs the 3 team-mates
+  nearest it: full weight if he's first, fading to 0 when one is 0.3 s quicker). The stick's heading is turned
+  toward his meeting point (`meet_chase`: body-height points only, grass bounces modelled, reach at the speed he is
+  actually running) by w x min(|delta|, F): full within F = 30 deg, fading linearly to exactly 0 at E = 55 deg of the
+  ball or the meeting point (Low 20/40, High 40/70). Never sprints for him, never changes his speed, buttons/aim stay
+  his. Measured (test_chase_assist, 8-way keys onto a still ball): 3 m 56/72 -> 72/72, 5 m 40/72 -> 72/72.
+- **AI pass to the human:** the same receive assist as his own passes; his stick at the kick is the "no opinion"
+  reference (a runner keeps his run). **Latch** survives analogue jitter (T_RECV_STICK_TOL). **Loose-ball
+  auto-switch by time** to the ball (YSoccer's 0.5x hysteresis), no longer blocked by a pass to the other team.
+- **Off = the pre-D-037 sim bit for bit** (verified: goldens unchanged with every seat Off, then Normal turned on).
+  Per seat `SimState.assist_level` (hashed when any is on); the menu applies it on Restart match.
