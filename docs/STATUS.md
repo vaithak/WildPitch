@@ -25,9 +25,9 @@ AI"** after feedback.
   the physics box, F3 shows ball speed/height/spin/owner/phase/events, control hints on screen.
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
-- Flags: `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
+- Flags: `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (8 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_scoring, test_determinism
-  (golden `df239f61a611a308`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+  (golden `41c7af68235c7e0b`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~7,100× real time (2.4 µs/tick; was 22,700× before team logic + pass solver — fine for play, revisit with a
   lookup table before RL training).
@@ -52,7 +52,8 @@ Bounce (D-016): 2 m drop → 0.69 m; full chip stops after ~30.6 m (was 39.7). P
 never closer than 0.40 m to the player's centre on stops/receptions/gathers; no braking from beyond reach.
 
 Scoring sweep (`test_scoring`, keyboard 8-way, statue keeper): natural positions (x ≥ 10 m, |y| ≤ 4 m, stick toward
-goal) score **51%**; misses are mostly the keeper/kickoff statues. Floor asserted at 45%.
+goal) score **51%** vs statues; in the **live** setup (keeper shades on his line, opposition shuffles) **39%**
+(asserted ≥ 25%). Live passes to moving team-mates: 23/24 complete; misses are mostly the keeper/kickoff statues. Floor asserted at 45%.
 Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here.
 
 | kick | speed | carry to 1st bounce | peak | flight |

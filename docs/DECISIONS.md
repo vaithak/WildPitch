@@ -151,5 +151,8 @@ permanent line on the title screen footer and in the credits. Never on the in-ma
   waits, the stick only AIMS and the legs step under the ball. Contact only in the head band (±0.32 m, 0.45 m
   reach); the attacker's body cylinder ignores the ball meanwhile. K: aim-assisted at goal, 11 m/s + 25% of the
   incoming pace (max 17), nodded down; J: cushioned to the best team-mate (hands control over).
+- **Missed headers:** the attempt ends as soon as the ball has gone past (or someone has it): body collision back,
+  player free ~12 ticks later. Auto-switch never fires while a header attempt (or kick wind-up) is pending. The
+  avatar's header pose is timed from take-off (jump) / contact (stand), holding a ready stance while waiting.
 - **Assisted receive meet point:** cheap 50 ms ball prediction; ground/lofted passes → the reachable point CLOSEST to
   the receiver (step across, let it come: arrives ~6 m/s); through balls → where it slows to ~3.5 m/s (run onto it).

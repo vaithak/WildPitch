@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "sim/sim.h"
+#include "sim/tuning.h"
 #include "game/render.h"
 #include "game/dedication.h"
 
@@ -88,6 +89,19 @@ static void demo_input(SimState *s, WpInput *in) {
 
 /* ---- autoplay harness (visual checks): seat 0 chases the ball, dribbles at the goal, charges and shoots ---- */
 static bool autoplay_chip = false, autoplay_dribble = false;
+static float autoplay_header = 0;   /* --autoplay-header H: a cross arriving at height H, K pressed (harness) */
+
+/* Harness only (writes the sim directly, like --demo): striker near goal, ball crossed in from the right. */
+static void header_cross_setup(SimState *s, float h) {
+    int me = s->seat_player[0];
+    WpPlayer *p = &s->players[me];
+    p->pos = fv2_make(FX(14.0), FX(1.0)); p->vel = fv2_make(0, 0); p->facing = 0;
+    WpBall *b = &s->ball;
+    fx T = FX(0.7), z0 = FX(1.0);
+    b->pos = fv2_make(FX(14.0), FX(11.0)); b->z = z0; b->owner = -1; b->spin = 0;
+    b->vel = fv2_scale(fv2_sub(p->pos, b->pos), fx_div(FX_ONE, T));
+    b->vz = fx_div((fx)(h * 65536.0f) - z0, T) + fx_mul(T_GRAVITY, T) / 2;
+}
 static void autoplay_input(const SimState *s, WpInput *in) {
     static int charging = 0;
     int me = s->seat_player[0];
@@ -244,6 +258,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--autoplay")) autoplay = true;
         else if (!strcmp(argv[i], "--autoplay-chip")) { autoplay = true; autoplay_chip = true; }
         else if (!strcmp(argv[i], "--autoplay-dribble")) { autoplay = true; autoplay_dribble = true; }
+        else if (!strcmp(argv[i], "--autoplay-header") && i + 1 < argc) { autoplay = true; autoplay_header = (float)atof(argv[++i]); }
         else if (!strcmp(argv[i], "--check-kick-pose")) return check_kick_pose();
     }
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -321,6 +336,10 @@ int main(int argc, char **argv) {
             uint16_t frame_ev = 0;
             while (acc >= tick_ns) {
                 if (g.demo) demo_input(&g.cur, &in);
+                else if (autoplay_header > 0) {
+                    if (g.cur.tick == 20) header_cross_setup(&g.cur, autoplay_header);
+                    in.seat[0] = (WpSeatInput){0, 0, (uint16_t)(g.cur.tick == 21 ? WP_BTN_SHOOT : 0)};
+                }
                 else if (autoplay) autoplay_input(&g.cur, &in);
                 else in.seat[0] = read_keyboard();
                 Uint64 t0 = SDL_GetTicksNS();

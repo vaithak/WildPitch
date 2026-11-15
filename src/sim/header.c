@@ -40,7 +40,8 @@ void header_start(SimState *s, int i, int shot, int jump) {
     p->kick.kind = WP_KICK_HEADER;
     p->kick.foot = (uint8_t)shot;            /* header sub-kind: 0 = pass, 1 = shot */
     p->kick.done = 0;
-    p->kick.windup = 0;                      /* jump: 0 = still waiting to take off; stand: contact tick + 1 */
+    p->kick.windup = 0;                      /* 0 = waiting; then jump: take-off tick + 1, stand: contact tick + 1
+                                                (the avatar's header pose is timed from it) */
     p->kick.to = 0;
     p->kick_charge = 0;
     p->charge_kind = 0xFF;
@@ -55,17 +56,29 @@ void header_step(SimState *s, int i, const WpSeatInput *in) {
     fx t, z, miss;
     ball_approach(s, p->pos, &t, &z, &miss);
     if (p->action == WP_ACT_JUMP_HEADER && !p->kick.windup) {
+        fv2 rel = fv2_sub(p->pos, b->pos);
+        if (b->owner >= 0 || (fv2_dot(rel, b->vel) < 0 && fv2_len(rel) > FX(1.0))) {   /* passed before take-off */
+            p->action = WP_ACT_NONE; p->action_timer = 0; p->kick.done = 1;
+            return;
+        }
         /* take off so the apex (~0.35 s) meets the ball; drift toward where it will be */
         if (t <= fx_div(WP_JUMP_VZ, T_GRAVITY) || p->action_timer > 45) {
             p->vz = WP_JUMP_VZ;
             fv2 meet = fv2_add(b->pos, fv2_scale(b->vel, t));
             p->vel = fv2_clamp_len(fv2_scale(fv2_sub(meet, p->pos), fx_div(FX_ONE, fx_max(t, FX(0.2)))), FX(3.5));
-            p->kick.windup = 1;
+            p->kick.windup = (uint8_t)(p->action_timer + 1);
         }
         return;
     }
     fv2 head = fv2_add(p->pos, fv2_from_angle(p->facing, HEAD_FWD));
     fx hz = p->z + HEAD_Z;
+    /* missed: the ball has gone past (or someone has it) -> give up now, body collision back, free soon */
+    fv2 to_head = fv2_sub(head, b->pos);
+    if (b->owner >= 0 || (fv2_dot(to_head, b->vel) < 0 && fv2_len(to_head) > HEAD_REACH_XY)) {
+        p->kick.done = 1;
+        if (p->action == WP_ACT_STAND_HEADER) p->kick.windup = (uint8_t)(p->action_timer + 1 > 255 ? 255 : p->action_timer + 1);
+        return;
+    }
     if (b->owner >= 0 || fx_abs(b->z - hz) > HEAD_REACH_Z || fv2_len(fv2_sub(b->pos, head)) > HEAD_REACH_XY) return;
     /* contact: direction from the human's stick now */
     int has;

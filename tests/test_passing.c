@@ -168,5 +168,50 @@ int main(void) {
         if (kind != 1) CHECKF(s.score[0] == 1 || s.phase == WP_PHASE_GOAL, "header at goal didn't score");
         if (kind == 1) CHECKF(s.seat_player[0] == MATE, "header pass: control not handed to the team-mate");
     }
+    /* 8. a missed header doesn't lock the player: free again soon after the ball has gone past, body back on */
+    {
+        setup_empty(&s, ME); s.seat_player[0] = ME;
+        s.players[ME].pos = fv2_make(FX(10.0), 0);
+        s.ball.pos = fv2_make(FX(10.0) - FX(4.5), FX(1.9)); s.ball.z = FX(1.6); s.ball.owner = -1;
+        s.ball.vel = fv2_make(FX(15.0), 0); s.ball.vz = fx_mul(T_GRAVITY, FX(0.15));  /* passes 1.9 m wide in 0.3 s: unreachable */
+        run_seat(&s, (WpSeatInput){0, 0, WP_BTN_SHOOT}, 1);
+        int started = s.players[ME].action == WP_ACT_STAND_HEADER || s.players[ME].action == WP_ACT_JUMP_HEADER;
+        int passed_t = -1, free_t = -1; uint16_t ev = 0;
+        for (int t = 0; t < 120 && free_t < 0; t++) {
+            ev |= run_seat(&s, NOIN, 1);
+            if (passed_t < 0 && s.ball.pos.x > s.players[ME].pos.x + FX(0.5)) passed_t = t;
+            if (passed_t >= 0 && s.players[ME].action == WP_ACT_NONE) free_t = t;
+        }
+        printf("missed header: started %d, ball past at t%d, player free at t%d\n", started, passed_t, free_t);
+        CHECKF(started && !(ev & WP_EV_HEADER), "miss setup: started %d header %d", started, (ev & WP_EV_HEADER) != 0);
+        CHECKF(free_t >= 0 && free_t - passed_t <= 20, "missed header locked the player for %d ticks", free_t - passed_t);
+        CHECK(s.players[ME].kick.done);                     /* body collision applies again */
+    }
+
+    /* 9. LIVE setup (no statue flag, one seat): taps to MOVING team-mates complete */
+    {
+        int ok = 0, tries = 0;
+        for (int trial = 0; trial < 24; trial++) {
+            WpMatchConfig cfg = sim_default_config();
+            sim_init(&s, &cfg);
+            int me = s.seat_player[0];
+            run_seat(&s, (WpSeatInput){127, (int8_t)((trial % 3 - 1) * 90), 0}, 20 + trial * 6);   /* dribble, let them move */
+            if (s.ball.owner != me) continue;
+            int j = 1 + trial % 3;                           /* a defender or the midfielder */
+            fv2 to = fv2_norm(fv2_sub(s.players[j].pos, s.players[me].pos));
+            int8_t sx = (int8_t)(to.x * 127 / FX_ONE), sy = (int8_t)(to.y * 127 / FX_ONE);
+            run_seat(&s, (WpSeatInput){sx, sy, WP_BTN_PASS}, 2);
+            run_seat(&s, (WpSeatInput){sx, sy, 0}, 1);
+            int got = -1, kicked = 0;
+            for (int t = 0; t < 300 && got < 0; t++) {
+                kicked |= (run_seat(&s, NOIN, 1) & WP_EV_KICK) != 0;
+                if (kicked && s.ball.owner >= 0) got = s.ball.owner;
+            }
+            tries++;
+            ok += got >= 0 && s.players[got].team == 0 && got != me;
+        }
+        printf("live passes to moving team-mates: %d/%d completed\n", ok, tries);
+        CHECKF(tries >= 15 && ok * 100 >= tries * 80, "live pass completion %d/%d", ok, tries);
+    }
     return TEST_DONE();
 }

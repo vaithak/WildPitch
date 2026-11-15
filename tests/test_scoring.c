@@ -6,11 +6,12 @@
 #include "test_util.h"
 #include "sim_test_helpers.h"
 
+static int live;   /* 1 = real CP0.2 setup: keeper shades toward the ball, opposition shuffles (no statue flag) */
 static char shoot(int x, int y, int8_t sx, int8_t sy, int charge, int jog, int chip) {
     static SimState s;
     WpMatchConfig cfg = sim_default_config();
     sim_init(&s, &cfg);
-    s.flags |= WP_SIMF_STATIC_OTHERS;                 /* aim-assist calibration vs statue keeper/defenders */
+    if (!live) s.flags |= WP_SIMF_STATIC_OTHERS;      /* aim-assist calibration vs statue keeper/defenders */
     int me = s.seat_player[0];
     s.players[me].pos = fv2_make(FX_INT(x), FX_INT(y));
     s.ball.pos = fv2_make(FX_INT(x) + FX(0.4), FX_INT(y));
@@ -55,5 +56,15 @@ int main(void) {
     printf("\nnatural shots (x>=10, |y|<=4, stick toward goal): %d/%d goals (%.0f%%)\n",
            goals_natural, shots_natural, 100.0 * goals_natural / shots_natural);
     CHECKF(goals_natural * 100 >= shots_natural * 45, "too hard to score from natural positions");   /* was 52%% at CP0.1 */
+    /* the same natural shots in the live setup (keeper shading on his line, opposition shuffling) */
+    live = 1;
+    int g2 = 0, n2 = 0;
+    for (int jog = 0; jog <= 1; jog++)
+        for (int c = 0; c < 2; c++)
+            for (int d = 0; d < 3; d++)
+                for (int y = 4; y >= -4; y -= 4)
+                    for (int x = 10; x <= 16; x += 3) { n2++; g2 += shoot(x, y, dirs[d][0], dirs[d][1], c ? 36 : 18, jog, 0) == 'G'; }
+    printf("natural shots, LIVE (keeper shades, opposition shuffles): %d/%d goals (%.0f%%)\n", g2, n2, 100.0 * g2 / n2);
+    CHECKF(g2 * 100 >= n2 * 25, "live scoring collapsed");
     return TEST_DONE();
 }

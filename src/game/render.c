@@ -116,6 +116,16 @@ void wp_render_reset_anim(WpRenderCtx *ctx) {
     wp_ball_vis_reset(&ctx->ball);
 }
 
+/* Pose clock for actions. Header attempts start by waiting for the ball, so their pose is timed from take-off
+ * (jump) or contact (stand); while waiting hold the "ready" part of the pose (arms up, before the nod). */
+static float header_pose_t(const WpPlayer *p, float alpha) {
+    float t = ((float)p->action_timer + alpha) / (float)WP_TICK_HZ;
+    if ((p->action != WP_ACT_JUMP_HEADER && p->action != WP_ACT_STAND_HEADER) || p->kick.kind != WP_KICK_HEADER) return t;
+    if (!p->kick.windup) return 0.15f;
+    float since = ((float)p->action_timer - (float)(p->kick.windup - 1) + alpha) / (float)WP_TICK_HZ;
+    return p->action == WP_ACT_JUMP_HEADER ? since : 0.28f + since;
+}
+
 typedef struct { float y; int kind, idx; } DrawItem;   /* depth-sorted sprites */
 
 void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
@@ -175,7 +185,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 .phase = ctx->anim[i].phase,
                 .z = pz[i],
                 .action = p->action,
-                .action_t = ((float)p->action_timer + alpha) / (float)WP_TICK_HZ,
+                .action_t = header_pose_t(p, alpha),
                 .time = ctx->time + (float)i * 0.37f,
                 .keeper = p->role == WP_ROLE_KEEPER,
                 .touch01 = 1.0f - ctx->anim[i].since_touch / 0.16f,

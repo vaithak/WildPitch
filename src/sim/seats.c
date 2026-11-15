@@ -64,7 +64,9 @@ void seats_update(SimState *s, const WpInput *in) {
             if (dx * dx + dy * dy > 48 * 48) s->pass_stick[0] = s->pass_stick[1] = -128;
         }
         const WpPlayer *p = &s->players[me];
-        if (s->phase != WP_PHASE_PLAY || b->owner == me || (p->action == WP_ACT_KICK && !p->kick.done)) continue;
+        int busy = (p->action == WP_ACT_KICK || p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) &&
+                   !p->kick.done;                                     /* mid-kick or going for a header */
+        if (s->phase != WP_PHASE_PLAY || b->owner == me || busy) continue;
         int pressed = (si->buttons & WP_BTN_SWITCH) && !(s->prev_buttons[k] & WP_BTN_SWITCH);
         if (pressed) {
             int to = nearest_to_ball(s, p->team, me, 0);
