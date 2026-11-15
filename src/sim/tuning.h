@@ -10,7 +10,10 @@
 #define T_BOUNCE_REST      FX(0.55)   /* vertical speed kept on a grass bounce */
 #define T_BOUNCE_KEEP      FX(0.85)   /* horizontal speed kept on a bounce */
 #define T_BOUNCE_MIN_VZ    FX(0.6)    /* below this the ball stops bouncing and rolls */
-#define T_ROLL_DECEL       FX(1.3)    /* m/s^2 rolling resistance on grass */
+/* Rolling on grass: decel = ROLL_DECEL + ROLL_LIN*v + AIR_DRAG*v^2. Fast balls bleed speed quickly, slow balls
+ * creep to a stop (a constant-only model made a 12 m/s pass roll 55 m / 9 s). 12 m/s pass -> ~18 m, ~5 s. */
+#define T_ROLL_DECEL       FX(0.9)    /* m/s^2 constant part (rolling resistance) */
+#define T_ROLL_LIN         FX(0.35)   /* 1/s speed-proportional part (grass) */
 #define T_AIR_DRAG         FX(0.013)  /* quadratic drag: a = k*v^2 (real ball ~0.013) */
 #define T_CURL             FX(0.045)  /* Magnus: lateral accel = k * spin * speed */
 #define T_SPIN_DECAY_AIR   FX(0.5)    /* per second */

@@ -98,3 +98,9 @@ smoothness, gap < 0.9 m, cuts/reversals after 40–180-tick run-ups) guard it.
 - Name: keep WILDPITCH? (working title in use)
 - Business model: one-time purchase vs open-source core.
 - Audio: requires `sudo apt install libasound2-dev libpulse-dev libudev-dev` then re-configure (needed by CP0.5).
+
+## D-015 — Speed-dependent rolling friction (2026-11-15, CP0.1c)
+Ground-ball deceleration = `T_ROLL_DECEL + T_ROLL_LIN·v + T_AIR_DRAG·v²` (`ball_roll_decel()` in sim_internal.h), used
+by ball physics AND dribble-touch sizing so they never disagree. Fast balls bleed speed, slow balls creep to a stop.
+Why: owner said a constant-decel pass "doesn't stop" (12 m/s rolled 55 m). Future pitch surfaces (wet/dry/long grass,
+procedural world) = different values of these three numbers.

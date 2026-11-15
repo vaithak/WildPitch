@@ -1,11 +1,11 @@
 # Status
 
-_Last updated: 2026-11-14 by Claude session #1_
+_Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.1b — Dribble feel fix: ✅ done, waiting for the owner's playtest** (owner said CP0.1 dribbling "feels a bit off,
-worse while sprinting"; diagnosis + fix in PLAYTEST_FEEDBACK / D-014). Next: **CP0.2 "Pass and move"** once dribbling
-feels right.
+**CP0.1c — Rolling friction: ✅ done, waiting for the owner's playtest.** CP0.1b dribble fix: owner said "this looks
+better". Then: "friction looks a bit weird, a simple pass doesn't stop" → speed-dependent rolling friction (D-015).
+Next: **CP0.2 "Pass and move"**.
 
 ## What works now
 - Build: CMake + Ninja, SDL 3.4.8 vendored and statically linked.
@@ -19,7 +19,7 @@ feels right.
   the physics box, F3 shows ball speed/height/spin/owner/phase/events, control hints on screen.
 - Flags: `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (7 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_scoring, test_determinism
-  (golden `eda2fc8bf4a1ac7e`; scripted seat chases the ball: ~110 kicks, 270 touches, 6 goals per 10 min, asserted),
+  (golden `6eb148877e33cf87`; scripted seat chases the ball: ~130 kicks, 440 touches, 11 goals per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~22,700× real time.
 
@@ -28,13 +28,16 @@ Dribble numbers (D-014). Direction-change rows are the WORST case over 16 start 
 | | jog | sprint |
 |---|---|---|
 | touch rhythm (steady) | every 16 ticks (0.27 s) | every 20 ticks (0.33 s) |
-| ball gap, steady / max | ~0.45 / 0.62 m | ~0.75 / 0.91 m (reach 1.0) |
+| ball gap, steady / max | ~0.45 / 0.56 m | ~0.75 / 0.91 m (reach 1.0) |
 | player speed change per tick at top speed | 0.00 m/s | 0.00 m/s (was 0.30 flicker) |
 | 90° cut: ball going the new way after | 3 ticks (50 ms) | 3 ticks |
 | 180° turn: ball heading back after / max gap | 3 ticks / 0.63 m | 3 ticks / 1.00 m (lose at 2.2) |
 | stop: ball settles from the player | 0.45 m | 0.45 m |
 | balls lost after long run-ups + cuts | 0 | 0 (was 2) |
 | shot release → ball leaves foot | ≤ 6 ticks (100 ms) | ≤ 6 ticks |
+
+Ground roll (D-015, `test_ball`): 3 m/s → 2.8 m / 2.2 s · 6 m/s → 7.6 m / 3.3 s · **12 m/s pass → 18 m / 4.5 s** ·
+22 m/s → 34 m / 5.5 s (was 55 m / 9 s for a pass).
 
 Scoring sweep (`test_scoring`, keyboard 8-way, statue keeper): natural positions (x ≥ 10 m, |y| ≤ 4 m, stick toward
 goal) score **52%**; misses are mostly the keeper/kickoff statues. Floor asserted at 45%.
@@ -50,7 +53,7 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Log the owner's CP0.1 playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; adjust `src/sim/tuning.h` if needed.
+1. Log the owner's CP0.1c playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; adjust `src/sim/tuning.h` if needed.
 2. Re-plan and start CP0.2 per ROADMAP: aimed passing (tap short / hold through ball), switch player, teammates
    holding shape with basic runs, receiving/first touch from passes, **playable contextual headers** (D-010:
    pass/shoot while a reachable ball is in the air → jump/stand header with head-band contact), HUD clock.
@@ -63,6 +66,10 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Playtest guide (CP0.1c — focus: ball roll)
+Pass (J) on open grass and watch it slow: quick at first, creeping to a stop (~18 m). Loose touches, rebounds and
+deflections also die sooner now. Too short/long? One number each in `src/sim/tuning.h` (`T_ROLL_DECEL`, `T_ROLL_LIN`).
 
 ## Playtest guide (CP0.1b — focus: dribbling)
 Same build/controls as below. Dribble at jog and with Shift held: straight runs, sharp cuts, reversals, stops.

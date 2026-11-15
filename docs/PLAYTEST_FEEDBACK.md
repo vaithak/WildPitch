@@ -31,3 +31,12 @@ Format:
   with a touch every 1-2 s — detached, no rhythm; (3) at a steady sprint the ball parked at exactly reach (1.0 m), so
   cuts could abandon it. Tests missed it: they only sampled the first second of a dribble.
 - **Action:** see CP0.1b in ROADMAP / D-014.
+
+## CP0.1b — 2026-11-15
+- **Feedback (verbatim):** "this looks better, but the friction looks a bit weird, a simple pass doesn't stop too, if
+  it will be done later, no worries, but just bringing it up."
+- **Diagnosis:** rolling friction was a constant 1.3 m/s² only → a 12 m/s pass rolled 55 m over 9 s (longer than the
+  40 m pitch) at an unnaturally even slowdown; no drag on ground balls.
+- **Action (CP0.1c, D-015):** decel = 0.9 + 0.35·v + 0.013·v² (rolling + grass + air drag). 12 m/s pass → 18 m / 4.5 s;
+  3 m/s → 2.8 m; 22 m/s → 34 m. Dribble touch sizing uses the same model (feel unchanged; sprint max gap 0.88→0.91 m).
+  Pass *weight* by distance (tap vs hold) still comes in CP0.2.

@@ -50,6 +50,9 @@ Not playable; invisible plumbing every later CP depends on.
 ### CP0.1b — Dribble feel fix ✅ 🔵  (owner feedback on CP0.1)
 - Rhythmic predictive touches (D-014), no speed flicker, flick animation, steady-state dribble tests.
 
+### CP0.1c — Rolling friction ✅ 🔵  (owner feedback on CP0.1b)
+- Speed-dependent ground friction (D-015): 12 m/s pass rolls 18 m instead of 55 m; roll-distance tests.
+
 ### CP0.2 — "Pass and move" ⏭ 🔵
 **Playable:** your full 5-a-side team (4 + keeper) vs. a passive opposition (cones that move a bit).
 - Pass: tap = short ground pass to the best teammate in the stick direction; hold = through ball

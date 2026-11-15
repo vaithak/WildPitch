@@ -18,6 +18,23 @@ int main(void) {
     run_seat(&s, NOIN, 60);
     CHECKF(s.ball.pos.y > FX(0.6), "curl y=%.2f", tod(s.ball.pos.y));
 
+    /* rolling friction (owner: "a simple pass doesn't stop"): speed-dependent decel, so passes stop in sane
+     * distances and fast balls don't glide for ever. Ground balls along y=8 from x=-18 (+x, away from goals). */
+    {
+        static const int speeds[] = {3, 6, 12, 22};
+        static const double lo[] = {2.0, 5.5, 14.0, 26.0}, hi[] = {4.0, 9.5, 22.0, 38.0};
+        for (int k = 0; k < 4; k++) {
+            setup_empty(&s, -1); s.seat_player[0] = -1;
+            launch(&s, FX(-18.0), FX(8.0), 0, FX_INT(speeds[k]), 0, 0);
+            int t = 0;
+            while ((s.ball.vel.x || s.ball.vel.y) && t < 1200) { run_seat(&s, NOIN, 1); t++; }
+            double d = tod(s.ball.pos.x) + 18.0;
+            printf("roll %2d m/s: stops after %.1f m, %.1f s\n", speeds[k], d, t / 60.0);
+            CHECKF(d > lo[k] && d < hi[k], "%d m/s roll %.1f m (want %.0f..%.0f)", speeds[k], d, lo[k], hi[k]);
+            CHECKF(t < 60 * 7, "%d m/s ball still rolling after %.1f s", speeds[k], t / 60.0);
+        }
+    }
+
     /* full-power ground shots dead at a post from several distances: must bounce out, never tunnel/score */
     for (int dist = 3; dist <= 15; dist += 6)
         for (int side = -1; side <= 1; side += 2) {

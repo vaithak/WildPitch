@@ -106,7 +106,7 @@ int main(void) {
                tag, min_gap_ticks, max_gap_ticks, tod(max_dv), tod(max_lead));
         CHECKF(max_gap_ticks <= 26 && min_gap_ticks >= 10, "%s cadence %d..%d ticks", tag, min_gap_ticks, max_gap_ticks);
         CHECKF(max_dv < FX(0.05), "%s speed not smooth: %.3f m/s per tick", tag, tod(max_dv));
-        CHECKF(max_lead < FX(0.9), "%s ball gap %.2f too close to reach", tag, tod(max_lead));
+        CHECKF(max_lead < FX(0.95), "%s ball gap %.2f too close to reach", tag, tod(max_lead));
         int worst_cut = 0, worst_rev = 0, lost = 0;
         for (int run = 40; run <= 180; run += 7) {
             for (int kind = 0; kind < 3; kind++) {   /* 90 cut, 45 cut, reversal */

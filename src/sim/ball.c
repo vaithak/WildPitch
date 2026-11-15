@@ -27,7 +27,7 @@ static void integrate(SimState *s, fx dt) {
         b->vz -= fx_mul(b->vz, kd) + fx_mul(T_GRAVITY, dt);
         b->spin -= fx_mul(fx_mul(b->spin, T_SPIN_DECAY_AIR), dt);
     } else {
-        fx dec = fx_mul(T_ROLL_DECEL, dt);
+        fx dec = fx_mul(ball_roll_decel(hs), dt);
         if (hs <= dec) b->vel = fv2_make(0, 0);
         else b->vel = fv2_scale(b->vel, fx_div(hs - dec, hs));
         b->spin -= fx_mul(fx_mul(b->spin, T_SPIN_DECAY_GROUND), dt);

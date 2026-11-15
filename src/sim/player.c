@@ -219,7 +219,7 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
         fv2 target = fv2_add(p_pred, fv2_scale(mdir, lead));
         fv2 need = fv2_scale(fv2_sub(target, b->pos), fx_div(FX_ONE, T));
         fv2 ndir = fv2_norm(need);
-        b->vel = fv2_add(need, fv2_scale(ndir, fx_mul(T_ROLL_DECEL, T) / 2));
+        b->vel = fv2_add(need, fv2_scale(ndir, fx_mul(ball_roll_decel(fv2_len(need)), T) / 2));
         b->spin = 0;
         if (b->vz > 0) b->vz = 0;
         p->touch_cooldown = (uint16_t)gap;
