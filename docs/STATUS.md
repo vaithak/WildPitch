@@ -3,12 +3,13 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3c — Player stats + AI passing (D-034/D-035): ✅ done, waiting for the owner's playtest.** (CP0.3b++ -
-back-pass, kick-off, boards - also still awaiting playtest.)
-Next: owner feedback; then **CP0.4 "A real match"** (halves alternate the kick-off, fouls, free kicks, offside).
-Open: AI conversion still ~45-50% in 7v7 (close-range 1v1s - keeper smother/rush); 5v5 leans to team 0 with
-no jitter (pre-existing); 5v5 tackles high (~2.2/min/team).
-Explainer: https://claude.ai/artifact/YT1ERDs2HvaMoz3udPpqT6
+**CP0.3d — Match clock (D-036) ✅; assisted movement toward the ball: 🚧 deep research running** (report:
+`reports/Assisted movement toward the ball.md`, notes in `research_notes/Assisted movement toward the ball/`), then
+implement it. CP0.3b++ / CP0.3c await the owner's playtest.
+
+### Playtest guide (CP0.3d clock)
+1. A match is two 5-minute halves (the clock runs 9x to 90'). At 45' the added minutes show (+N); the half ends
+   after them. HALF TIME: teams change ends, blue kicks off the second half. FULL TIME: Esc > Restart match.
 
 ### Playtest guide (CP0.3c)
 1. Bottom-left: your player's stats (PAC CTL PAS SHO TCK STA; keepers KEEP) and an ENERGY bar. Switch players (Q)
@@ -20,7 +21,7 @@ Explainer: https://claude.ai/artifact/YT1ERDs2HvaMoz3udPpqT6
 
 Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20 m passes 47% (was 28%), goals
 ~0.5/min, shots ~1/min, conversion ~45-50% (was ~60%); AI energy settles ~75%. Goldens: 5v5 `a034042ea9bdd9a8`,
-7v7 `800c7d4fe755cfb4`. bench_sim 17.7 us/tick.
+7v7 `a462a0410e97ee05` (after D-036). bench_sim 17.7 us/tick.
 
 ### Playtest guide (CP0.3b++)
 1. Kick-off: you can't dribble off - press S (pass) to start; blue waits outside the circle. After a goal the team
@@ -89,8 +90,8 @@ Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (13 ctest entries, all passing):** test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `a034042ea9bdd9a8`, 7v7 `800c7d4fe755cfb4`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (14 ctest entries, all passing):** test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
+  (golden 5v5 `a034042ea9bdd9a8`, 7v7 `a462a0410e97ee05`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

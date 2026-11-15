@@ -224,7 +224,7 @@ void seats_update(SimState *s, const WpInput *in) {
                      (s->pass_target >= 0 && s->players[s->pass_from].team != p->team);
         if (theirs) {
             if (s->switch_cool[k]) continue;
-            fx sg = p->team == 0 ? FX_ONE : -FX_ONE;
+            fx sg = FX_INT(team_dir(s, p->team));
             fv2 spot = fv2_add(b->pos, fv2_make(-fx_mul(sg, FX(1.5)), 0));
             int best = -1; fx bd = 0;
             for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {

@@ -18,7 +18,7 @@ void restart_out(SimState *s, int touchline, fx x_or_y, int goal_side) {
         s->restart_team = (uint8_t)(1 - last_team);
         s->restart_spot = fv2_make(fx_clamp(x_or_y, -hl + FX(1.0), hl - FX(1.0)), b->pos.y > 0 ? hw : -hw);
     } else {
-        int defending = goal_side > 0 ? 1 : 0;            /* team 1 defends +x */
+        int defending = team_dir(s, 0) == (goal_side > 0 ? 1 : -1) ? 1 : 0;   /* the team whose goal it is */
         if (last_team == defending) {
             s->restart_kind = WP_RS_CORNER;
             s->restart_team = (uint8_t)(1 - defending);
@@ -30,6 +30,7 @@ void restart_out(SimState *s, int touchline, fx x_or_y, int goal_side) {
         }
     }
     s->restart_taker = -1;
+    clock_add_stoppage(s, T_STOPPAGE_RESTART_S);
 }
 
 /* end of the OUT pause: place the ball and the taker */
@@ -88,8 +89,8 @@ void restart_step(SimState *s) {
         for (int j = 0; j < 2 * s->n_per_side; j++) {
             WpPlayer *q = &s->players[j];
             if (j == s->restart_taker) continue;
-            if (q->team == 0 && q->pos.x > -FX(0.2)) q->pos.x = -FX(0.2);
-            if (q->team == 1 && q->pos.x < FX(0.2)) q->pos.x = FX(0.2);
+            if (team_dir(s, q->team) > 0 && q->pos.x > -FX(0.2)) q->pos.x = -FX(0.2);
+            if (team_dir(s, q->team) < 0 && q->pos.x < FX(0.2)) q->pos.x = FX(0.2);
         }
     fx keep = ko ? kickoff_r(s) : T_RESTART_DIST;
     for (int j = other * s->n_per_side; j < (other + 1) * s->n_per_side; j++) {

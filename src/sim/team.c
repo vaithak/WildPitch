@@ -61,7 +61,7 @@ void team_input(const SimState *s, int i, WpSeatInput *out) {
     const WpBall *b = &s->ball;
     fx hl = s->pitch.length / 2, hw = s->pitch.width / 2;
     int team = p->team, k = i % s->n_per_side;
-    fx sg = team == 0 ? FX_ONE : -FX_ONE;                  /* attacking direction along x */
+    fx sg = FX_INT(team_dir(s, team));                     /* attacking direction along x */
     if (s->phase != WP_PHASE_PLAY) { team_steer(p, p->pos, FX_ONE, FX_ONE, out); return; }
     if (b->owner == i) {                                   /* placeholder on the ball: carry it toward goal */
         team_steer(p, fv2_make(fx_mul(sg, hl), 0), FX(0.3), FX(2.0), out);

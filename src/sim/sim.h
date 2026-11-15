@@ -120,7 +120,8 @@ typedef struct {
 
 enum { WP_ROLE_KEEPER = 0, WP_ROLE_OUTFIELD = 1 };
 
-enum { WP_PHASE_KICKOFF = 0, WP_PHASE_PLAY = 1, WP_PHASE_GOAL = 2, WP_PHASE_OUT = 3 };
+enum { WP_PHASE_KICKOFF = 0, WP_PHASE_PLAY = 1, WP_PHASE_GOAL = 2, WP_PHASE_OUT = 3, WP_PHASE_HALFTIME = 4,
+       WP_PHASE_FULLTIME = 5 };
 
 /* Per-tick event flags (cleared every tick). Presentation ORs them across the ticks of a frame to drive
  * sound/juice and to skip interpolation on teleports (WP_EV_RESET). */
@@ -136,6 +137,7 @@ enum {
     WP_EV_BODY   = 1 << 8,   /* ball hit a player's body */
     WP_EV_HEADER = 1 << 9,   /* head contact (also sets WP_EV_KICK) */
     WP_EV_TACKLE = 1 << 10,  /* a tackle won the ball off its owner */
+    WP_EV_WHISTLE = 1 << 11, /* the referee ended a half (D-036) */
 };
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };
@@ -208,6 +210,13 @@ typedef struct {
     uint8_t  pick_stick_age[WP_MAX_SEATS];/* ... and ticks since (255 = none) */
     int8_t   pick_diag[WP_MAX_SEATS][2]; /* last keyboard diagonal ... */
     uint8_t  pick_diag_age[WP_MAX_SEATS];
+    /* match clock (D-036): half_ticks = 0 means an endless match (tests, drills) */
+    uint32_t half_ticks;             /* regulation length of a half in ticks (the clock shows 45:00 then) */
+    uint32_t clock;                  /* ticks played in this half (runs through goals and restarts) */
+    uint16_t stoppage;               /* added ticks announced for this half (0 until regulation ends) */
+    uint16_t stop_acc;               /* stoppage collected so far this half (goals, set pieces) */
+    uint8_t  half;                   /* 0 = first, 1 = second: team 0 attacks +x in the first half */
+    uint8_t  first_kickoff;          /* who kicked off the first half (the other team starts the second) */
     uint8_t  stats_mode;             /* WP_STATS_* */
     uint8_t  stats[WP_MAX_PLAYERS][WP_STAT_N];
     WpPlayer players[WP_MAX_PLAYERS];
@@ -219,6 +228,7 @@ typedef struct {
     WpPitch  pitch;
     uint8_t  ai_level[2];             /* per team; sim_default_config(): both NORMAL */
     uint8_t  stats_mode;              /* WP_STATS_*; generated from the seed (sim_default_config(): NEUTRAL) */
+    uint32_t half_ticks;              /* 0 = endless (tests); the game: 2 halves of 5 min = 90' at 9x (D-036) */
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */
@@ -231,6 +241,8 @@ void     sim_player_kick(SimState *s, int i, const WpKick *k);
 void     sim_init(SimState *s, const WpMatchConfig *cfg);
 void     sim_kickoff_setpiece(SimState *s);   /* opening kick-off as a set piece (D-032; goals do it themselves) */
 void     sim_step(SimState *s, const WpInput *in);
-uint64_t sim_hash(const SimState *s);   /* field-wise FNV-1a; independent of struct padding */
+uint64_t sim_hash(const SimState *s);
+/* the broadcast clock (D-036): mm:ss of the match (0..90'), seconds into stoppage time, minutes added (0 = not yet) */
+void     sim_clock_display(const SimState *s, int *minutes, int *seconds, int *added_min, int *extra);   /* field-wise FNV-1a; independent of struct padding */
 
 #endif

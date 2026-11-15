@@ -402,3 +402,17 @@ Baseline (`passfail.c`): 61% of AI passes arrived; >20 m passes 28% (61% cut out
 - AI shot aim error base 0.3 -> 0.5 m, under pressure 0.6 -> 0.8 m.
 Result (7v7, 20 x 5 min, stats on): passes 61% -> 78% complete (>20 m 28% -> 47%), goals ~0.5/min, shots ~1/min,
 conversion ~60% -> ~45-50% in 7v7 (5v5 ~25%). Still high from close range: 1v1 smothers are follow-up work.
+
+## D-036 — Match clock at 9x, halves, change of ends, stoppage time (2026-11-15, owner request)
+Owner: "clock running at 9x, so 5 mins both halves, ensure that side changes after each half, also add the extra
+time thing" ("extra time" clarified = stoppage time).
+- `WpMatchConfig.half_ticks` (game formats: `T_HALF_TICKS` = 18000 = 5 real minutes = 45'; the clock shows 9x).
+  0 = an endless match (tests, drills, regression config): no clock, nothing extra hashed (5v5 golden unchanged).
+- The clock runs through goals and restarts. Goals add 45 game-seconds, throw-ins/corners/goal kicks 8 to the
+  stoppage pot; at 45' it is announced in whole minutes (1..4) and the half ends at the first live moment after
+  (`WP_EV_WHISTLE`). Half time: 3.5 s pause ("teams change ends"), then the teams swap ends and the team that didn't
+  kick off the match starts the second half. Full time: the match freezes, the banner says how to restart.
+- Every "team 0 attacks +x" assumption now goes through `team_dir(s, team)` (flips in the second half): formation,
+  team plan, brain, keeper box, aim assist, through-ball solver, kick-off placement, restarts, goal crediting
+  (refactor verified bit-identical before the clock was switched on).
+- HUD: `27:15   1ST HALF`, `45:00 (+3)` once announced, `45+1:12 (+3)` in stoppage; HALF TIME / FULL TIME banners.

@@ -59,7 +59,7 @@ void team_plan_update(SimState *s) {
     for (int t = 0; t < 2; t++) {
         WpTeamPlan *pl = &s->plan[t];
         int base = t * n;
-        fx sg = t == 0 ? FX_ONE : -FX_ONE;
+        fx sg = FX_INT(team_dir(s, t));
         fv2 own_goal = fv2_make(-fx_mul(sg, s->pitch.length / 2), 0);
         /* focus + possession fade */
         pl->focus = fv2_add(pl->focus, fv2_scale(fv2_sub(b->pos, pl->focus), T_PLAN_FOCUS_RATE));

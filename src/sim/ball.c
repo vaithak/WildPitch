@@ -127,10 +127,11 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z, fx dt) {
             fx yc = prev.y + fx_mul(b->pos.y - prev.y, t);
             fx zc = prev_z + fx_mul(b->z - prev_z, t);
             if (fx_abs(yc) < gw2 && zc < gh) {
-                int scorer = sg > 0 ? 0 : 1;                              /* team 0 attacks +x */
+                int scorer = team_dir(s, 0) == (sg > 0 ? 1 : -1) ? 0 : 1;  /* the team attacking that goal */
                 s->score[scorer]++;
                 s->kickoff_team = (uint8_t)(1 - scorer);
                 s->phase = WP_PHASE_GOAL;
+                clock_add_stoppage(s, T_STOPPAGE_GOAL_S);
                 s->phase_timer = T_GOAL_PAUSE_TICKS;
                 s->events |= WP_EV_GOAL;
             } else {

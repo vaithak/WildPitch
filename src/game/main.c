@@ -462,8 +462,18 @@ int main(int argc, char **argv) {
             }
             SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
             char buf[160];
-            unsigned secs = g.cur.tick / WP_TICK_HZ;
-            snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02u:%02u", g.cur.score[0], g.cur.score[1], secs / 60, secs % 60);
+            if (g.cur.half_ticks) {                            /* broadcast clock, 9x (D-036) */
+                int mm, ss, added, extra;
+                sim_clock_display(&g.cur, &mm, &ss, &added, &extra);
+                if (extra > 0) snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %d+%d:%02d   (+%d)", g.cur.score[0], g.cur.score[1],
+                                        mm, extra / 60, extra % 60, added);
+                else if (added > 0) snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02d:%02d   (+%d)", g.cur.score[0], g.cur.score[1], mm, ss, added);
+                else snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02d:%02d   %s", g.cur.score[0], g.cur.score[1], mm, ss,
+                              g.cur.half ? "2ND HALF" : "1ST HALF");
+            } else {
+                unsigned secs = g.cur.tick / WP_TICK_HZ;
+                snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02u:%02u", g.cur.score[0], g.cur.score[1], secs / 60, secs % 60);
+            }
             SDL_RenderDebugText(g.ren, 12, 12, buf);
             {   /* hints show the player's actual keys */
                 const WpKeymap *k = &g.km;
@@ -476,7 +486,19 @@ int main(int argc, char **argv) {
             }
             SDL_RenderDebugText(g.ren, 12, (float)h - 20, buf);
             wp_hud_player(g.ren, &g.cur, 0, w, h);             /* controlled player's stats + energy (D-034) */
-            if (g.cur.phase == WP_PHASE_GOAL) {
+            if (g.cur.phase == WP_PHASE_HALFTIME || g.cur.phase == WP_PHASE_FULLTIME) {
+                char msg[64];
+                snprintf(msg, sizeof msg, "%s   RED %d - %d BLUE", g.cur.phase == WP_PHASE_HALFTIME ? "HALF TIME" : "FULL TIME",
+                         g.cur.score[0], g.cur.score[1]);
+                float sc = 3.0f;
+                SDL_SetRenderScale(g.ren, sc, sc);
+                SDL_SetRenderDrawColor(g.ren, 255, 235, 90, 255);
+                SDL_RenderDebugText(g.ren, ((float)w / sc - 8.0f * (float)strlen(msg)) * 0.5f, (float)h / sc * 0.22f, msg);
+                SDL_SetRenderScale(g.ren, 1, 1);
+                SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
+                const char *sub = g.cur.phase == WP_PHASE_HALFTIME ? "teams change ends" : "Esc - menu - Restart match";
+                SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(sub), (float)h * 0.22f + 34, sub);
+            } else if (g.cur.phase == WP_PHASE_GOAL) {
                 const char *msg = "G O A L !";
                 float sc = 4.0f;
                 SDL_SetRenderScale(g.ren, sc, sc);

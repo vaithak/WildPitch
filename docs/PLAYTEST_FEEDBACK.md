@@ -137,3 +137,14 @@ Format:
 ## 2026-11-15 — go-ahead for CP0.3c
 - **Feedback (verbatim):** "continue with next checkpoint"
 - **Action:** CP0.3c player stats + AI pass choice (D-034/D-035); CP0.3b++ playtest still pending.
+
+## 2026-11-15 — after CP0.3c
+- **Feedback (verbatim):** "this looks good, but one feedback, first of all, the game should not of 90 minutes, it
+  should be some scaled down version of it, like clock running at 9x, so 5 mins both halves, ensure that side changes
+  after each half, also add the extra time thing. Secondly, the players need to be moved in the exact direction of
+  ball if the ball is just there, or during long passes, is there any assust from system side to aid player towards
+  the ball as long it is moving in the general direction of the ball? how does it work in games like fifa or other
+  good games, do a deep research on this, as it will be an important user experience part"
+- Clarified (AskUserQuestion): "extra time" = **stoppage time** (added minutes each half, e.g. 45+2').
+- **Action:** match clock at 9x (two 5-min halves), sides switch at half time, stoppage time (D-036). Deep research
+  "Assisted movement toward the ball" (4 researchers), then implement.

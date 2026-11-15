@@ -98,6 +98,10 @@ void team_input(const SimState *s, int i, WpSeatInput *out);
 void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSeatInput *out);
 void team_steer_speed(const SimState *s, const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed (m/s, his own top speeds) */
 
+/* clock.c (D-036) */
+void clock_step(SimState *s);
+void clock_add_stoppage(SimState *s, int game_seconds);
+
 /* stats.c (D-034) */
 void stats_init(SimState *s, uint8_t mode);
 fx   stat_k(const SimState *s, int i, int which);           /* (stat - 50) / 50; 0 when stats are neutral */
@@ -107,11 +111,13 @@ void stamina_step(SimState *s, int i);                      /* energy drain / re
 /* Is `at` inside `team`'s own penalty area? (depth 15% of the length, half-width 24% of the width; render matches) */
 /* back-pass rule (D-032): a keeper uses his hands only in his own box and not on a ball his team-mate deliberately
  * kicked or threw to him (headers, chests and deflections are fine) */
+/* which way team attacks along x (+1 / -1): team 0 attacks +x in the first half; sides change at half time (D-036) */
+static inline int team_dir(const SimState *s, int team) { return ((team == 0) != (s->half == 1)) ? 1 : -1; }
 static inline int in_own_box(const SimState *s, int team, fv2 at);
 static inline int keeper_hands(const SimState *s, int i);
 static inline int in_own_box(const SimState *s, int team, fv2 at) {
     fx hl = s->pitch.length / 2, depth = fx_mul(s->pitch.length, FX(0.15)), hw = fx_mul(s->pitch.width, FX(0.24));
-    fx x = team == 0 ? at.x : -at.x;
+    fx x = team_dir(s, team) > 0 ? at.x : -at.x;
     return x <= -hl + depth && x >= -hl - FX(0.5) && at.y >= -hw && at.y <= hw;
 }
 static inline int keeper_hands(const SimState *s, int i) {
@@ -120,9 +126,9 @@ static inline int keeper_hands(const SimState *s, int i) {
 }
 static inline fv2 clamp_own_box(const SimState *s, int team, fv2 at) {
     fx hl = s->pitch.length / 2, depth = fx_mul(s->pitch.length, FX(0.15)), hw = fx_mul(s->pitch.width, FX(0.24));
-    fx x = team == 0 ? at.x : -at.x;
+    fx x = team_dir(s, team) > 0 ? at.x : -at.x;
     x = fx_clamp(x, -hl + FX(0.3), -hl + depth - FX(0.2));
-    return fv2_make(team == 0 ? x : -x, fx_clamp(at.y, -hw + FX(0.2), hw - FX(0.2)));
+    return fv2_make(team_dir(s, team) > 0 ? x : -x, fx_clamp(at.y, -hw + FX(0.2), hw - FX(0.2)));
 }
 
 /* put the ball in keeper i's hands (chest height, in front of him); ball physics skips a held ball */

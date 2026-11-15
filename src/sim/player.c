@@ -66,7 +66,7 @@ void sim_player_kick(SimState *s, int i, const WpKick *k) {
  * remains so aiming still matters. Shared by shots, chips and headers. */
 wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim) {
     const WpPlayer *p = &s->players[i];
-    int sg = p->team == 0 ? 1 : -1;
+    int sg = team_dir(s, p->team);
     fx margin = fx_mul(T_AIM_POST_MARGIN, FX_ONE - fx_mul(T_STAT_SHOT_MARGIN, stat_k(s, i, WP_STAT_SHOOTING)));   /* D-034 */
     fx side = fx_max(fx_mul(s->pitch.goal_width, T_AIM_SIDE), s->pitch.goal_width / 2 - margin);
     fx gy;
@@ -207,7 +207,7 @@ static fv2 through_solve(const SimState *s, int r, fx h, fx pace, fv2 *meet, fx 
     const WpPlayer *q = &s->players[r];
     fv2 b = s->ball.pos;
     fx spd = fv2_len(q->vel), sp, delay = 0, hl = s->pitch.length / 2, hw = s->pitch.width / 2;
-    fv2 u, attack = fv2_make(q->team == 0 ? FX_ONE : -FX_ONE, 0);
+    fv2 u, attack = fv2_make(FX_INT(team_dir(s, q->team)), 0);
     /* a through ball goes into space toward goal: a runner drifting back/sideways (> ~70 deg off the attacking
      * direction) is planned as setting off on a fresh forward run instead */
     if (spd > FX(1.5) && fv2_dot(q->vel, attack) > fx_mul(spd, FX(0.35))) { u = fv2_scale(q->vel, fx_div(FX_ONE, spd)); sp = spd; }

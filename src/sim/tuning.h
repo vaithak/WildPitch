@@ -67,6 +67,12 @@
 #define T_KEEPER_NARROW_MAX FX(3.5)   /* ... at most this far out */
 #define T_AI_SAVE_ENERGY   FX(0.55)   /* AI below this energy jogs unless the job is urgent (press/chase/cover) */
 #define T_AI_TIRED_RUN     FX(2.0)    /* ... and a run in behind costs this x (1 - energy) utility */
+/* match clock (D-036) */
+#define T_HALF_TICKS       18000      /* the game's half: 5 real minutes = 45' (clock at 9x) */
+#define T_HALFTIME_TICKS   210        /* the half-time pause (3.5 s), then ends change */
+#define T_STOPPAGE_GOAL_S  45         /* game seconds of stoppage per goal ... */
+#define T_STOPPAGE_RESTART_S 8        /* ... per throw-in / corner / goal kick ... */
+#define T_STOPPAGE_MAX_MIN 4          /* ... announced as whole minutes, 1..this */
 #define T_KICKOFF_R_FRAC   FX(0.0871) /* centre-circle radius / pitch length (9.15 / 105, a real pitch) */
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */

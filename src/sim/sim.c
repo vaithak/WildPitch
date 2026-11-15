@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 2192  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 2208  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
  * 5.6 x 2.1 m goals (7.32/68 of the width, like a real pitch) */
@@ -17,6 +17,7 @@ WpMatchConfig sim_config_7v7(void) {
     c.pitch.goal_height = FX(2.1);
     c.pitch.goal_depth = FX(1.5);
     c.stats_mode = WP_STATS_OWN;                      /* generated squads, equal totals (D-034) */
+    c.half_ticks = T_HALF_TICKS;                      /* two 5-minute halves, 90' at 9x (D-036) */
     return c;
 }
 
@@ -29,6 +30,7 @@ WpMatchConfig sim_config_5v5(void) {
     c.pitch.goal_height = FX(2.0);
     c.pitch.goal_depth = FX(1.3);
     c.stats_mode = WP_STATS_OWN;
+    c.half_ticks = T_HALF_TICKS;
     return c;
 }
 
@@ -72,14 +74,14 @@ void match_place_kickoff(SimState *s) {
         fx fxl, fyl;
         formation_frac(s->n_per_side, k, &fxl, &fyl);
         fx px = fx_mul(fxl, hl), py = fx_mul(fyl, hw);
-        if (team == 1) { px = -px; py = -py; }
+        if (team_dir(s, team) < 0) { px = -px; py = -py; }
         if (k == s->n_per_side - 1 && s->n_per_side >= 5 && team != s->kickoff_team)   /* striker: outside the circle */
-            px = team == 0 ? -(kickoff_r(s) + FX(0.5)) : kickoff_r(s) + FX(0.5);
+            px = team_dir(s, team) > 0 ? -(kickoff_r(s) + FX(0.5)) : kickoff_r(s) + FX(0.5);
         fx stamina = p->stamina;
         memset(p, 0, sizeof *p);
         p->stamina = stamina;
         p->pos = fv2_make(px, py);
-        p->facing = team == 0 ? 0 : 32768;
+        p->facing = team_dir(s, team) > 0 ? 0 : 32768;
         p->team = (uint8_t)team;
         p->role = k == 0 ? WP_ROLE_KEEPER : WP_ROLE_OUTFIELD;
         p->charge_kind = 0xFF;
@@ -101,7 +103,7 @@ void match_place_kickoff(SimState *s) {
 void sim_kickoff_setpiece(SimState *s) {
     int taker = s->kickoff_team * s->n_per_side + s->n_per_side - 1;
     WpPlayer *tp = &s->players[taker];
-    tp->pos = fv2_make(s->kickoff_team == 0 ? -FX(0.45) : FX(0.45), 0);
+    tp->pos = fv2_make(team_dir(s, s->kickoff_team) > 0 ? -FX(0.45) : FX(0.45), 0);
     s->ball.owner = (int8_t)taker;
     s->ball.last_touch = (int8_t)taker;
     s->restart_kind = WP_RS_KICKOFF;
@@ -125,6 +127,8 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
         s->pick_stick_age[i] = s->pick_diag_age[i] = 255;
     }
     s->seat_player[0] = (int8_t)(s->n_per_side - 1); /* seat 0 = team 0 striker */
+    s->half_ticks = cfg->half_ticks;                 /* 0 = endless (D-036) */
+    s->first_kickoff = 0;
     stats_init(s, cfg->stats_mode);                  /* draws from s->rng only when stats are on (D-034) */
     s->kickoff_team = 0;
     match_place_kickoff(s);
@@ -134,7 +138,7 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
 
 /* Goal celebration -> kickoff reset; temporary out-of-play rule: ball placed just inside the line. */
 static void match_flow(SimState *s, const WpInput *in) {
-    if (s->phase == WP_PHASE_PLAY || s->phase_timer == 0) return;
+    if (s->phase == WP_PHASE_PLAY || s->phase >= WP_PHASE_HALFTIME || s->phase_timer == 0) return;   /* clock.c owns HT/FT */
     if (--s->phase_timer) return;
     if (s->phase == WP_PHASE_GOAL) {
         match_place_kickoff(s);
@@ -150,6 +154,7 @@ void sim_step(SimState *s, const WpInput *in) {
     players_step(s, in);
     ball_step(s);
     match_flow(s, in);
+    clock_step(s);
     for (int k = 0; k < WP_MAX_SEATS; k++) s->prev_buttons[k] = in->seat[k].buttons;
     s->tick++;
 }
@@ -196,6 +201,10 @@ uint64_t sim_hash(const SimState *s) {
         fnv_i(&f, s->pick_recv[k]); fnv_i(&f, s->pick_danger[k]); fnv_i(&f, s->pick_dir[k]);
         fnv_i(&f, s->pick_stick[k][0]); fnv_i(&f, s->pick_stick[k][1]); fnv_i(&f, s->pick_stick_age[k]);
         fnv_i(&f, s->pick_diag[k][0]); fnv_i(&f, s->pick_diag[k][1]); fnv_i(&f, s->pick_diag_age[k]);
+    }
+    if (s->half_ticks) {                                  /* endless matches carry no clock: unhashed (D-036) */
+        fnv_i(&f, s->half_ticks); fnv_i(&f, s->clock); fnv_i(&f, s->stoppage); fnv_i(&f, s->stop_acc);
+        fnv_i(&f, s->half); fnv_i(&f, s->first_kickoff);
     }
     if (s->stats_mode) {                                  /* neutral stats carry no information: unhashed (D-034) */
         fnv_i(&f, s->stats_mode);

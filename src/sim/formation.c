@@ -52,7 +52,7 @@ static fv2 block_spot(const Block *bl, const fx *slot, fx bx, fx by, fx sx, fx s
 /* where slot k of `team` should stand now (world coordinates) */
 fv2 shape_spot(const SimState *s, int team, int k) {
     const Format *f = format_of(s);
-    fx sg = team == 0 ? FX_ONE : -FX_ONE, hl = s->pitch.length / 2, hw = s->pitch.width / 2;
+    fx sg = FX_INT(team_dir(s, team)), hl = s->pitch.length / 2, hw = s->pitch.width / 2;
     if (!f) {                                             /* other formats: the kick-off shape shifted with the ball */
         fx fxl, fyl;
         formation_frac(s->n_per_side, k, &fxl, &fyl);

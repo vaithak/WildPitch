@@ -485,7 +485,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
      * - the ball can't be played, so only movement matters */
     if (s->phase != WP_PHASE_PLAY && s->phase != WP_PHASE_OUT) { p->ai_act = AI_NONE; p->ai_hold = 0; return; }
     Ctx x;
-    x.s = s; x.i = i; x.team = p->team; x.sg = p->team == 0 ? 1 : -1; x.n = 0;
+    x.s = s; x.i = i; x.team = p->team; x.sg = team_dir(s, p->team); x.n = 0;
     x.hl = s->pitch.length / 2; x.hw = s->pitch.width / 2;
     x.own_goal = fv2_make(-x.hl * x.sg, 0);
     x.opp_goal = fv2_make(x.hl * x.sg, 0);
