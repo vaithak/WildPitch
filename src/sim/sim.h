@@ -27,7 +27,7 @@ enum {
     WP_BTN_SPRINT = 1 << 2,
     WP_BTN_SWITCH = 1 << 3,
     WP_BTN_SHOUT  = 1 << 4,
-    WP_BTN_CHIP   = 1 << 5,  /* modifier */
+    WP_BTN_CHIP   = 1 << 5,  /* chip: hold to charge, release (like shoot) */
 };
 
 typedef struct {
@@ -74,6 +74,20 @@ enum {
 #define WP_BAND_HEAD_MAX  FX(2.05)   /* standing head reach; jumping adds the player's z */
 #define WP_JUMP_VZ        FX(3.4)    /* ~0.59 m jump apex */
 
+/* A kick is a parametric move (DECISIONS D-012): what it does to the ball + when contact happens.
+ * The avatar reads the same fields (foot, windup) so the visible strike lands on the contact tick. */
+enum { WP_KICK_PASS = 0, WP_KICK_SHOT, WP_KICK_CHIP, WP_KICK_HEADER };
+typedef struct {
+    fx       power;              /* horizontal ball speed at contact, m/s */
+    fx       vz;                 /* vertical ball speed at contact, m/s */
+    fx       spin;               /* sidespin (curl); + bends counter-clockwise */
+    wp_angle dir;                /* direction of the strike */
+    uint8_t  foot;               /* 0 = left, 1 = right */
+    uint8_t  kind;               /* WP_KICK_* */
+    uint8_t  windup;             /* ticks from action start to contact */
+    uint8_t  done;               /* contact resolved (struck or missed) */
+} WpKick;
+
 typedef struct {
     fv2 pos, vel;
     fx  z, vz;                   /* feet height above grass (jumping), vertical speed */
@@ -82,14 +96,31 @@ typedef struct {
     uint16_t action_timer;       /* ticks since the action started */
     uint8_t team;                /* 0 or 1 */
     uint8_t role;                /* WP_ROLE_* */
-    uint16_t kick_charge;        /* ticks the kick button has been held */
+    uint16_t kick_charge;        /* ticks the shoot/chip button has been held */
+    uint8_t  charge_kind;        /* WP_KICK_SHOT / WP_KICK_CHIP while charging, else 0xFF */
+    uint8_t  immune;             /* ticks this player's body ignores the ball (just kicked it) */
     uint16_t touch_cooldown;     /* ticks before this player may touch the ball again */
     fx stamina;                  /* 0..1 */
+    WpKick kick;                 /* current/last kick parameters */
 } WpPlayer;
 
 enum { WP_ROLE_KEEPER = 0, WP_ROLE_OUTFIELD = 1 };
 
-enum { WP_PHASE_KICKOFF = 0, WP_PHASE_PLAY = 1, WP_PHASE_GOAL = 2 };
+enum { WP_PHASE_KICKOFF = 0, WP_PHASE_PLAY = 1, WP_PHASE_GOAL = 2, WP_PHASE_OUT = 3 };
+
+/* Per-tick event flags (cleared every tick). Presentation ORs them across the ticks of a frame to drive
+ * sound/juice and to skip interpolation on teleports (WP_EV_RESET). */
+enum {
+    WP_EV_KICK   = 1 << 0,
+    WP_EV_TOUCH  = 1 << 1,
+    WP_EV_BOUNCE = 1 << 2,
+    WP_EV_POST   = 1 << 3,
+    WP_EV_NET    = 1 << 4,
+    WP_EV_GOAL   = 1 << 5,
+    WP_EV_OUT    = 1 << 6,
+    WP_EV_RESET  = 1 << 7,   /* players/ball teleported: don't interpolate this tick */
+    WP_EV_BODY   = 1 << 8,   /* ball hit a player's body */
+};
 
 typedef struct {
     uint32_t tick;
@@ -100,6 +131,8 @@ typedef struct {
     uint8_t  phase;
     uint16_t phase_timer;            /* ticks remaining in the current phase (e.g. goal celebration) */
     uint8_t  score[2];
+    uint8_t  kickoff_team;           /* team taking the next kickoff */
+    uint16_t events;                 /* WP_EV_* raised during the last sim_step */
     int8_t   seat_player[WP_MAX_SEATS]; /* player index each seat controls, -1 = none */
     uint16_t prev_buttons[WP_MAX_SEATS];/* for edge detection inside the sim */
     WpPlayer players[WP_MAX_PLAYERS];
@@ -112,8 +145,10 @@ typedef struct {
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);
-/* Start a jump for player i (no-op if already airborne). Gameplay triggers come in CP0.1/0.2. */
+/* Start a jump for player i (no-op if already airborne). Gameplay triggers come in CP0.2. */
 void     sim_player_jump(SimState *s, int i, uint8_t action);
+/* Start a kick action with explicit parameters (used by AI later, tests and --demo). No-op if busy. */
+void     sim_player_kick(SimState *s, int i, const WpKick *k);
 void     sim_init(SimState *s, const WpMatchConfig *cfg);
 void     sim_step(SimState *s, const WpInput *in);
 uint64_t sim_hash(const SimState *s);   /* field-wise FNV-1a; independent of struct padding */

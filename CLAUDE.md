@@ -37,6 +37,9 @@ Golden hash changes are only OK when sim behaviour changed on purpose:
 - **Runs cool:** the frame loop must never busy-wait; menus redraw only on change. Measure, don't guess.
 - No new third-party dependencies without asking the owner. No licensed names/likenesses; football only.
 - Code is C17, warnings-clean (`-Wall -Wextra -Wconversion -Wshadow`).
+- **Keep it modular without costing efficiency** (owner request): one responsibility per file (see
+  ARCHITECTURE.md code map), private cross-module interfaces in `*_internal.h`, all gameplay tunables in
+  `src/sim/tuning.h`, no per-tick allocation, data in flat arrays. Prefer a new small module over growing a big one.
 
 ## Working agreement with the owner
 - Incremental checkpoints (CP). Each CP ends with: tests passing, determinism check passing, a screenshot

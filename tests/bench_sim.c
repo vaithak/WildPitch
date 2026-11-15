@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     WpInput in;
     struct timespec t0, t1;
     clock_gettime(CLOCK_MONOTONIC, &t0);
-    for (uint32_t t = 0; t < ticks; t++) { scripted_input(&script, t, &in); scripted_poke(&script, t, &s); sim_step(&s, &in); }
+    for (uint32_t t = 0; t < ticks; t++) { scripted_input(&script, t, &s, &in); scripted_poke(&script, t, &s); sim_step(&s, &in); }
     clock_gettime(CLOCK_MONOTONIC, &t1);
     double el = (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;
     printf("%u ticks in %.3f s = %.0f ticks/s = %.0fx real time (%.2f us/tick), hash %016llx\n",

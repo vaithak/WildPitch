@@ -5,7 +5,9 @@ _Last updated: 2026-11-14 by Claude session #1_
 ## Current checkpoint
 **CP0.0b — Human avatars: ✅ done.** Owner chose Modern look, wide zoom, contextual headers (D-011, defaults set).
 Owner asked architecture questions (pitch sizes, flair-move training) → answered; D-012 (parametric moves).
-Waiting for the owner's explicit go-ahead for **CP0.1 "Ball on grass"**.
+**CP0.1 "Ball on grass": 🚧 in progress** (owner said go). Sim slice done + committed (ball/goals/dribble/kicks);
+remaining: game side (HUD power bar, F3 ball info, avatar kick pose from kick params, reset interpolation, demo via
+`sim_player_kick`), playtest guide, final commit.
 
 ## What works now
 - Build: CMake + Ninja, SDL 3.4.8 vendored and statically linked.

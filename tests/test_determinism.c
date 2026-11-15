@@ -4,6 +4,7 @@
  * and say so in the commit message. Also checks: same run twice -> same hash; snapshot/resume -> same hash. */
 #include <stdlib.h>
 #include <inttypes.h>
+#include <string.h>
 #include "test_util.h"
 #include "scripted_match.h"
 
@@ -11,12 +12,14 @@
 
 typedef struct { SimState sim; WpRng script; } Snapshot;
 
+static int ev_count[16];
 static void advance(SimState *s, WpRng *script, uint32_t from, uint32_t to) {
     WpInput in;
     for (uint32_t t = from; t < to; t++) {
-        scripted_input(script, t, &in);
+        scripted_input(script, t, s, &in);
         scripted_poke(script, t, s);
         sim_step(s, &in);
+        for (int b = 0; b < 16; b++) if (s->events & (1 << b)) ev_count[b]++;
     }
 }
 
@@ -36,6 +39,8 @@ int main(void) {
     static SimState a, b;
     static Snapshot snap;
     uint64_t ha = run(&a, &snap);
+    int counts[16];
+    memcpy(counts, ev_count, sizeof counts);
     uint64_t hb = run(&b, NULL);
     CHECK(ha == hb);
     /* resume from a mid-match snapshot (struct copy) must reach the identical final state.
@@ -43,8 +48,13 @@ int main(void) {
      * because intents change on tick%30 boundaries and TICKS/2 is one. */
     advance(&snap.sim, &snap.script, TICKS / 2, TICKS);
     CHECK(sim_hash(&snap.sim) == ha);
-    /* the ball must actually have moved (guards against a vacuous golden hash) */
-    CHECK(a.ball.pos.x != 0 || a.ball.pos.y != 0);
+    /* the scripted match must exercise the gameplay code, or the golden hash is vacuous */
+    printf("events in scripted match: kick %d touch %d bounce %d post %d net %d goal %d out %d reset %d body %d; score %d-%d\n",
+           counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7], counts[8], a.score[0], a.score[1]);
+    CHECK(counts[0] >= 20);   /* kicks */
+    CHECK(counts[1] >= 50);   /* touches */
+    CHECK(counts[5] + counts[6] >= 3);   /* goals + outs */
+    CHECK(counts[7] >= 2);    /* resets */
 
     const char *path = "tests/golden/determinism.txt";
     if (getenv("WP_UPDATE_GOLDEN")) {
