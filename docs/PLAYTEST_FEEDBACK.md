@@ -94,3 +94,7 @@ Format:
 - **Feedback (verbatim):** "also please increase now 7v7 and increase the pitch size, it is getting otugh to test with 5v5"
 - **Action:** 7-a-side format (keeper + 2-3-1) on 55 x 35 m with 5 m goals as the game default (`--5v5` to go
   back); formations generalised per format; 5v5 regression tests unchanged + a 7v7 AI-match test.
+
+## CP0.3a (7v7) — 2026-11-15
+- **Feedback (verbatim):** "it is a good game, keep going ahead with further planned improvements"
+- **Action:** CP0.3b: baselines in 7v7, keeper dives/parries, AI aerial duels, difficulty → playtest; then stats.

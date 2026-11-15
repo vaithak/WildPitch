@@ -16,3 +16,11 @@ cc -std=c17 -Isrc -Itests -Itools/playtest tools/playtest/recv3.c build/libwp_si
 - regressions found in the re-test: `own.c own2.c` (back-pass to own keeper), `ng1.c` (runner predicted off pitch)
 - other: `onetwo.c onetwo2.c dbg.c`, `summ.py` (summarises live output)
 They are tools, not tests (not built by CMake); numbers they print are what the findings quote.
+
+CP0.3 harnesses (all take a format flag, 1 = 7v7): `shots.c` (live shot outcomes), `icpt.c` (live taps to the ringed
+mate: received / intercepted), `human.c` (dispossession standing/jogging/sprinting, kickoff race), `mirror.c`
+(mirror-symmetry divergence), `aimatch.c [matches] [minutes] [seven]` (AI vs AI balance and rates).
+
+7v7 baselines (2026-11-15, before CP0.3b): shots 7-16 m: goal 19% / keeper 71% (catches weak, body-blocks firm);
+taps to the ringed mate: 67% received, 21% intercepted (6% on clear lanes), launch 14.0 m/s; dispossessed standing,
+jogging and sprinting; mirror divergence at tick 166 (rounding, same actions).

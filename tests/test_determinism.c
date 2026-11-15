@@ -41,6 +41,39 @@ static void advance(SimState *s, WpRng *script, uint32_t from, uint32_t to) {
     }
 }
 
+/* 7v7 (the game's format, D-025): 6 scripted minutes, all-AI from minute 3 */
+static uint64_t run7(SimState *s, int *ai_kicks) {
+    WpMatchConfig cfg = sim_config_7v7();
+    cfg.seed = 4242;
+    sim_init(s, &cfg);
+    scripted_setup(s);
+    WpRng script; wp_rng_seed(&script, 778, 3);
+    WpInput in;
+    *ai_kicks = 0;
+    for (uint32_t t = 0; t < 60 * 60 * 6; t++) {
+        if (t == 60 * 60 * 3) for (int k = 0; k < WP_MAX_SEATS; k++) s->seat_player[k] = -1;
+        scripted_input(&script, t, s, &in);
+        scripted_poke(&script, t, s);
+        sim_step(s, &in);
+        if (t >= 60 * 60 * 3 && (s->events & WP_EV_KICK)) (*ai_kicks)++;
+    }
+    return sim_hash(s);
+}
+
+static void golden_check(const char *path, uint64_t ha, const char *label) {
+    if (getenv("WP_UPDATE_GOLDEN")) {
+        FILE *f = fopen(path, "w");
+        CHECK(f != NULL);
+        if (f) { fprintf(f, "%016" PRIx64 "\n", ha); fclose(f); printf("golden updated (%s): %016" PRIx64 "\n", label, ha); }
+    } else {
+        FILE *f = fopen(path, "r");
+        uint64_t g = 0;
+        CHECKF(f != NULL, "missing %s (run with WP_UPDATE_GOLDEN=1)", path);
+        if (f) { CHECK(fscanf(f, "%" SCNx64, &g) == 1); fclose(f); }
+        CHECKF(g == ha, "%s hash %016" PRIx64 " != golden %016" PRIx64, label, ha, g);
+    }
+}
+
 static uint64_t run(SimState *s, Snapshot *mid) {
     WpMatchConfig cfg = sim_default_config();
     cfg.seed = 12345;
@@ -80,18 +113,14 @@ int main(void) {
     CHECK(switches >= 20);    /* switching (manual + auto + pass hand-off) is exercised */
     CHECK(bad_owner == 0);
 
-    const char *path = "tests/golden/determinism.txt";
-    if (getenv("WP_UPDATE_GOLDEN")) {
-        FILE *f = fopen(path, "w");
-        CHECK(f != NULL);
-        if (f) { fprintf(f, "%016" PRIx64 "\n", ha); fclose(f); printf("golden updated: %016" PRIx64 "\n", ha); }
-    } else {
-        FILE *f = fopen(path, "r");
-        uint64_t g = 0;
-        CHECKF(f != NULL, "missing %s (run with WP_UPDATE_GOLDEN=1)", path);
-        if (f) { CHECK(fscanf(f, "%" SCNx64, &g) == 1); fclose(f); }
-        CHECKF(g == ha, "hash %016" PRIx64 " != golden %016" PRIx64, ha, g);
-    }
+    golden_check("tests/golden/determinism.txt", ha, "5v5");
     printf("final hash %016" PRIx64 "\n", ha);
+    /* 7v7: run twice (same hash) and against its own golden */
+    int k1 = 0, k2 = 0;
+    uint64_t h7 = run7(&a, &k1), h7b = run7(&b, &k2);
+    CHECK(h7 == h7b);
+    CHECKF(k1 >= 30, "7v7 all-AI stretch: only %d kicks", k1);
+    golden_check("tests/golden/determinism7.txt", h7, "7v7");
+    printf("final hash 7v7 %016" PRIx64 "\n", h7);
     return TEST_DONE();
 }
