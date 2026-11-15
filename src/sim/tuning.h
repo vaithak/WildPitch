@@ -72,10 +72,10 @@
 #define T_SWITCH_HYST      FX(2.0)    /* auto-switch only to a team-mate this much nearer the ball */
 #define T_PASS_FLIGHT_MAX  240        /* a pass in flight stops blocking auto-switch after this many ticks */
 /* passes & reception (D-020: solve the meeting point, steer the receiver, widen the foot) */
-#define T_PASS_ARR_MIN     FX(5.5)    /* tap pass arrival pace: MIN + PER_M * (distance - 5 m), capped at MAX */
-#define T_PASS_ARR_PER_M   FX(0.25)
-#define T_PASS_ARR_MAX     FX(9.0)
-#define T_PASS_MAX         FX(22.0)   /* hardest ground pass */
+#define T_PASS_ARR_MIN     FX(8.0)    /* tap pass arrival pace: MIN + PER_M * (distance - 5 m), capped at MAX */
+#define T_PASS_ARR_PER_M   FX(0.3)    /* (CP0.3a feedback "passes very slow, intercepted": was 5.5 + 0.25/m, max 9) */
+#define T_PASS_ARR_MAX     FX(12.0)
+#define T_PASS_MAX         FX(24.0)   /* hardest ground pass */
 #define T_PASS_CONE_DEG    55         /* receivers within this angle of the stick are candidates */
 #define T_PASS_W_ANGLE     10         /* pass pick points per degree off the stick ... */
 #define T_PASS_W_DIST      8          /* ... per metre of distance (1 m ~ 0.8 deg) ... */
@@ -143,6 +143,8 @@
 #define T_AI_TACKLE_DIST   FX(0.95)    /* AI tackles when the ball is this close ... */
 #define T_AI_TACKLE_EXPOSED FX(0.6)  /* ... and this far from the carrier's feet (between touches) ... */
 #define T_AI_TACKLE_SHIELD FX(0.3)    /* ... or (carrier slow < 2 m/s, holding it) this far */
+#define T_AI_PASS_REACT    12         /* AI defenders react to a pass being struck after this many ticks (0.2 s) */
+#define T_INTERCEPT_REACH  FX(0.8)    /* cutting out someone else's pass needs the ball this close (the receiver: 1.0) */
 #define T_KEEPER_REACH     FX(1.3)    /* keepers take a loose ball within this (hands) ... */
 #define T_KEEPER_HANDS_Z   FX(1.45)   /* ... up to this high (body height until CP0.3b adds hands: higher = parry) ... */
 #define T_KEEPER_CATCH_REL FX(22.0)   /* ... arriving at up to this speed (faster: it beats/bounces off him) */

@@ -244,5 +244,10 @@ before an AI pass. Verification: `tests/test_ai_match.c` (AI vs AI, nudged start
 `tools/playtest/aimatch.c`, mirror-symmetry harness. Tackles (CP0.3a re-check): AI tackles a running carrier when his ball
 is ≥ 0.6 m from his feet, a slow/holding carrier at ≥ 0.3 m, only on its decision beat (reaction); a won tackle
 blocks the ball back toward the tackler, who recovers at once. Kickoff: the non-kicking team holds shape until the
-first touch. Keeper catches capped at body height (1.45 m) until CP0.3b adds hands. Not yet (CP0.3b): player
+first touch. Keeper catches capped at body height (1.45 m) until CP0.3b adds hands.
+Passing vs AI (owner: "passes very slow, intercepted almost every time"; measured 40% of taps to the ringed mate
+intercepted, 22% even with clear lanes, launch 10 m/s): tap arrival 8 + 0.3/m (max 12; was 5.5 + 0.25, max 9,
+amends D-020), AI defenders react to a struck pass after 0.2 s, cutting out the other team's pass needs the ball
+within 0.8 m (the receiver keeps 1.0). Now 20% intercepted (6% with clear lanes), launch 12.9 m/s; AI-vs-AI pass
+completion 60% → 77%. Not yet (CP0.3b): player
 stats, AI aerial duels, keeper dives/poses/hands, difficulty, AI set pieces.

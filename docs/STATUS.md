@@ -11,7 +11,8 @@ jumps to our AI team-mate/keeper who wins the ball; the human controls the keepe
 - **CP0.3a (D-022/D-023):** the blue team plays: presses, marks, covers, tackles, passes, runs in behind, shoots;
   your red team-mates support, run, cover and mark; keepers position and catch. **J near their ball = tackle**
   (lunge; well-timed wins it, mistimed commits you). Bodies block. If a team-mate wins it, you get control.
-  AI vs AI (20 × 5 min): ~0.6 goals/min, ~60% passes arrive, possession 49/51, ~7 tackles/min, nobody stuck.
+  AI vs AI (20 × 5 min): ~0.75 goals/min, 77% passes arrive, possession 50/50, ~5 tackles/min, nobody stuck.
+  Your taps to the ringed mate in live play: 69% received, 20% intercepted (6% when the lane is clear), out ~5%.
   Human-vs-AI checks: standing/jogging/sprinting on the ball all get dispossessed (block tackles go to the tackler);
   on our kickoff we reach the ball first; one-twos now happen (the passer runs past). Receiver sweep with brain
   team-mates: pick rate 72%, untargeted out 5%, but 35% of (all-direction) taps are intercepted - defenders defend.

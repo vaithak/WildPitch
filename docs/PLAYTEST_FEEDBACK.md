@@ -80,3 +80,8 @@ Format:
 - **Action:** start CP0.3 "Instinct AI".
 - **Owner decisions for CP0.3 (asked):** when an AI team-mate wins the ball, control jumps to him (held stick
   latched); when our keeper has the ball, the human controls the keeper (control jumps to him too).
+
+## CP0.3a — 2026-11-15
+- **Feedback (verbatim):** "the passes seem very slow now with opponents, they are intecepted almost everytime,"
+- **Action:** measure pass speed/flight time and interception rate in live play; tune pass pace, AI reaction to a
+  pass, interceptor reach (see STATUS/D-023).

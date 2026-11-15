@@ -376,6 +376,8 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     int decide = ((s->tick + (uint32_t)(i % s->n_per_side)) % T_AI_DECIDE) == 0   /* staggered by role: mirror-fair */ || p->ai_act == AI_NONE ||
                  (owner && p->ai_act < AI_DRIBBLE) || (!owner && p->ai_act >= AI_DRIBBLE && p->ai_act != AI_KEEP);
     if (s->pass_target == i && p->ai_act != AI_RECEIVE) decide = 1;
+    /* a pass by the other team has just been struck: defenders need a moment to react (keep doing what they were) */
+    if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < T_AI_PASS_REACT) decide = 0;
     if (decide) {
         if (owner) gen_on_ball(&x); else gen_off_ball(&x);
         int best = -1; fx bs = 0;
@@ -406,7 +408,8 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         if (nearest_opp(&x, b->pos) > FX(4.0)) out->buttons = WP_BTN_SPRINT;
         return;
     }
-    case AI_CHASE: {                                      /* the ball moves: keep re-aiming */
+    case AI_CHASE: {                                      /* the ball moves: keep re-aiming (after reacting) */
+        if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < T_AI_PASS_REACT) break;
         Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
         p->ai_goal = m.pos;
         team_steer_speed(p, m.pos, fx_min(fx_mul(dist(m.pos, p->pos), FX(4.0)) + FX(2.0), T_SPRINT_SPEED), out);

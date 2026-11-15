@@ -56,7 +56,7 @@ int main(void) {
             CHECKF(kick_t >= 0 && seat_before_kick_ok, "%s: kick %d, switched before contact %d", runs[r].name, kick_t, !seat_before_kick_ok);
             CHECKF(got == MATE, "%s %d m: ball ended with %d, not the receiver", runs[r].name, far ? 18 : 8, got);
             CHECKF(s.seat_player[0] == MATE, "%s: control didn't move to the receiver", runs[r].name);
-            CHECKF(arrive > FX(3.0) && arrive < FX(10.0), "%s: arrival pace %.1f m/s", runs[r].name, tod(arrive));
+            CHECKF(arrive > FX(3.0) && arrive < FX(14.0), "%s: arrival pace %.1f m/s", runs[r].name, tod(arrive));
         }
     }
 

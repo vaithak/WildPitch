@@ -479,7 +479,9 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
     fx sl2 = fv2_dot(seg, seg), u = 0;
     if (sl2 > 0) u = fx_clamp(fx_div(fv2_dot(fv2_sub(p->pos, b->pos), seg), sl2), 0, FX_ONE);
     fx dseg = fv2_len(fv2_sub(p->pos, fv2_add(b->pos, fv2_scale(seg, u))));
-    fx reach = gk ? T_KEEPER_REACH : T_CONTROL_REACH;
+    /* cutting out the other team's pass in flight needs a closer foot than receiving one */
+    int intercept = s->pass_target >= 0 && s->players[s->pass_from].team != p->team;
+    fx reach = gk ? T_KEEPER_REACH : intercept ? T_INTERCEPT_REACH : T_CONTROL_REACH;
     if (s->pass_target == i && dseg > T_CONTROL_REACH) {
         /* stretch (heavier touch) only for a ball that would otherwise pass him out of clean reach;
          * one coming to him rolls in to his foot */
