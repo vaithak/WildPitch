@@ -20,7 +20,9 @@ really good, move ahead now".) Next: **CP0.2b** — through balls, lofted passes
 - **Game:** Modern look, wide zoom (defaults), power bar while charging, leg draws back as you charge, kick pose
   driven by kick params (foot/kind/wind-up), GOAL banner, OUT label, no interpolation across resets, net drawn as
   the physics box, F3 shows ball speed/height/spin/owner/phase/events, control hints on screen.
-- Flags: `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
+- **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
+  skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
+- Flags: `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (8 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_scoring, test_determinism
   (golden `07feb9343617ebcb`; scripted seat chases the ball + mashes pass/switch: ~100 kicks, 440 touches, 11 goals, 650 switches, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.

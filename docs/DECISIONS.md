@@ -132,3 +132,10 @@ From the ball-physics research (`reports/Football game ball physics.md`, steps R
 - **Assisted receive:** the receiver runs to meet the ball on its path until the human moves the stick away from
   where it was at the pass; it steers the legs only — aim/buttons always use the human's real stick.
 - Non-human movement is generated as WpSeatInput (team.c placeholder) through the same move() physics as humans.
+
+## D-018 — Dedication (2026-11-15, owner request)
+The game is dedicated: **"In the memory of my brother Shubham Thakkar ❤️"** — the owner's exact words, never
+edited or "tidied". Shown as a quiet card on every normal launch (`src/game/dedication.c`: dark screen, the line
+centred, a drawn red heart; ~4 s with fades, any key skips; never in harness/capture modes; `--dedication
+--screenshot F.bmp` captures it). Also at the top of README.md. When menus exist (CP0.4/0.5) it also gets a
+permanent line on the title screen footer and in the credits. Never on the in-match HUD.

@@ -20,6 +20,7 @@
 #include <string.h>
 #include "sim/sim.h"
 #include "game/render.h"
+#include "game/dedication.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen */
 static const char *ZOOM_NAME[3] = {"wide", "medium", "close"};
@@ -230,13 +231,14 @@ static void apply_vsync(Game *g) {
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, autoplay = false;
+    bool gallery = false, demo = false, autoplay = false, force_card = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--style") && i + 1 < argc) start_style = atoi(argv[++i]) % WP_AVATAR_STYLE_COUNT;
         else if (!strcmp(argv[i], "--zoom") && i + 1 < argc) start_zoom = atoi(argv[++i]) % 3;
         else if (!strcmp(argv[i], "--gallery")) gallery = true;
+        else if (!strcmp(argv[i], "--dedication")) force_card = true;   /* with --screenshot: capture the card */
         else if (!strcmp(argv[i], "--demo")) demo = true;
         else if (!strcmp(argv[i], "--autoplay")) autoplay = true;
         else if (!strcmp(argv[i], "--autoplay-chip")) { autoplay = true; autoplay_chip = true; }
@@ -255,6 +257,17 @@ int main(int argc, char **argv) {
         return 1;
     }
     apply_vsync(&g);
+    if (force_card && shot_path) {                       /* visual check of the dedication card (mid-hold) */
+        int w, h;
+        SDL_GetRenderOutputSize(g.ren, &w, &h);
+        wp_dedication_draw(g.ren, w, h, 2.0f);
+        SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
+        if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
+        SDL_Quit();
+        return 0;
+    }
+    /* the owner's dedication (D-018): on a normal launch only, never in harness/capture modes */
+    if ((force_card || !(shot_path || gallery || demo || autoplay)) && !wp_dedication_run(g.ren)) { SDL_Quit(); return 0; }
     int vs = 0;
     bool vsync = SDL_GetRenderVSync(g.ren, &vs) && vs != 0;
 

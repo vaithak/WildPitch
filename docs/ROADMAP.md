@@ -61,6 +61,9 @@ Not playable; invisible plumbing every later CP depends on.
 - Targeted, weighted ground passes; control hand-off; manual (Q) + auto switching; assisted receive; team-mates
   hold a 2-1-1 shape and make simple runs; passive opposition shuffles; match clock (D-017).
 
+> **Dedication (D-018):** launch card done; when menus arrive (CP0.4/CP0.5) add it to the title-screen footer and
+> the credits, with the drawn heart.
+
 ### CP0.2b — Through balls, lofted passes, headers ⏭ 🔵
 - Hold pass = through ball into space (power by hold); lofted pass (L) with an airborne inverse model; playable
   contextual headers (D-010) incl. body-cylinder exemption during a header; pass power bar.
