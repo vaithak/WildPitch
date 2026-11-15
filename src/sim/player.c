@@ -336,6 +336,7 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
         if (p->action == WP_ACT_NONE && (pressed & (WP_BTN_PASS | WP_BTN_LOB | WP_BTN_SHOOT | WP_BTN_CHIP))) {
             WpKick k;
             uint8_t kind = (pressed & WP_BTN_PASS) ? WP_KICK_THROW : (pressed & WP_BTN_LOB) ? WP_KICK_LOB : WP_KICK_PUNT;
+            if (kind == WP_KICK_PUNT && s->restart_kind == WP_RS_THROW) return;   /* a throw-in is thrown */
             make_kick(s, i, kind, 0, aim, has, &k);
             sim_player_kick(s, i, &k);
         }
@@ -395,6 +396,15 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     }
     int winding = p->action == WP_ACT_KICK && !p->kick.done;
     if (winding) top = fx_mul(top, T_KICK_SPEED_MUL);
+    if (restart_is_taker(s, i)) {                         /* taking a set piece: stands still, may turn to aim */
+        p->vel = fv2_make(0, 0);
+        if (has) {
+            wp_angle w = fx_atan2(dir.y, dir.x);
+            int32_t st = DEG_TO_ANG(T_TURN_DEG_S) / WP_TICK_HZ, dd = ang_diff(w, p->facing);
+            p->facing = (wp_angle)(p->facing + (dd > st ? st : (dd < -st ? -st : dd)));
+        }
+        return;
+    }
     if (p->action == WP_ACT_KEEPER_DIVE) {                /* flying, then down: slides to a stop */
         if (p->z == 0) p->vel = fv2_scale(p->vel, FX(0.85));
         return;
@@ -443,7 +453,7 @@ static void control_owner(SimState *s, int i, const WpSeatInput *in) {
     if (b->held) {                                        /* in the keeper's hands: carried, can't be lost */
         ball_to_hands(s, i);
         if (b->held_ticks < 65535) b->held_ticks++;
-        if (b->held_ticks > T_KEEPER_HOLD_MAX && p->action == WP_ACT_NONE) {   /* time's up: he must release it */
+        if (b->held_ticks > T_KEEPER_HOLD_MAX && p->action == WP_ACT_NONE && !restart_is_taker(s, i)) {   /* time's up */
             WpKick k = {0};
             k.kind = WP_KICK_PUNT; k.dir = p->facing; k.windup = T_KICK_WINDUP_CHIP;
             sim_player_kick(s, i, &k);
@@ -664,7 +674,8 @@ void players_step(SimState *s, const WpInput *in) {
         move(s, i, &mv[i]);
         WpPlayer *p = &s->players[i];
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
-        if (s->ball.held && s->ball.owner == i) p->pos = clamp_own_box(s, p->team, p->pos);   /* can't carry it out */
+        if (s->ball.held && s->ball.owner == i && p->role == WP_ROLE_KEEPER && !restart_is_taker(s, i))
+            p->pos = clamp_own_box(s, p->team, p->pos);   /* can't carry it out of his box */
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
         header_step(s, i);
         tackle_step(s, i);
@@ -687,6 +698,7 @@ void players_step(SimState *s, const WpInput *in) {
             header_contact(s, best, &aim);
         }
     }
+    restart_step(s);                                      /* set piece: taker still, opponents at distance */
     bodies_separate(s);                                   /* players block each other */
     if (s->ball.owner >= 0) {
         control_owner(s, s->ball.owner, &pin[s->ball.owner]);

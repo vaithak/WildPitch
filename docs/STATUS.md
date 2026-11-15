@@ -7,6 +7,9 @@ _Last updated: 2026-11-15 by Claude session #1_
 "it is a good game, keep going ahead".) Next: **CP0.3c player stats** (own hand-over: it shifts calibrated numbers).
 
 ## What works now
+- **Owner's CP0.3b requests (D-029):** keepers hold the ball in their hands after a save in their box (throw S /
+  high throw A / punt D, 6 s limit); real throw-ins, corners and goal kicks with takers and a 4 m distance rule;
+  control auto-switches to the best defender when they have the ball.
 - **CP0.3b:** keepers dive (catch or parry; pose), shots keep their aim (corner shots beat him), tackles have a
   lunge pose; AI players win headers (shots near goal, clearances, nod-ons) and cross from wide; difficulty
   Easy/Normal/Hard for the opposition (Esc menu, Restart match). 7v7 has its own golden + harnesses. 7v7 shots
@@ -101,8 +104,7 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 ## Known issues / environment notes
 - **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
   `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build` (needed by CP0.4/CP0.5).
-- Keepers don't dive yet (they shuffle and catch; hard shots beat them or bounce off). No player stats yet (all equal).
-  No fouls/offside/set pieces (CP0.4).
+- No player stats yet (all equal). No fouls/offside/free kicks/halves yet (CP0.4).
 - Headers: height bands exist; the trigger is CP0.2.
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".

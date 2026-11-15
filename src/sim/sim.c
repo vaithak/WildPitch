@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 1936  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 1952  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (CP0.3a, owner request): bigger pitch and goals, keeper + 2-3-1 */
 WpMatchConfig sim_config_7v7(void) {
@@ -72,6 +72,8 @@ void match_place_kickoff(SimState *s) {
     }
     s->pass_target = -1;
     s->pass_from = -1;
+    s->restart_kind = 0;
+    s->restart_taker = -1;
     memset(&s->ball, 0, sizeof s->ball);
     s->ball.owner = -1;
     s->ball.last_touch = -1;
@@ -98,21 +100,13 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
 }
 
 /* Goal celebration -> kickoff reset; temporary out-of-play rule: ball placed just inside the line. */
-static void match_flow(SimState *s) {
+static void match_flow(SimState *s, const WpInput *in) {
     if (s->phase == WP_PHASE_PLAY || s->phase_timer == 0) return;
     if (--s->phase_timer) return;
     if (s->phase == WP_PHASE_GOAL) {
         match_place_kickoff(s);
     } else if (s->phase == WP_PHASE_OUT) {
-        WpBall *b = &s->ball;
-        fx hl = s->pitch.length / 2 - FX(1.0), hw = s->pitch.width / 2 - FX(0.5);
-        fv2 at = fv2_make(fx_clamp(b->pos.x, -hl, hl), fx_clamp(b->pos.y, -hw, hw));
-        memset(b, 0, sizeof *b);
-        b->pos = at;
-        b->owner = -1;
-        b->last_touch = -1;
-        s->pass_target = -1;
-        s->events |= WP_EV_RESET;
+        restart_place(s, in);                             /* throw-in / corner / goal kick (D-029) */
     }
     s->phase = WP_PHASE_PLAY;
 }
@@ -121,7 +115,7 @@ void sim_step(SimState *s, const WpInput *in) {
     s->events = 0;
     players_step(s, in);
     ball_step(s);
-    match_flow(s);
+    match_flow(s, in);
     for (int k = 0; k < WP_MAX_SEATS; k++) s->prev_buttons[k] = in->seat[k].buttons;
     s->tick++;
 }
@@ -145,7 +139,9 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, b->vel.x); fnv_i(&f, b->vel.y); fnv_i(&f, b->vz); fnv_i(&f, b->spin);
     fnv_i(&f, b->owner); fnv_i(&f, b->last_touch); fnv_i(&f, b->held); fnv_i(&f, b->held_ticks);
     fnv_i(&f, s->n_per_side); fnv_i(&f, s->phase); fnv_i(&f, s->phase_timer);
-    fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->ai_level[0]); fnv_i(&f, s->ai_level[1]); fnv_i(&f, s->events);
+    fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->ai_level[0]); fnv_i(&f, s->ai_level[1]);
+    fnv_i(&f, s->restart_kind); fnv_i(&f, s->restart_team); fnv_i(&f, s->restart_taker); fnv_i(&f, s->restart_ticks);
+    fnv_i(&f, s->restart_spot.x); fnv_i(&f, s->restart_spot.y); fnv_i(&f, s->events);
     for (int k = 0; k < WP_MAX_SEATS; k++) {
         fnv_i(&f, s->seat_player[k]); fnv_i(&f, s->prev_buttons[k]); fnv_i(&f, s->switch_cool[k]);
     }

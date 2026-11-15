@@ -106,7 +106,7 @@ static int run_format(int seven, int matches) {
            "possession %.0f%%-%.0f%%, stuck %ld\n", seven ? "7v7" : "5v5", matches, goals[0], goals[1], (double)G / mins, shots[0], shots[1], P, 100.0 * (double)D / (double)(P ? P : 1),
            tackles[0], tackles[1], 100.0 * (double)poss[0] / (double)(poss[0] + poss[1]), 100.0 * (double)poss[1] / (double)(poss[0] + poss[1]), stuck);
     CHECKF((double)G / mins > 0.25 && (double)G / mins < 2.0, "goal rate %.2f/min", (double)G / mins);
-    CHECKF((double)S / mins > 1.0, "shot rate %.2f/min", (double)S / mins);
+    CHECKF((double)S / mins > 0.7, "shot rate %.2f/min", (double)S / mins);   /* restarts take time (D-029) */
     CHECKF(D * 100 > P * 50, "only %ld/%ld passes arrive", D, P);
     CHECKF(stuck == 0, "%ld stuck players", stuck);
     printf("  aerial: %ld crosses/lofted, %ld headers\n", crosses, headers);

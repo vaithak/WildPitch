@@ -30,7 +30,12 @@
 
 /* ---- match flow ---- */
 #define T_GOAL_PAUSE_TICKS 120        /* celebration before kickoff reset */
-#define T_OUT_PAUSE_TICKS  45         /* temporary out-of-play rule (CP0.1 until CP0.4 rules) */
+#define T_OUT_PAUSE_TICKS  45         /* pause before a throw-in / corner / goal kick is set (players reposition) */
+#define T_RESTART_DIST     FX(4.0)    /* opponents keep this far from a set piece until it's played */
+#define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
+#define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */
+#define T_AI_RESTART_DELAY 40         /* AI takers line it up this long first ... */
+#define T_AI_CORNER_WAIT   180        /* ... and on a corner wait (up to 3 s) for two team-mates in the box */
 
 /* ---- players ---- */
 #define T_ACCEL            FX(18.0)

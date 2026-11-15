@@ -468,8 +468,12 @@ int main(int argc, char **argv) {
                 SDL_RenderDebugText(g.ren, ((float)w / sc - 8.0f * (float)strlen(msg)) * 0.5f, (float)h / sc * 0.22f, msg);
                 SDL_SetRenderScale(g.ren, 1, 1);
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
-            } else if (g.cur.phase == WP_PHASE_OUT) {
-                SDL_RenderDebugText(g.ren, (float)w * 0.5f - 12, 40, "OUT");
+            } else if (g.cur.phase == WP_PHASE_OUT || g.cur.restart_kind) {
+                static const char *RS[4] = {"OUT", "THROW-IN", "CORNER", "GOAL KICK"};
+                const char *lab = RS[g.cur.restart_kind < 4 ? g.cur.restart_kind : 0];
+                char rb[48];
+                snprintf(rb, sizeof rb, "%s - %s", lab, g.cur.restart_team == 0 ? "RED" : "BLUE");
+                SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(rb), 40, rb);
             }
             if (g.show_debug) {
                 const WpBall *b = &g.cur.ball;

@@ -177,7 +177,7 @@ static void gen_off_ball(Ctx *x) {
                 c->f[F_FIRST] = rank == 0 ? FX_ONE : 0;
             }
         } else {                                          /* they have it: press, cover, mark */
-            if (!b->held && (c = add(x, AI_PRESS, -1, fv2_add(b->pos, fv2_scale(goal_dir, FX(0.9)))))) {
+            if (!b->held && !s->restart_kind && (c = add(x, AI_PRESS, -1, fv2_add(b->pos, fv2_scale(goal_dir, FX(0.9)))))) {
                 c->f[F_COST] = dist(c->at, p->pos);
                 c->f[F_FIRST] = rank == 0 ? FX_ONE : 0;
             }
@@ -201,6 +201,20 @@ static void gen_off_ball(Ctx *x) {
             c->f[F_CROWD] = others;
         }
         return;
+    }
+    /* our corner: attack the box - near post, penalty spot, far post (the cross is aimed at whoever's there) */
+    if (s->restart_kind == WP_RS_CORNER && s->restart_team == x->team && s->restart_taker != x->i) {
+        fx gx = x->opp_goal.x, side = s->restart_spot.y > 0 ? FX_ONE : -FX_ONE;
+        static const fx spot[3][2] = {{FX(3.5), FX(1.6)}, {FX(6.0), FX(0.0)}, {FX(4.5), -FX(2.2)}};
+        for (int k = 0; k < 3; k++) {
+            fv2 at = fv2_make(gx - fx_mul(FX_INT(x->sg), spot[k][0]), fx_mul(side, spot[k][1]));
+            if ((c = add(x, AI_RUN, -1, at))) {
+                c->f[F_FWD] = FX(6.0);
+                c->f[F_THREAT] = FX_ONE;
+                c->f[F_COST] = dist(at, p->pos);
+                c->f[F_CROWD] = crowd(x, at);
+            }
+        }
     }
     /* attacking: offer an open option; forwards also run beyond the last defender */
     static const int16_t ang[7] = {0, 30, -30, 60, -60, 110, -110};
@@ -395,7 +409,9 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     const WpBall *b = &s->ball;
     out->move_x = out->move_y = 0;
     out->buttons = 0;
-    if (s->phase != WP_PHASE_PLAY) { p->ai_act = AI_NONE; p->ai_hold = 0; return; }
+    /* the ball is dead between goal and kick-off: stand still. Before a set piece (OUT pause) everyone repositions
+     * - the ball can't be played, so only movement matters */
+    if (s->phase != WP_PHASE_PLAY && s->phase != WP_PHASE_OUT) { p->ai_act = AI_NONE; p->ai_hold = 0; return; }
     Ctx x;
     x.s = s; x.i = i; x.team = p->team; x.sg = p->team == 0 ? 1 : -1; x.n = 0;
     x.hl = s->pitch.length / 2; x.hw = s->pitch.width / 2;
@@ -404,6 +420,43 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     int owner = b->owner == i;
     p->ai_hold = owner ? (uint8_t)(p->ai_hold < 255 ? p->ai_hold + 1 : 255) : 0;
 
+    if (owner && restart_is_taker(s, i)) {               /* taking a set piece (D-029) */
+        if (p->ai_hold < T_AI_RESTART_DELAY || p->action != WP_ACT_NONE) return;
+        int best = -1; fx bs = 0;
+        int corner = s->restart_kind == WP_RS_CORNER, throw_in = s->restart_kind == WP_RS_THROW;
+        if (corner && p->ai_hold < T_AI_CORNER_WAIT) {    /* wait for two team-mates to get into the box */
+            int in_box = 0;
+            for (int j = x.team * s->n_per_side; j < (x.team + 1) * s->n_per_side; j++)
+                if (j != i && dist(s->players[j].pos, x.opp_goal) < FX(12.0)) in_box++;
+            if (in_box < 2) return;
+        }
+        for (int j = x.team * s->n_per_side; j < (x.team + 1) * s->n_per_side; j++) {
+            const WpPlayer *q = &s->players[j];
+            if (j == i || q->role == WP_ROLE_KEEPER) continue;
+            fx d = dist(q->pos, b->pos);
+            if (d < FX(3.0) || d > (throw_in ? FX(16.0) : FX(26.0))) continue;
+            fx open = nearest_opp(&x, q->pos), lane = fx_min(pass_lane_clear(s, x.team, b->pos, q->pos), FX(4.0));
+            fx sc = open + fx_mul(lane, FX(1.2)) + fx_mul((q->pos.x - b->pos.x) * x.sg, FX(0.15));
+            if (corner) sc = fx_max(FX(13.0) - dist(q->pos, x.opp_goal), 0) * 2 + open;   /* someone in the box */
+            if (best < 0 || sc > bs) { best = j; bs = sc; }
+        }
+        if (best < 0) {                                   /* nobody: the nearest team-mate */
+            for (int j = x.team * s->n_per_side; j < (x.team + 1) * s->n_per_side; j++)
+                if (j != i && s->players[j].role != WP_ROLE_KEEPER &&
+                    (best < 0 || dist(s->players[j].pos, b->pos) < bs)) { best = j; bs = dist(s->players[j].pos, b->pos); }
+        }
+        if (best < 0) return;
+        uint8_t kind = throw_in ? WP_KICK_THROW
+                     : corner ? (dist(s->players[best].pos, x.opp_goal) < FX(13.0) ? WP_KICK_LOB : WP_KICK_PASS)
+                     : (dist(s->players[best].pos, b->pos) > FX(20.0) ? WP_KICK_LOB : WP_KICK_PASS);
+        WpKick k = {0};
+        fv2 d = fv2_sub(s->players[best].pos, b->pos);
+        k.kind = kind; k.dir = fx_atan2(d.y, d.x); k.to = (uint8_t)(best + 1); k.foot = 1;
+        k.power = kind == WP_KICK_THROW ? T_THROW_SPEED : T_PASS_SPEED;
+        k.windup = kind == WP_KICK_PASS ? T_KICK_WINDUP_PASS : T_KICK_WINDUP_CHIP;
+        sim_player_kick(s, i, &k);
+        return;
+    }
     if (p->role == WP_ROLE_KEEPER && !owner) { keeper(&x, out); return; }
     if (owner && b->held) {                              /* keeper with it in his hands: look up, then distribute */
         if (p->ai_hold < T_AI_KEEPER_HOLD || p->action != WP_ACT_NONE) return;

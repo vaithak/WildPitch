@@ -136,6 +136,7 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z, fx dt) {
                 s->phase = WP_PHASE_OUT;
                 s->phase_timer = T_OUT_PAUSE_TICKS;
                 s->events |= WP_EV_OUT;
+                restart_out(s, 0, yc, sg);                                /* corner or goal kick */
             }
             b->owner = -1;
         }
@@ -164,6 +165,7 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z, fx dt) {
         }
     }
     if (s->phase == WP_PHASE_PLAY && fx_abs(b->pos.y) > hw + R) {     /* touchline */
+        restart_out(s, 1, b->pos.x, 0);                                   /* throw-in */
         s->phase = WP_PHASE_OUT;
         s->phase_timer = T_OUT_PAUSE_TICKS;
         s->events |= WP_EV_OUT;

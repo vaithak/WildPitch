@@ -138,7 +138,8 @@ enum {
 };
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };
-enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };   /* players no seat controls stand still (statues / cones) */
+enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };
+enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK };   /* players no seat controls stand still (statues / cones) */
 /* how an assisted receiver plays a pass: step to the closest reachable point (standing/checking receivers, lofts),
  * run through a planned meet at just-in-time speed (runners; in-stride through balls keep >= 4.5 m/s) */
 enum { WP_PLAN_CLOSEST = 0, WP_PLAN_RUN = 1, WP_PLAN_STRIDE = 2 };
@@ -155,6 +156,11 @@ typedef struct {
     uint8_t  kickoff_team;           /* team taking the next kickoff */
     uint8_t  flags;                  /* WP_SIMF_* (drills / isolation tests) */
     uint8_t  ai_level[2];            /* per team: WP_AI_EASY / NORMAL / HARD (reaction + decision speed) */
+    uint8_t  restart_kind;           /* WP_RS_*: set piece being taken (0 = none) */
+    uint8_t  restart_team;
+    int8_t   restart_taker;
+    uint16_t restart_ticks;
+    fv2      restart_spot;
     uint16_t events;                 /* WP_EV_* raised during the last sim_step */
     int8_t   seat_player[WP_MAX_SEATS]; /* player index each seat controls, -1 = none */
     uint16_t prev_buttons[WP_MAX_SEATS];/* for edge detection inside the sim */

@@ -298,3 +298,18 @@ shot 26/20/15, tackle needs the carrier's ball 0.75/0.6/0.5 m exposed. NORMAL re
 for bit (verified against the old goldens with the field unhashed). The game applies the chosen level to the
 OPPOSITION; our AI team-mates stay NORMAL. Esc menu: Difficulty < Easy | Normal | Hard > (saved to `settings.cfg`,
 separate from `controls.cfg`), applied by "Restart match". EASY vs HARD AI (7v7): goals 15–21, possession 44–56%.
+
+## D-029 — Keeper's hands, throw-ins, corners, goal kicks, defender auto-switch (2026-11-15, owner request)
+- **Hands:** a keeper who catches/gathers the ball inside his own box holds it (`WpBall.held`): chest height, no
+  ball physics, can't be tackled, can't leave the box, 6 s limit (then released). Distribution: S throw (to the
+  ringed mate), A high throw, D/W punt; the AI keeper looks up ~0.8 s then throws to a free man or punts. Outside
+  his box a keeper has no hands. Opponents don't press a keeper holding it.
+- **Restarts** (`src/sim/restart.c`): touchline → THROW-IN for the team that didn't touch it last, from the
+  crossing point (thrown from the hands: S / A, no punt); goal line → CORNER if the defenders touched it last, else
+  GOAL KICK (keeper, 2.5 m out, centred). After the 0.75 s pause (everyone repositions; the ball is dead) the
+  nearest player of that team is the taker: stands still (can turn), the other team is held 4 m away until it's
+  played, control jumps to him if he's ours. AI takers: throw to an open man, cross a corner once two team-mates
+  are in the box (attackers take near-post / penalty-spot / far-post spots), goal kick short or long. The HUD
+  shows THROW-IN / CORNER / GOAL KICK and the team. Replaces the temporary "placed back inside" rule.
+- **Defender auto-switch:** when they have the ball (or their pass is travelling) control moves to the team-mate
+  nearest a spot just goal-side of the ball if he's > 3 m closer than the current man (0.75 s cooldown).

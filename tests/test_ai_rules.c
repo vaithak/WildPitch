@@ -177,5 +177,53 @@ int main(void) {
         for (int t = 0; t < 30; t++) step1(NOIN);
         CHECKF(!(s.ball.owner == kp && s.ball.held), "keeper held it outside his box");
     }
+    /* 8. restarts (D-029, 7v7) */
+    {
+        WpMatchConfig c7 = sim_config_7v7();
+        /* a) blue knocks it over the touchline -> OUR throw-in: control jumps to the taker, ball in his hands at the
+         *    line, blue held 4 m off; S throws it to a team-mate */
+        sim_init(&s, &c7);
+        int blue = 2 * s.n_per_side - 2;
+        s.ball.pos = fv2_make(FX(3.0), FX(16.0)); s.ball.vel = fv2_make(0, FX(4.0)); s.ball.owner = -1;
+        s.ball.last_touch = (int8_t)blue;
+        for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
+        int taker = s.restart_taker;
+        fx closest_blue = FX(99.0);
+        for (int t = 0; t < 30; t++) {
+            step1(NOIN);
+            for (int j = s.n_per_side; j < 2 * s.n_per_side; j++) {
+                fx d = fv2_len(fv2_sub(s.players[j].pos, s.ball.pos));
+                if (d < closest_blue) closest_blue = d;
+            }
+        }
+        printf("throw-in: kind %d team %d taker %d (seat on %d), held %d, nearest blue %.1f m\n", s.restart_kind,
+               s.restart_team, taker, s.seat_player[0], s.ball.held, tod(closest_blue));
+        CHECK(s.restart_kind == WP_RS_THROW && s.restart_team == 0 && taker >= 0 && s.players[taker].team == 0);
+        CHECK(s.seat_player[0] == taker && s.ball.held && s.ball.owner == taker);
+        CHECKF(closest_blue >= T_RESTART_DIST - FX(0.1), "blue %.1f m from the throw", tod(closest_blue));
+        step1((WpSeatInput){0, -127, WP_BTN_PASS});
+        int got = -1;
+        for (int t = 0; t < 180 && got < 0; t++) { step1(NOIN); if (s.ball.owner >= 0 && s.ball.owner != taker) got = s.ball.owner; }
+        printf("  thrown to %d (team %d)\n", got, got >= 0 ? s.players[got].team : -1);
+        CHECKF(got >= 0 && s.players[got].team == 0, "throw-in didn't reach a team-mate (%d)", got);
+        /* b) we put it behind OUR goal line -> THEIR corner, their AI crosses it */
+        sim_init(&s, &c7);
+        s.ball.pos = fv2_make(-FX(26.5), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1; s.ball.last_touch = 2;
+        int crossed = 0;
+        for (int t = 0; t < 300 && !crossed; t++) {
+            uint16_t ev = step1(NOIN);
+            if ((ev & WP_EV_KICK) && s.ball.last_touch >= s.n_per_side && s.players[s.ball.last_touch].kick.kind == WP_KICK_LOB) crossed = 1;
+        }
+        printf("corner to blue: delivered as a cross %d\n", crossed);
+        CHECK(crossed);
+        /* c) blue puts it behind our goal line -> OUR goal kick by our keeper */
+        sim_init(&s, &c7);
+        s.ball.pos = fv2_make(-FX(26.5), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1;
+        s.ball.last_touch = (int8_t)blue;
+        for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
+        printf("goal kick: kind %d team %d taker %d (keeper %d)\n", s.restart_kind, s.restart_team, s.restart_taker,
+               s.restart_taker >= 0 && s.players[s.restart_taker].role == WP_ROLE_KEEPER);
+        CHECK(s.restart_kind == WP_RS_GOALKICK && s.restart_team == 0 && s.restart_taker == 0);
+    }
     return TEST_DONE();
 }
