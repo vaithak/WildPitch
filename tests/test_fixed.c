@@ -48,10 +48,10 @@ int main(void) {
             x ^= x << 13; x ^= x >> 7; x ^= x << 17;
             int32_t a = (int32_t)(x >> (33 + (k % 31))) ;
             fv2 v = fv2_make(a, (int32_t)(x & 0xFFFFFF));
-            uint64_t n = (uint64_t)((int64_t)v.x * v.x + (int64_t)v.y * v.y);
+            uint64_t nn = (uint64_t)((int64_t)v.x * v.x + (int64_t)v.y * v.y);
             uint64_t res = 0, bit = (uint64_t)1 << 62;                 /* reference */
-            while (bit > n) bit >>= 2;
-            while (bit) { if (n >= res + bit) { n -= res + bit; res = (res >> 1) + bit; } else res >>= 1; bit >>= 2; }
+            while (bit > nn) bit >>= 2;
+            while (bit) { if (nn >= res + bit) { nn -= res + bit; res = (res >> 1) + bit; } else res >>= 1; bit >>= 2; }
             bad += (uint64_t)fv2_len(v) != res;
         }
         CHECKF(bad == 0, "isqrt mismatches: %d", bad);
