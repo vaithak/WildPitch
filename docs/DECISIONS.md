@@ -251,3 +251,11 @@ amends D-020), AI defenders react to a struck pass after 0.2 s, cutting out the 
 within 0.8 m (the receiver keeps 1.0). Now 20% intercepted (6% with clear lanes), launch 12.9 m/s; AI-vs-AI pass
 completion 60% → 77%. Not yet (CP0.3b): player
 stats, AI aerial duels, keeper dives/poses/hands, difficulty, AI set pieces.
+
+## D-024 — Rebindable controls + pause menu (2026-11-15, owner request)
+Defaults (owner): arrows move, **E** sprint, **S** pass (hold: through ball; near their ball: tackle), **D** shoot,
+**A** lofted pass, **C** zoom. My picks (rebindable): **W** chip, **Q** switch, **P** look. Fixed: F3 debug, Esc.
+**Esc** opens a pause menu (Resume / Controls / Quit; the sim is paused and the window only redraws on input).
+Controls: Enter on an action, press the new key (a key already in use is swapped, never shared), R = defaults.
+Saved immediately as text (`action = Key Name`, SDL key names) in the SDL pref dir (`controls.cfg`), loaded at
+startup (not in harness/capture modes). `src/game/keymap.c`, `src/game/menu.c`; ctest `keymap` (`--check-keymap`).

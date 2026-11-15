@@ -30,6 +30,8 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
                         --style --zoom --screenshot --frames), retro low-res render target, 60 fps vsync pacing
   camera.h              WpCamera + wp_project (tilted 2.5D projection)
   render.h/.c           WpRenderCtx (presentation state), pitch/goals/shadows, depth sort, sim -> avatar pose adapter
+  keymap.h/.c           rebindable controls (D-024): defaults, text save/load in the pref dir, swap-on-rebind
+  menu.h/.c             Esc pause menu + Controls screen (rebind); paused + redraw-on-input only
   dedication.h/.c       the owner's dedication card on launch (D-018; wording is fixed)
   ball_draw.h/.c        the ball: visual orientation rolled from drawn motion, 12 panels, speed blur/streak, shadow
   avatar.h/.c           procedural skeleton footballers (D-009): looks, styles, pose solver, soft-capsule drawing

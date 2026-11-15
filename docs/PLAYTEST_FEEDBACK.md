@@ -85,3 +85,7 @@ Format:
 - **Feedback (verbatim):** "the passes seem very slow now with opponents, they are intecepted almost everytime,"
 - **Action:** measure pass speed/flight time and interception rate in live play; tune pass pace, AI reaction to a
   pass, interceptor reach (see STATUS/D-023).
+- **Feedback (verbatim):** "one more thing allow the keybindings to be changeable with a config menu, and keep the
+  following as default: arrow keys for movement, e for spring, s for pass, d for shoot, a for lobs, c for zoom change"
+- **Action:** keymap module + Esc pause menu with a Controls screen (rebind, reset), saved to the user pref dir.
+  Defaults as asked ("spring" read as sprint); chip W, switch Q, look P (my picks, rebindable).

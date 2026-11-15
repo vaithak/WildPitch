@@ -14,7 +14,7 @@ generated world. Long-term project built in small, playtested checkpoints with t
 ```sh
 tools/fetch_deps.sh                       # once: fetches pinned SDL3 into third_party/SDL (git-ignored)
 cmake -S . -B build -G Ninja && cmake --build build
-./build/wildpitch                         # play (F3 = debug overlay, Esc = quit)
+./build/wildpitch                         # play (F3 = debug overlay, Esc = pause menu: Controls rebinds keys)
 ./build/wildpitch --screenshot out.bmp    # visual check: renders --frames N (default 60), saves BMP, exits
 ./build/wildpitch --demo                  # 8 scripted runners (avatar motion check); --gallery = pose sheet
                                           # --style 0|1|2 (Modern/Arcade/Retro), --zoom 0|1|2; P/Z keys in game

@@ -68,6 +68,7 @@ if(WP_BUILD_TESTS)
   endforeach()
   if(WP_BUILD_GAME)   # presentation check without a window: kicking instep at the ball on the contact tick
     add_test(NAME avatar_kick_pose COMMAND wildpitch --check-kick-pose)
+    add_test(NAME keymap COMMAND wildpitch --check-keymap)
   endif()
   add_executable(bench_sim ${CMAKE_SOURCE_DIR}/tests/bench_sim.c)
   target_link_libraries(bench_sim PRIVATE wp_sim)

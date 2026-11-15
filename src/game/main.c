@@ -10,6 +10,7 @@
  *   --autoplay             seat 0 is scripted: chase ball, dribble at goal, charged shot (visual checks)
  *   --autoplay-chip / --autoplay-dribble   variants: chip instead of shot / sprint zigzag dribble (no shot)
  *   --check-kick-pose      numeric check: kicking instep at the ball on the contact tick (no window)
+ *   --check-keymap         keymap defaults / save-load round trip / rebind swap (no window)
  *   --screenshot F.bmp     save frame number --frames N (default 60) to F.bmp and exit
  */
 #include <SDL3/SDL.h>
@@ -22,6 +23,8 @@
 #include "sim/tuning.h"
 #include "game/render.h"
 #include "game/dedication.h"
+#include "game/keymap.h"
+#include "game/menu.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen */
 static const char *ZOOM_NAME[3] = {"wide", "medium", "close"};
@@ -37,22 +40,31 @@ typedef struct {
     int           zoom;
     bool          show_debug, demo;
     double        sim_ms_avg;
+    WpKeymap      km;              /* rebindable controls (Esc -> Controls) */
+    WpMenu        menu;            /* pause menu; the sim is paused while it's open */
 } Game;
 
-static WpSeatInput read_keyboard(void) {
-    const bool *k = SDL_GetKeyboardState(NULL);
-    WpSeatInput in = {0, 0, 0};
-    int mx = (k[SDL_SCANCODE_D] || k[SDL_SCANCODE_RIGHT]) - (k[SDL_SCANCODE_A] || k[SDL_SCANCODE_LEFT]);
-    int my = (k[SDL_SCANCODE_W] || k[SDL_SCANCODE_UP]) - (k[SDL_SCANCODE_S] || k[SDL_SCANCODE_DOWN]);
-    in.move_x = (int8_t)(mx * 127);
-    in.move_y = (int8_t)(my * 127);
-    if (k[SDL_SCANCODE_J] || k[SDL_SCANCODE_SPACE]) in.buttons |= WP_BTN_PASS;
-    if (k[SDL_SCANCODE_K]) in.buttons |= WP_BTN_SHOOT;
-    if (k[SDL_SCANCODE_LSHIFT] || k[SDL_SCANCODE_RSHIFT]) in.buttons |= WP_BTN_SPRINT;
-    if (k[SDL_SCANCODE_Q]) in.buttons |= WP_BTN_SWITCH;
-    if (k[SDL_SCANCODE_I]) in.buttons |= WP_BTN_CHIP;
-    if (k[SDL_SCANCODE_L]) in.buttons |= WP_BTN_LOB;
-    return in;
+/* --check-keymap: defaults, text round trip, swap-on-rebind (no window) */
+static int check_keymap(void) {
+    WpKeymap a, b;
+    wp_keymap_defaults(&a);
+    int bad = 0;
+    bad += a.key[WP_KEY_UP] != SDL_SCANCODE_UP || a.key[WP_KEY_SPRINT] != SDL_SCANCODE_E ||
+           a.key[WP_KEY_PASS] != SDL_SCANCODE_S || a.key[WP_KEY_SHOOT] != SDL_SCANCODE_D ||
+           a.key[WP_KEY_LOB] != SDL_SCANCODE_A || a.key[WP_KEY_ZOOM] != SDL_SCANCODE_C;
+    for (int i = 0; i < WP_KEY_COUNT; i++)
+        for (int j = i + 1; j < WP_KEY_COUNT; j++) bad += a.key[i] == a.key[j];     /* no shared keys */
+    wp_keymap_bind(&a, WP_KEY_PASS, SDL_SCANCODE_D);                                /* swap with shoot */
+    bad += a.key[WP_KEY_PASS] != SDL_SCANCODE_D || a.key[WP_KEY_SHOOT] != SDL_SCANCODE_S;
+    char buf[2048];
+    wp_keymap_to_text(&a, buf, (int)sizeof buf);
+    wp_keymap_defaults(&b);
+    wp_keymap_from_text(&b, buf);
+    for (int i = 0; i < WP_KEY_COUNT; i++) bad += a.key[i] != b.key[i];
+    wp_keymap_from_text(&b, "garbage\nshoot = NotAKey\n# comment\nlook=Return\n");
+    bad += b.key[WP_KEY_LOOK] != SDL_SCANCODE_RETURN || b.key[WP_KEY_SHOOT] != a.key[WP_KEY_SHOOT];
+    printf("keymap check: %s\n", bad ? "FAIL" : "ok");
+    return bad ? 1 : 0;
 }
 
 /* ---- demo harness: scripted runners so avatar motion can be judged without AI. Writes action/jump
@@ -246,7 +258,7 @@ static void apply_vsync(Game *g) {
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, autoplay = false, force_card = false;
+    bool gallery = false, demo = false, autoplay = false, force_card = false, menu_shot = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
@@ -260,6 +272,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--autoplay-dribble")) { autoplay = true; autoplay_dribble = true; }
         else if (!strcmp(argv[i], "--autoplay-header") && i + 1 < argc) { autoplay = true; autoplay_header = (float)atof(argv[++i]); }
         else if (!strcmp(argv[i], "--check-kick-pose")) return check_kick_pose();
+        else if (!strcmp(argv[i], "--check-keymap")) return check_keymap();
+        else if (!strcmp(argv[i], "--menu")) menu_shot = true;      /* with --screenshot: capture the Controls screen */
     }
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -273,6 +287,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     apply_vsync(&g);
+    wp_keymap_defaults(&g.km);
+    if (!(shot_path || autoplay || demo || gallery)) wp_keymap_load(&g.km);   /* the player's saved controls */
     if (force_card && shot_path) {                       /* visual check of the dedication card (mid-hold) */
         int w, h;
         SDL_GetRenderOutputSize(g.ren, &w, &h);
@@ -307,15 +323,38 @@ int main(int argc, char **argv) {
     long total_frames = 0;
     Uint64 start_ns = SDL_GetTicksNS();
     bool running = true;
+    if (menu_shot) { wp_menu_open(&g.menu); g.menu.screen = WP_MENU_CONTROLS; g.menu.sel = WP_KEY_PASS; }
     while (running) {
         SDL_Event e;
+        if (g.menu.screen != WP_MENU_CLOSED) {
+            /* paused: draw the menu, then sleep until the next event (no busy loop, nothing redrawn meanwhile) */
+            int mw, mh;
+            SDL_GetRenderOutputSize(g.ren, &mw, &mh);
+            wp_menu_draw(&g.menu, &g.km, g.ren, mw, mh);
+            if (shot_path) {                              /* visual check of the menu */
+                SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
+                if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
+                break;
+            }
+            SDL_RenderPresent(g.ren);
+            if (!SDL_WaitEvent(&e)) continue;
+            do {
+                if (e.type == SDL_EVENT_QUIT) running = false;
+                WpMenuResult res = wp_menu_event(&g.menu, &e, &g.km);
+                if (res == WP_MENU_QUIT) running = false;
+            } while (SDL_PollEvent(&e));
+            last = SDL_GetTicksNS();                      /* don't fast-forward the time spent paused */
+            acc = 0;
+            continue;
+        }
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) running = false;
-            if (e.type == SDL_EVENT_KEY_DOWN) {
-                if (e.key.key == SDLK_ESCAPE) running = false;
-                if (e.key.key == SDLK_F3) g.show_debug = !g.show_debug;
-                if (e.key.key == SDLK_P) g.rctx.style = (g.rctx.style + 1) % WP_AVATAR_STYLE_COUNT;
-                if (e.key.key == SDLK_Z) g.zoom = (g.zoom + 1) % 3;
+            if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
+                SDL_Scancode sc = e.key.scancode;
+                if (sc == SDL_SCANCODE_ESCAPE && !shot_path) wp_menu_open(&g.menu);
+                if (sc == SDL_SCANCODE_F3) g.show_debug = !g.show_debug;
+                if (sc == g.km.key[WP_KEY_LOOK]) g.rctx.style = (g.rctx.style + 1) % WP_AVATAR_STYLE_COUNT;
+                if (sc == g.km.key[WP_KEY_ZOOM]) g.zoom = (g.zoom + 1) % 3;
             }
             if (e.type == SDL_EVENT_WINDOW_DISPLAY_CHANGED) apply_vsync(&g);
         }
@@ -341,7 +380,7 @@ int main(int argc, char **argv) {
                     in.seat[0] = (WpSeatInput){0, 0, (uint16_t)(g.cur.tick == 21 ? WP_BTN_SHOOT : 0)};
                 }
                 else if (autoplay) autoplay_input(&g.cur, &in);
-                else in.seat[0] = read_keyboard();
+                else in.seat[0] = wp_keymap_read(&g.km, SDL_GetKeyboardState(NULL));
                 Uint64 t0 = SDL_GetTicksNS();
                 g.prev = g.cur;
                 sim_step(&g.cur, &in);
@@ -395,8 +434,15 @@ int main(int argc, char **argv) {
             unsigned secs = g.cur.tick / WP_TICK_HZ;
             snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02u:%02u", g.cur.score[0], g.cur.score[1], secs / 60, secs % 60);
             SDL_RenderDebugText(g.ren, 12, 12, buf);
-            snprintf(buf, sizeof buf, "WASD move  Shift sprint  J pass (hold: through)  L lob  Q switch  K shoot  I chip  (J/K at a high ball: header)   [P] %s  [Z] %s  F3",
-                     st->name, ZOOM_NAME[g.zoom]);
+            {   /* hints show the player's actual keys */
+                const WpKeymap *k = &g.km;
+                snprintf(buf, sizeof buf, "%s/%s/%s/%s move  %s sprint  %s pass (hold: through, near their ball: tackle)  %s lob  "
+                         "%s shoot  %s chip  %s switch  %s zoom  %s look  Esc menu",
+                         wp_keymap_key_name(k, WP_KEY_UP), wp_keymap_key_name(k, WP_KEY_LEFT), wp_keymap_key_name(k, WP_KEY_DOWN),
+                         wp_keymap_key_name(k, WP_KEY_RIGHT), wp_keymap_key_name(k, WP_KEY_SPRINT), wp_keymap_key_name(k, WP_KEY_PASS),
+                         wp_keymap_key_name(k, WP_KEY_LOB), wp_keymap_key_name(k, WP_KEY_SHOOT), wp_keymap_key_name(k, WP_KEY_CHIP),
+                         wp_keymap_key_name(k, WP_KEY_SWITCH), wp_keymap_key_name(k, WP_KEY_ZOOM), wp_keymap_key_name(k, WP_KEY_LOOK));
+            }
             SDL_RenderDebugText(g.ren, 12, (float)h - 20, buf);
             if (g.cur.phase == WP_PHASE_GOAL) {
                 const char *msg = "G O A L !";

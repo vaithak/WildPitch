@@ -44,8 +44,8 @@ jumps to our AI team-mate/keeper who wins the ball; the human controls the keepe
   the physics box, F3 shows ball speed/height/spin/owner/phase/events, control hints on screen.
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
-- Flags: `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (11 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism
+- Flags: `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
+- **Tests (12 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
   (golden `b536eddf99f2591c`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~1,080× real time (15 µs/tick with 10 AI players; ~0.1% of a core in play). RL training will want a
@@ -101,6 +101,11 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Controls (D-024 — defaults; Esc → Controls to rebind, saved automatically)
+Arrows move · **E** sprint · **S** pass (hold = through ball; near their ball = tackle) · **D** shoot (hold) ·
+**A** lofted pass · **W** chip (hold) · **Q** switch · **C** zoom · **P** look · F3 debug · **Esc** pause menu.
+Older playtest guides below still say J/K/L/I/WASD — read them as Pass/Shoot/Lob/Chip/Move.
 
 ## Playtest guide (CP0.3a — focus: a real match vs AI)
 `./build/wildpitch`. The blue team now attacks and defends. Defend: get goal-side and press **J** when the blue
