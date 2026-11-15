@@ -3,11 +3,15 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.2b — Through balls, lofted passes, headers: ✅ done; CP0.2 (a+b) waiting for the owner's playtest.** Owner said
-"go ahead" after CP0.2a without passing notes, so both halves are up for feedback together. Next: **CP0.3 "Instinct
-AI"** after feedback.
+**CP0.2c — Passing & reception that feel natural: ✅ done, waiting for the owner's playtest.** Owner said through-ball
+power and reception felt off and that pressing a key while receiving made the player run past the ball → research
+(`reports/Through ball and pass reception.md`) + headless playtest agent → D-020. Next: **CP0.3 "Instinct AI"**.
 
 ## What works now
+- **CP0.2c (D-020):** through balls land just ahead of a running receiver (hold = deeper/softer, never weaker than a
+  tap), taps lead runners by the real flight time and pace grows with distance, receivers keep running and are never
+  abandoned when you press or release keys (the stick picks where he meets it), 1 m swept reach, deflections switch
+  you to the best-placed man at once, hold J with nobody ahead = harder ball.
 - **CP0.2b:** hold J = through ball (white bar = how far ahead; receiver runs onto it), L = lofted pass over
   defenders, J/K at a ball coming in high = header (stand or timed jump; K at goal, J to a team-mate).
 - **CP0.2a:** full 5-a-side team. J = pass to the best team-mate toward the stick (weighted to arrive ~6 m/s), control
@@ -26,10 +30,10 @@ AI"** after feedback.
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (8 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_scoring, test_determinism
-  (golden `41c7af68235c7e0b`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (9 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_scoring, test_determinism
+  (golden `ef60beafb1e050e8`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
-- Perf: full game loop ~5% of one core; `bench_sim` ~7,100× real time (2.4 µs/tick; was 22,700× before team logic + pass solver — fine for play, revisit with a
+- Perf: full game loop ~5% of one core; `bench_sim` ~4,900× real time (3.4 µs/tick; receiver ball prediction each tick; was 22,700× before team logic + pass solver — fine for play, revisit with a
   lookup table before RL training).
 
 ### Feel numbers (from test_ball_control; update when tuning changes)
@@ -66,10 +70,11 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Log the owner's CP0.2 playtest feedback (passing, switching, through balls, lobs, headers) in
-   `docs/PLAYTEST_FEEDBACK.md`; tune `src/sim/tuning.h` (switching & passing block) as needed.
+1. Log the owner's CP0.2c playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; tune the D-020 block in `tuning.h`.
+   Open owner questions: hold = deeper (current) or firmer? Separate through-ball key instead of tap/hold?
 2. Re-plan and start CP0.3 "Instinct AI" per ROADMAP (candidate actions × utility, D-008): replaces team.c
-   placeholder; opposition becomes real; keepers dive; AI aerial duels; simple player stats.
+   placeholder (incl. one-twos / follow-up runs / run timing / pass lanes from D-020's deferred list); real
+   opposition; keepers dive; AI aerial duels; simple player stats. Consider a perf pass (bench 4,900×) first.
 
 ## Known issues / environment notes
 - **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
@@ -80,6 +85,14 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Playtest guide (CP0.2c — focus: does passing/receiving feel natural now?)
+Same controls. Try: through balls (hold J) to a running striker — he should keep running and meet it just ahead,
+in stride; longer hold = deeper and softer (the bar = how far ahead). Taps to a running team-mate lead him. While a
+pass travels, press or release keys freely: he still gets it, and the direction you hold picks where he meets it
+(toward = attack it, along = take it on the run); only holding straight back for 1/4 s gives you full manual. A tap
+is now anything up to 200 ms. Deflected passes switch you to the best-placed man and he chases the ball.
+Questions: through ball depth/pace right? Should the bar mean "deeper" (now) or "firmer"? Separate through key?
 
 ## Playtest guide (CP0.2b — focus: through balls, lofts, headers)
 New on top of CP0.2a: **hold J** = through ball — the white bar fills = how far ahead of your team-mate it goes;

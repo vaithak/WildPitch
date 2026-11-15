@@ -111,7 +111,7 @@ void header_step(SimState *s, int i, const WpSeatInput *in) {
     p->kick.done = 1;
     if (p->action == WP_ACT_STAND_HEADER) p->kick.windup = (uint8_t)(p->action_timer + 1 > 255 ? 255 : p->action_timer + 1);
     s->events |= WP_EV_KICK | WP_EV_HEADER;
-    if (to >= 0) seats_pass_handoff(s, i, to, in);
+    if (to >= 0) seats_pass_handoff(s, i, to, in, s->players[to].pos, FX(1.0), WP_PLAN_CLOSEST);
 }
 
 /* While a header attempt waits for the ball, the stick only AIMS; the legs step under the ball's path. */

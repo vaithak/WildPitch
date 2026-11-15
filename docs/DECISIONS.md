@@ -156,3 +156,28 @@ permanent line on the title screen footer and in the credits. Never on the in-ma
   avatar's header pose is timed from take-off (jump) / contact (stand), holding a ready stance while waiting.
 - **Assisted receive meet point:** cheap 50 ms ball prediction; ground/lofted passes → the reachable point CLOSEST to
   the receiver (step across, let it come: arrives ~6 m/s); through balls → where it slows to ~3.5 m/s (run onto it).
+
+## D-020 — Passes solve the meeting point; the receiver is steered, never abandoned (2026-11-15, CP0.2c)
+Owner: "something off about the through ball power and passing/through ball reception" + "while a ball is being
+received, and the moving key is pressed, player moves ahead without reception". Research + headless playtest:
+`reports/Through ball and pass reception.md`. **Amends D-017 (receive/switch) and D-019 (through ball).**
+- **Exact roll tables** R(v) (distance to stop) and T(v) (time to stop), built once from one trajectory of the real
+  integrator; flight v0→va = T(v0) − T(va). Replaces the bisection.
+- **Tap pass:** arrival pace 5.5 m/s + 0.25 per m beyond 5 m (max 9); leads the receiver by the REAL flight time
+  (3 iterations); receivers judged where they'll be; none beyond 26 m, scored down beyond 18 m. Runners (moving away
+  from the ball > 2 m/s) keep their line and run through the meeting point; others step to the closest point.
+- **Through ball (hold J > 12 ticks):** intercept solve — first time t at which the ball reaches the runner's path
+  point P(t) = pos + u(s·t + 0.8 m) no later than he does; arrival pace in [max(5, s−1.5), min(1.5s, 12)] and the
+  hold h picks inside it (h=0 firm & early, h=1 soft & deep: the bar = how far ahead); launch ≤ 24 m/s and never
+  softer than a tap to him; meet ≥ 3 m inside the goal line / 1.5 m inside the touchline. Fallbacks: firmest pace →
+  runner planned 25% slower (≥ 5) → lead pass clamped inside the margins (short room near goal: he eases). Runs
+  always go toward goal (a man drifting back is planned to set off forward). Hold with nobody in the cone = power
+  12→20 m/s.
+- **Reception:** released or unchanged stick = no opinion (the assist plays it); any other direction PICKS among the
+  reachable meeting points (GRF cost t/2 + 0.3·(1−cos)); full manual only after > 120° away for 250 ms, SWITCH, the
+  ball gone (6 ticks) or the pass ending. A planned runner lets the ball run until 0.2 s before the meet. Control
+  reach 1.0 m, swept over the tick; the pass's receiver may stretch to 1.3 m (heavier touch). Head-on in the last
+  0.5 s he closes at ≤ 4 m/s.
+- **Deflection mid-pass:** switch at once to the team-mate with the best time to the ball; after any auto-switch the
+  inherited stick is ignored (he chases the ball) until it changes/releases, ≤ 30 ticks.
+- Not done (CP0.3 AI): one-twos / passer follow-up runs, off-ball run timing, pass-lane scoring.

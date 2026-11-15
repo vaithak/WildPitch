@@ -1,9 +1,17 @@
-/* seats.c - which player each human seat controls (switching) and the pass in flight.
+/* seats.c - which player each human seat controls (switching), the pass in flight, and the assisted receiver.
  *  - Never switch away from the ball carrier (control()/body rules assume the owner is a seat's player).
  *  - Targeted pass: control hands over to the receiver on the CONTACT tick (a whiff doesn't switch).
- *  - While that pass is in flight there is no auto-switch (the passer would otherwise be nearest and win it back);
- *    the receiver auto-runs to meet the ball until the human moves the stick away from where it was at the pass.
- *  - Loose ball: auto-switch to the outfield team-mate nearest the ball, with hysteresis + cooldown.
+ *  - While that pass is in flight there is no auto-switch (the passer would otherwise be nearest and win it back).
+ *  - Assisted receive (D-020): the receiver plays the pass by itself — runners run THROUGH the planned meeting point
+ *    at just-in-time speed, standing/checking receivers step to the closest reachable point. The human's stick never
+ *    cancels this: released or unchanged = no opinion; any other direction PICKS among the reachable meeting points
+ *    (along the ball = meet it later on the move, toward it = attack it, sideways = line up that side). Full manual
+ *    control only after the stick points > 120 deg away from the meet for 250 ms, a SWITCH press, the ball having
+ *    gone (no reachable point for 6 ticks) or the pass ending.
+ *  - Deflection off anyone: switch at once to the team-mate with the best time to the ball.
+ *  - Loose ball: auto-switch to the outfield team-mate nearest the ball (hysteresis + cooldown).
+ *  - After any auto-switch the stick the human was holding is ignored (the new man chases the ball) until it
+ *    changes or is released, at most T_SWITCH_LATCH_TICKS (FIFA's "auto switching move assistance").
  *  - SWITCH button: nearest team-mate to the ball other than the current one; locks auto-switch for a while. */
 #include "sim/sim_internal.h"
 
@@ -12,12 +20,18 @@ static int seat_owns(const SimState *s, int player) {
     return 0;
 }
 
-static void do_switch(SimState *s, int seat, int to, uint8_t cool) {
+static void do_switch(SimState *s, int seat, int to, uint8_t cool, const WpSeatInput *si, int latch) {
     WpPlayer *old = &s->players[s->seat_player[seat]];
     old->kick_charge = 0;
     old->charge_kind = 0xFF;
     s->seat_player[seat] = (int8_t)to;
     s->switch_cool[seat] = cool;
+    s->latch_ticks[seat] = 0;
+    if (latch && si && (si->move_x || si->move_y)) {
+        s->latch_stick[seat][0] = si->move_x;
+        s->latch_stick[seat][1] = si->move_y;
+        s->latch_ticks[seat] = T_SWITCH_LATCH_TICKS;
+    }
 }
 
 /* nearest outfield team-mate of `team` to the ball, skipping `skip` and players other seats hold */
@@ -33,63 +47,18 @@ static int nearest_to_ball(const SimState *s, int team, int skip, fx *out_d) {
     return best;
 }
 
-void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput *in) {
-    int seat = -1;
-    for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == kicker) seat = k;
-    s->pass_target = (int8_t)receiver;
-    s->pass_from = (int8_t)kicker;
-    s->pass_ticks = 0;
-    if (seat < 0 || seat_owns(s, receiver)) { s->pass_stick[0] = s->pass_stick[1] = -128; return; }
-    s->pass_stick[0] = in->move_x;
-    s->pass_stick[1] = in->move_y;
-    do_switch(s, seat, receiver, T_SWITCH_COOL);
-}
+typedef struct { fv2 pos; fx t; int found; } Meet;
 
-void seats_update(SimState *s, const WpInput *in) {
-    const WpBall *b = &s->ball;
-    /* pass in flight bookkeeping */
-    if (s->pass_target >= 0) {
-        s->pass_ticks++;
-        int ends = s->phase != WP_PHASE_PLAY || b->owner >= 0 || b->last_touch != s->pass_from ||
-                   s->pass_ticks > T_PASS_FLIGHT_MAX || (b->z == 0 && fv2_len(b->vel) < FX(1.0));
-        if (ends) s->pass_target = -1;
-    }
-    for (int k = 0; k < WP_MAX_SEATS; k++) {
-        int me = s->seat_player[k];
-        if (me < 0) continue;
-        const WpSeatInput *si = &in->seat[k];
-        if (s->switch_cool[k]) s->switch_cool[k]--;
-        if (s->pass_target == me && s->pass_stick[0] != -128) {      /* has the human taken over the receiver? */
-            int dx = si->move_x - s->pass_stick[0], dy = si->move_y - s->pass_stick[1];
-            if (dx * dx + dy * dy > 48 * 48) s->pass_stick[0] = s->pass_stick[1] = -128;
-        }
-        const WpPlayer *p = &s->players[me];
-        int busy = (p->action == WP_ACT_KICK || p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) &&
-                   !p->kick.done;                                     /* mid-kick or going for a header */
-        if (s->phase != WP_PHASE_PLAY || b->owner == me || busy) continue;
-        int pressed = (si->buttons & WP_BTN_SWITCH) && !(s->prev_buttons[k] & WP_BTN_SWITCH);
-        if (pressed) {
-            int to = nearest_to_ball(s, p->team, me, 0);
-            if (to >= 0) do_switch(s, k, to, T_SWITCH_LOCK_MANUAL);
-            continue;
-        }
-        if (s->switch_cool[k] || s->pass_target >= 0 || b->owner >= 0) continue;
-        fx dn;
-        int to = nearest_to_ball(s, p->team, me, &dn);
-        fx dme = fv2_len(fv2_sub(b->pos, p->pos));
-        if (to >= 0 && dme - dn > T_SWITCH_HYST) do_switch(s, k, to, T_SWITCH_COOL);
-    }
-}
-
-/* Where should player p meet the ball? Steps a cheap prediction (gravity + air drag in flight, rolling decel on
- * the grass, bounces ignored) every 50 ms for up to 4 s; among the points at head height or below that he can run
- * to in time (~6.5 m/s + 0.15 s to react) it takes the one CLOSEST to him: step across to a pass and let it come
- * (soft first touch), wait where a through ball slows, get under a lofted ball. Fallback: where it ends up. */
-static fv2 meet_point(const SimState *s, const WpPlayer *p, int through) {
+/* Where can player p meet the ball? Cheap prediction every 50 ms for up to 4 s (gravity + air drag in flight,
+ * rolling decel on the grass, bounces ignored). Candidates: points at head height or below that he can run to in
+ * time (~6.5 m/s + 0.15 s to react). No preference -> the candidate CLOSEST to him (step across, let it come).
+ * With a stick preference (unit vector) -> min cost t/2 + 0.3*(1 - cos(stick, direction to candidate)) (GRF's
+ * 0.6*angle/pi weighting). Not found -> the last predicted point. */
+static Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
     const WpBall *b = &s->ball;
     fv2 pos = b->pos, v = b->vel;
-    fx z = b->z, vz = b->vz, dt = FX(0.05), best_d = -1;
-    fv2 best = b->pos;
+    fx z = b->z, vz = b->vz, dt = FX(0.05), best_cost = 0;
+    Meet m = {b->pos, 0, 0};
     for (int k = 1; k <= 80; k++) {
         fx hs = fv2_len(v);
         if (z > 0 || vz > 0) {
@@ -104,23 +73,156 @@ static fv2 meet_point(const SimState *s, const WpPlayer *p, int through) {
         }
         pos = fv2_add(pos, fv2_scale(v, dt));
         if (z > FX(1.9)) continue;
-        if (through && fv2_len(v) <= T_THROUGH_ARRIVE + FX(0.5)) return pos;   /* run onto it where it slows */
-        fx d = fv2_len(fv2_sub(pos, p->pos)), t = dt * k, reach = fx_div(d, FX(6.5)) + FX(0.15);
-        if (reach <= t && (best_d < 0 || d < best_d)) { best_d = d; best = pos; }
+        fv2 to = fv2_sub(pos, p->pos);
+        fx d = fv2_len(to), t = dt * k;
+        if (fx_div(d, FX(6.5)) + FX(0.15) > t) continue;
+        fx cost = d;
+        if (has_pref) {
+            fx c = d < FX(0.3) ? FX_ONE : fv2_dot(pref, fv2_scale(to, fx_div(FX_ONE, d)));
+            cost = t / 2 + fx_mul(FX(0.3), FX_ONE - c);
+        }
+        if (!m.found || cost < best_cost) { m.pos = pos; m.t = t; m.found = 1; best_cost = cost; }
     }
-    return best_d >= 0 ? best : pos;
+    if (!m.found) m.pos = pos;
+    return m;
 }
 
-/* Assisted receive: the seat's player is the pass target and the human hasn't moved the stick since the pass ->
- * run to where he can first meet the ball (onto a through ball, under a lofted one). Buttons kept. */
+void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput *in, fv2 meet, fx t_meet,
+                        uint8_t plan) {
+    int seat = -1;
+    for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == kicker) seat = k;
+    s->pass_target = (int8_t)receiver;
+    s->pass_from = (int8_t)kicker;
+    s->pass_ticks = 0;
+    s->pass_meet = meet;
+    s->pass_meet_tick = (uint16_t)(s->tick + (uint32_t)((t_meet * WP_TICK_HZ) / FX_ONE));
+    s->pass_plan = plan;
+    s->recv_away = s->recv_gone = 0;
+    s->recv_goal = meet;
+    s->recv_speed = 0;
+    if (seat < 0 || seat_owns(s, receiver)) { s->pass_stick[0] = s->pass_stick[1] = -128; return; }
+    s->pass_stick[0] = in->move_x;
+    s->pass_stick[1] = in->move_y;
+    do_switch(s, seat, receiver, T_SWITCH_COOL, 0, 0);
+}
+
+/* the assisted receiver's goal + speed for this tick, and the takeover rule */
+static void recv_update(SimState *s, int me, const WpSeatInput *si) {
+    const WpPlayer *p = &s->players[me];
+    const WpBall *b = &s->ball;
+    int dx = si->move_x - s->pass_stick[0], dy = si->move_y - s->pass_stick[1];
+    int has = si->move_x || si->move_y;
+    int opinion = has && dx * dx + dy * dy > T_RECV_STICK_TOL * T_RECV_STICK_TOL;
+    fv2 pref = opinion ? fv2_norm(fv2_make((fx)si->move_x * (FX_ONE / 127), (fx)si->move_y * (FX_ONE / 127)))
+                       : fv2_make(0, 0);
+    int32_t left = (int32_t)(int16_t)(uint16_t)(s->pass_meet_tick - (uint16_t)s->tick);   /* ticks to the plan */
+    fv2 goal; fx speed;
+    if (!opinion && s->pass_plan != WP_PLAN_CLOSEST && left > 3) {
+        goal = s->pass_meet;                          /* run THROUGH the plan, arriving just in time */
+        speed = fx_div(fv2_len(fv2_sub(goal, p->pos)), FX_INT(left) / WP_TICK_HZ);
+        speed = fx_clamp(speed, s->pass_plan == WP_PLAN_STRIDE ? FX(4.5) : 0, T_SPRINT_SPEED);
+        s->recv_gone = 0;
+    } else {
+        Meet m = meet_choose(s, p, pref, opinion);
+        if (m.found) s->recv_gone = 0; else if (s->recv_gone < 255) s->recv_gone++;
+        goal = m.pos;
+        speed = fx_min(fx_mul(fv2_len(fv2_sub(goal, p->pos)), FX(4.0)), T_SPRINT_SPEED);   /* arrive, don't overrun */
+    }
+    /* head-on in the ball's last 0.5 s: don't sprint into it (closing speed stays controllable) */
+    fv2 to_ball = fv2_sub(b->pos, p->pos);
+    fx bspd = fv2_len(b->vel), dball = fv2_len(to_ball);
+    if (bspd > FX(1.0) && fv2_dot(b->vel, to_ball) < 0 && dball < fx_mul(bspd, FX(0.5)) &&
+        fv2_dot(fv2_norm(fv2_sub(goal, p->pos)), fv2_norm(to_ball)) > FX(0.7))
+        speed = fx_min(speed, T_RECV_HEADON_MS);
+    s->recv_goal = goal;
+    s->recv_speed = speed;
+    /* takeover: stick held well away from the meeting point, or the ball has gone */
+    fv2 dg = fv2_sub(goal, p->pos);
+    if (opinion && fv2_len(dg) > FX(0.5) && fv2_dot(pref, fv2_norm(dg)) < -FX(0.5)) {
+        if (s->recv_away < 255) s->recv_away++;
+    } else {
+        s->recv_away = 0;
+    }
+    if (s->recv_away >= T_RECV_TAKEOVER_TICKS || s->recv_gone >= T_RECV_GONE_TICKS)
+        s->pass_stick[0] = s->pass_stick[1] = -128;
+}
+
+/* a deflection mid-pass: give each seat of the passing team the team-mate with the best time to the ball */
+static void deflect_switch(SimState *s, const WpInput *in, int team) {
+    for (int k = 0; k < WP_MAX_SEATS; k++) {
+        int me = s->seat_player[k];
+        if (me < 0 || s->players[me].team != team) continue;
+        int best = -1; fx bt = 0;
+        for (int j = team * s->n_per_side; j < (team + 1) * s->n_per_side; j++) {
+            const WpPlayer *q = &s->players[j];
+            if (q->role == WP_ROLE_KEEPER || (j != me && seat_owns(s, j))) continue;
+            Meet m = meet_choose(s, q, fv2_make(0, 0), 0);
+            fx t = m.found ? m.t : FX(9.0);
+            if (best < 0 || t < bt) { best = j; bt = t; }
+        }
+        if (best >= 0 && best != me) do_switch(s, k, best, T_SWITCH_COOL, &in->seat[k], 1);
+    }
+}
+
+void seats_update(SimState *s, const WpInput *in) {
+    const WpBall *b = &s->ball;
+    /* pass in flight bookkeeping */
+    if (s->pass_target >= 0) {
+        s->pass_ticks++;
+        int deflected = b->owner < 0 && b->last_touch >= 0 && b->last_touch != s->pass_from;
+        int ends = s->phase != WP_PHASE_PLAY || b->owner >= 0 || deflected ||
+                   s->pass_ticks > T_PASS_FLIGHT_MAX || (b->z == 0 && fv2_len(b->vel) < FX(1.0));
+        if (ends) {
+            int team = s->players[s->pass_from].team;
+            s->pass_target = -1;
+            if (deflected && s->phase == WP_PHASE_PLAY) deflect_switch(s, in, team);
+        }
+    }
+    for (int k = 0; k < WP_MAX_SEATS; k++) {
+        int me = s->seat_player[k];
+        if (me < 0) continue;
+        const WpSeatInput *si = &in->seat[k];
+        if (s->switch_cool[k]) s->switch_cool[k]--;
+        if (s->latch_ticks[k]) {                      /* inherited stick: until it changes / is released */
+            if (si->move_x != s->latch_stick[k][0] || si->move_y != s->latch_stick[k][1]) s->latch_ticks[k] = 0;
+            else s->latch_ticks[k]--;
+        }
+        if (s->pass_target == me && s->pass_stick[0] != -128) recv_update(s, me, si);
+        const WpPlayer *p = &s->players[me];
+        int busy = (p->action == WP_ACT_KICK || p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) &&
+                   !p->kick.done;                                     /* mid-kick or going for a header */
+        if (s->phase != WP_PHASE_PLAY || b->owner == me || busy) continue;
+        int pressed = (si->buttons & WP_BTN_SWITCH) && !(s->prev_buttons[k] & WP_BTN_SWITCH);
+        if (pressed) {
+            int to = nearest_to_ball(s, p->team, me, 0);
+            if (to >= 0) {
+                if (s->pass_target == me) s->pass_stick[0] = s->pass_stick[1] = -128;
+                do_switch(s, k, to, T_SWITCH_LOCK_MANUAL, si, 0);
+            }
+            continue;
+        }
+        if (s->switch_cool[k] || s->pass_target >= 0 || b->owner >= 0) continue;
+        fx dn;
+        int to = nearest_to_ball(s, p->team, me, &dn);
+        fx dme = fv2_len(fv2_sub(b->pos, p->pos));
+        if (to >= 0 && dme - dn > T_SWITCH_HYST) do_switch(s, k, to, T_SWITCH_COOL, si, 1);
+    }
+}
+
+/* Legs-only input for a seat's player (aim and buttons always stay the human's): the assisted receiver, or a
+ * freshly auto-switched player chasing the loose ball while the inherited stick is still held. */
 void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io) {
     int me = s->seat_player[seat];
-    if (me < 0 || s->pass_target != me || s->pass_stick[0] == -128) return;
-    const WpBall *b = &s->ball;
+    if (me < 0) return;
     const WpPlayer *p = &s->players[me];
-    (void)b;
-    fv2 meet = meet_point(s, p, s->pass_from >= 0 && s->players[s->pass_from].kick.kind == WP_KICK_THROUGH);
     uint16_t buttons = io->buttons;
-    team_steer(p, meet, FX(0.3), FX(1.5), io);
-    io->buttons = buttons;
+    if (s->pass_target == me && s->pass_stick[0] != -128) {
+        team_steer_speed(p, s->recv_goal, s->recv_speed, io);
+    } else if (s->latch_ticks[seat] && s->ball.owner < 0) {
+        Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
+        team_steer_speed(p, m.pos, fx_min(fx_mul(fv2_len(fv2_sub(m.pos, p->pos)), FX(4.0)), T_SPRINT_SPEED), io);
+    } else {
+        return;
+    }
+    io->buttons = (uint16_t)((buttons & ~WP_BTN_SPRINT) | (io->buttons & WP_BTN_SPRINT));
 }

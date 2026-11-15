@@ -23,6 +23,21 @@ void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSe
     out->move_y = (int8_t)fx_clamp(v.y / FX_ONE, -127, 127);
 }
 
+void team_steer_speed(const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out) {
+    fv2 d = fv2_sub(target, p->pos);
+    fx dist = fv2_len(d);
+    out->move_x = out->move_y = 0;
+    out->buttons = 0;
+    if (dist < FX(0.05) || speed <= 0) return;
+    int sprint = speed > T_WALK_SPEED;
+    fx mag = fx_min(fx_div(speed, sprint ? T_SPRINT_SPEED : T_WALK_SPEED), FX_ONE);
+    fv2 v = fv2_scale(d, fx_div(fx_mul(mag, FX(127.0)), dist));
+    out->move_x = (int8_t)fx_clamp(v.x / FX_ONE, -127, 127);
+    out->move_y = (int8_t)fx_clamp(v.y / FX_ONE, -127, 127);
+    if (!out->move_x && !out->move_y) out->move_x = (int8_t)(d.x > 0 ? 1 : -1);
+    if (sprint) out->buttons = WP_BTN_SPRINT;
+}
+
 static int team_has_seat(const SimState *s, int team) {
     for (int k = 0; k < WP_MAX_SEATS; k++)
         if (s->seat_player[k] >= 0 && s->players[s->seat_player[k]].team == team) return 1;

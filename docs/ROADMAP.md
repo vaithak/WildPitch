@@ -78,6 +78,10 @@ Not playable; invisible plumbing every later CP depends on.
 - HUD: score, clock, controlled-player marker, pass power bar.
 - **Playtest:** do passes go where you expect? Is switching intuitive?
 
+### CP0.2c — Passing & reception that feel natural ✅ 🔵  (owner feedback on CP0.2b → research + playtest agent)
+- Intercept-solved through balls and tap passes, steered (never abandoned) receivers, swept 1.0 m reach, deflection
+  switching, untargeted hold power, 200 ms tap window (D-020). Acceptance tests: test_reception.
+
 ### CP0.3 — "Instinct AI" ⏭ 🟡
 **Playable:** first real 5v5 match vs AI.
 - **Instinct layer** as *candidate actions × utility scores* over an observation vector

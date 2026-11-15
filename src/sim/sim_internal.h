@@ -28,7 +28,9 @@ static inline fx ball_roll_decel(fx v) { return T_ROLL_DECEL + fx_mul(T_ROLL_LIN
 /* Ground ball: launch speed that makes it roll exactly distance d before stopping (inverse of the roll model,
  * by bisection over the same per-tick integration ball.c uses). Used for stopping touches; passes later (CP0.2). */
 fx ball_roll_speed_for(fx d);
-fx ball_roll_distance(fx v);                 /* forward model: how far a ground ball at v rolls */
+fx ball_roll_distance(fx v);                 /* R(v): how far a ground ball at v rolls (table, D-020) */
+fx ball_roll_time(fx v);                     /* T(v): seconds until it stops; flight v0->va = T(v0) - T(va) */
+fx ball_roll_speed_after(fx v0, fx d);       /* speed after rolling d from v0 (0 if it stops first) */
 
 fx ball_lob_speed_for(fx d, fx vz);          /* horizontal launch speed so a ball launched with vz lands at d */
 fx ball_carry_distance(fx vh, fx vz);        /* forward model: where (horizontally) it first lands */
@@ -45,11 +47,13 @@ void header_assist_move(const SimState *s, int i, WpSeatInput *io);
 
 /* seats.c */
 void seats_update(SimState *s, const WpInput *in);
-void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput *in);
+void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput *in, fv2 meet, fx t_meet,
+                        uint8_t plan);
 void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io);
 /* team.c */
 void team_input(const SimState *s, int i, WpSeatInput *out);
 void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSeatInput *out);
+void team_steer_speed(const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed */
 
 /* Can player i take control of a loose ball? (CP0.1: only human-controlled players; AI joins in CP0.3) */
 static inline int player_can_control(const SimState *s, int i) {

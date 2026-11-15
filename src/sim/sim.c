@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 1536  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 1584  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 WpMatchConfig sim_default_config(void) {
     WpMatchConfig c;
@@ -124,6 +124,12 @@ uint64_t sim_hash(const SimState *s) {
     }
     fnv_i(&f, s->pass_target); fnv_i(&f, s->pass_from); fnv_i(&f, s->pass_ticks);
     fnv_i(&f, s->pass_stick[0]); fnv_i(&f, s->pass_stick[1]);
+    fnv_i(&f, s->pass_meet.x); fnv_i(&f, s->pass_meet.y); fnv_i(&f, s->pass_meet_tick); fnv_i(&f, s->pass_plan);
+    fnv_i(&f, s->recv_away); fnv_i(&f, s->recv_gone);
+    fnv_i(&f, s->recv_goal.x); fnv_i(&f, s->recv_goal.y); fnv_i(&f, s->recv_speed);
+    for (int k = 0; k < WP_MAX_SEATS; k++) {
+        fnv_i(&f, s->latch_stick[k][0]); fnv_i(&f, s->latch_stick[k][1]); fnv_i(&f, s->latch_ticks[k]);
+    }
     for (int i = 0; i < 2 * s->n_per_side; i++) {
         const WpPlayer *p = &s->players[i];
         fnv_i(&f, p->pos.x); fnv_i(&f, p->pos.y); fnv_i(&f, p->vel.x); fnv_i(&f, p->vel.y);

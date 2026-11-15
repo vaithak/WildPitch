@@ -171,30 +171,73 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z, fx dt) {
     }
 }
 
-/* distance a ground ball launched at v rolls before stopping (mirrors integrate()'s ground branch + substeps) */
-fx ball_roll_distance(fx v) {
-    fx x = 0;
-    for (int t = 0; t < 1200 && v > 0; t++) {
-        int n = 1 + (int)(fx_mul(v, WP_DT) / T_SUBSTEP_MAX_MOVE);
-        if (n > 12) n = 12;
-        fx dt = WP_DT / n;
-        for (int k = 0; k < n && v > 0; k++) {
+/* ---- ground-roll tables (D-020): R(v) = distance a ground ball at speed v rolls before stopping, T(v) = time it
+ * takes. Built once from ONE trajectory of the same per-tick integration integrate() uses (the decel law depends
+ * only on speed, so every speed's future is a tail of that trajectory). Lazily built, deterministic, read-only
+ * afterwards. Replaces the old per-call bisection (100x cheaper). ---- */
+#define RT_STEP  FX(0.25)
+#define RT_N     125                     /* 0 .. 31 m/s */
+static fx RT_R[RT_N], RT_T[RT_N];
+static int rt_ready;
+
+static void rt_build(void) {
+    static fx tv[1400], tx[1400];        /* speed and distance after each tick, starting above the table */
+    int n = 0;
+    fx v = RT_STEP * RT_N, x = 0;
+    tv[n] = v; tx[n] = 0; n++;
+    while (v > 0 && n < 1400) {
+        int ns = 1 + (int)(fx_mul(v, WP_DT) / T_SUBSTEP_MAX_MOVE);
+        if (ns > 12) ns = 12;
+        fx dt = WP_DT / ns;
+        for (int k = 0; k < ns && v > 0; k++) {
             fx dec = fx_mul(ball_roll_decel(v), dt);
             v = v > dec ? v - dec : 0;
             x += fx_mul(v, dt);
         }
+        tv[n] = v; tx[n] = x; n++;
     }
-    return x;
+    fx X = tx[n - 1], Tn = FX_INT(n - 1);
+    int k = 0;
+    for (int i = RT_N - 1; i >= 0; i--) {
+        fx g = RT_STEP * i;
+        while (k + 1 < n - 1 && tv[k + 1] >= g) k++;          /* tv[k] >= g > tv[k+1] */
+        fx span = tv[k] - tv[k + 1];
+        fx frac = span > 0 ? fx_div(tv[k] - g, span) : 0;
+        if (g == 0) { RT_R[i] = 0; RT_T[i] = 0; continue; }
+        fx xa = tx[k] + fx_mul(tx[k + 1] - tx[k], frac);
+        fx ta = FX_INT(k) + frac;
+        RT_R[i] = X - xa;
+        RT_T[i] = (Tn - ta) / WP_TICK_HZ;
+    }
+    rt_ready = 1;
 }
 
-fx ball_roll_speed_for(fx d) {
+static fx rt_lookup(const fx *tab, fx v) {
+    if (!rt_ready) rt_build();
+    if (v <= 0) return 0;
+    int i = (int)(v / RT_STEP);
+    if (i >= RT_N - 1) i = RT_N - 2;
+    fx frac = fx_div(v - RT_STEP * i, RT_STEP);
+    return tab[i] + fx_mul(tab[i + 1] - tab[i], frac);
+}
+
+fx ball_roll_distance(fx v) { return rt_lookup(RT_R, v); }
+fx ball_roll_time(fx v) { return rt_lookup(RT_T, v); }
+
+fx ball_roll_speed_for(fx d) {              /* inverse of R: binary search + interpolation */
+    if (!rt_ready) rt_build();
     if (d <= 0) return 0;
-    fx lo = 0, hi = FX(30.0);
-    for (int it = 0; it < 18; it++) {
-        fx mid = (lo + hi) / 2;
-        if (ball_roll_distance(mid) < d) lo = mid; else hi = mid;
-    }
-    return hi;
+    int lo = 0, hi = RT_N - 1;
+    if (d >= RT_R[hi]) return RT_STEP * hi;
+    while (hi - lo > 1) { int mid = (lo + hi) / 2; if (RT_R[mid] < d) lo = mid; else hi = mid; }
+    fx span = RT_R[hi] - RT_R[lo];
+    return RT_STEP * lo + (span > 0 ? fx_mul(RT_STEP, fx_div(d - RT_R[lo], span)) : 0);
+}
+
+/* speed of a ground ball launched at v0 after it has rolled d (0 if it stops first) */
+fx ball_roll_speed_after(fx v0, fx d) {
+    fx left = ball_roll_distance(v0) - d;
+    return left > 0 ? ball_roll_speed_for(left) : 0;
 }
 
 /* where a ball launched at (vh, vz) from the grass first lands (mirrors integrate()'s air branch + substeps) */

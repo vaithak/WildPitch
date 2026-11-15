@@ -127,6 +127,9 @@ enum {
 };
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };   /* players no seat controls stand still (statues / cones) */
+/* how an assisted receiver plays a pass: step to the closest reachable point (standing/checking receivers, lofts),
+ * run through a planned meet at just-in-time speed (runners; in-stride through balls keep >= 4.5 m/s) */
+enum { WP_PLAN_CLOSEST = 0, WP_PLAN_RUN = 1, WP_PLAN_STRIDE = 2 };
 
 typedef struct {
     uint32_t tick;
@@ -147,6 +150,15 @@ typedef struct {
     int8_t   pass_from;              /* who struck it */
     uint16_t pass_ticks;             /* age of the pass in flight */
     int8_t   pass_stick[2];          /* receiver's stick at the hand-off; -128 = player has taken over */
+    fv2      pass_meet;              /* planned meeting point (receiver's feet) for a pass to a runner (D-020) */
+    uint16_t pass_meet_tick;         /* ... and when */
+    uint8_t  pass_plan;              /* WP_PLAN_*: how the assisted receiver plays it */
+    uint8_t  recv_away;              /* ticks the receiver's stick has pointed away from the meet (takeover rule) */
+    uint8_t  recv_gone;              /* ticks with no reachable meeting point (ball has gone) */
+    fv2      recv_goal;              /* where the assisted receiver is steering this tick */
+    fx       recv_speed;             /* ... and how fast (m/s) */
+    int8_t   latch_stick[WP_MAX_SEATS][2]; /* stick held at an auto-switch: treated as neutral until it changes */
+    uint8_t  latch_ticks[WP_MAX_SEATS];
     WpPlayer players[WP_MAX_PLAYERS];
 } SimState;
 

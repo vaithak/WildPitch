@@ -32,6 +32,8 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
 tests/                  headless tests (test_*.c auto-registered with ctest), bench_sim.c
   test_ball.c           physics, curl, roll distances + inverse, bounce (drop/continuity/chip), posts/bar, goals, net, outs
   test_ball_control.c   dribble feel targets, never-whiff kicks, height bands, no-magnet checks, shot table (prints)
+  test_reception.c      D-020 acceptance: through-ball geometry at the planned meet, runners keep their speed, keys
+                        pressed/released mid-flight (0 misses), deflection switch, untargeted hold, live short room
   test_passing.c        targeted passes reach the receiver (standing/jog/sprint), hand-off timing, one-two aim,
                         switching rules, through balls (lead by hold), lob over a defender + solver agreement,
                         headers (stand/jump, at goal scores, pass hands off)

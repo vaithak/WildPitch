@@ -48,7 +48,7 @@
 #define T_BODY_REST        FX(0.30)
 
 /* ---- ball control (height bands: see sim.h WP_BAND_*) ---- */
-#define T_CONTROL_REACH    FX(0.75)   /* horizontal distance from player centre to gain control */
+#define T_CONTROL_REACH    FX(1.0)    /* gain control of a loose ball passing within this (swept over the tick) */
 #define T_CONTROL_MAX_REL  FX(16.0)   /* relative speed above which first touch fails (deflects) */
 #define T_LOSE_DIST        FX(2.2)    /* owner loses possession beyond this distance */
 /* Dribbling = rhythmic touches (D-014): while the ball is in reach, touch every GAP ticks; each touch is sized so
@@ -71,15 +71,32 @@
 #define T_SWITCH_LOCK_MANUAL 90       /* after a manual switch, no auto-switch for this long */
 #define T_SWITCH_HYST      FX(2.0)    /* auto-switch only to a team-mate this much nearer the ball */
 #define T_PASS_FLIGHT_MAX  240        /* a pass in flight stops blocking auto-switch after this many ticks */
-#define T_PASS_ARRIVE      FX(5.5)    /* targeted ground pass arrives at the receiver at this speed */
+/* passes & reception (D-020: solve the meeting point, steer the receiver, widen the foot) */
+#define T_PASS_ARR_MIN     FX(5.5)    /* tap pass arrival pace: MIN + PER_M * (distance - 5 m), capped at MAX */
+#define T_PASS_ARR_PER_M   FX(0.25)
+#define T_PASS_ARR_MAX     FX(9.0)
 #define T_PASS_MAX         FX(22.0)   /* hardest ground pass */
 #define T_PASS_CONE_DEG    55         /* receivers within this angle of the stick are candidates */
-#define T_PASS_LEAD_S      FX(0.25)   /* aim at the receiver's position this far ahead */
+#define T_PASS_PENALTY_M   FX(18.0)   /* receivers further than this are scored down ... */
+#define T_PASS_MAX_DIST    FX(26.0)   /* ... and beyond this not picked at all */
+#define T_PASS_RUNNER_MS   FX(2.0)    /* receiver moving away from the passer faster than this = a runner */
 #define T_SPRINT_SPILL     FX(0.12)   /* extra first-touch spill when receiving at a sprint */
-#define T_PASS_TAP_TICKS   9          /* J released within this = tap (targeted pass); held longer = through ball */
-#define T_THROUGH_LEAD_MIN FX(2.5)    /* through ball lands this far ahead of the receiver at minimum hold ... */
-#define T_THROUGH_LEAD_MAX FX(10.0)   /* ... and this far at full hold */
-#define T_THROUGH_ARRIVE   FX(3.0)    /* through ball's speed when it reaches that spot */
+#define T_PASS_TAP_TICKS   12         /* J released within this (200 ms) = tap pass; held longer = through ball */
+#define T_THROUGH_STRIDE   FX(0.8)    /* through ball meets the runner this far ahead of his feet */
+#define T_THROUGH_MAX      FX(24.0)   /* hardest through ball (futsal kicks ~24 m/s) */
+#define T_THROUGH_MARGIN_X FX(3.0)    /* meeting point stays this far inside the goal line ... */
+#define T_THROUGH_MARGIN_Y FX(1.5)    /* ... and the touchline */
+#define T_THROUGH_STAND_V  FX(6.0)    /* a standing receiver is planned to set off at this speed ... */
+#define T_THROUGH_STAND_DELAY FX(0.3) /* ... after this reaction time */
+#define T_THROUGH_FREE_MIN FX(12.0)   /* hold J with nobody in the cone: power 12 -> 20 m/s with the hold */
+#define T_THROUGH_FREE_MAX FX(20.0)
+#define T_CONTROL_STRETCH  FX(1.3)    /* the pass's receiver can stretch for a ball up to here (heavier touch) */
+#define T_STRETCH_SPILL    FX(0.3)    /* extra spill at the far edge of the stretch band */
+#define T_RECV_STICK_TOL   48         /* stick within this of the hand-off stick (or released) = no opinion */
+#define T_RECV_TAKEOVER_TICKS 15      /* stick > 120 deg away from the meet this long = full manual control */
+#define T_RECV_GONE_TICKS  6          /* no reachable meeting point this long = the ball has gone */
+#define T_RECV_HEADON_MS   FX(4.0)    /* closing on the ball head-on in its last 0.5 s: at most this fast */
+#define T_SWITCH_LATCH_TICKS 30       /* after an auto-switch the held stick is ignored until it changes (max) */
 #define T_LOB_VZ_BASE      FX(4.0)    /* lofted pass: vz = BASE + PER_M * distance, clamped */
 #define T_LOB_VZ_PER_M     FX(0.22)
 #define T_LOB_VZ_MIN       FX(5.0)

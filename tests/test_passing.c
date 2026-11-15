@@ -47,7 +47,7 @@ int main(void) {
                 uint16_t ev = run_seat(&s, (WpSeatInput){0, 0, 0}, 1);
                 if (ev & WP_EV_KICK) kick_t = t;
                 if (kick_t < 0 && s.seat_player[0] != ME) seat_before_kick_ok = 0;
-                if (kick_t >= 0 && s.ball.owner < 0 && dist_of(&s, MATE) < FX(1.0) && !arrive) arrive = fv2_len(s.ball.vel);
+                if (kick_t >= 0 && s.ball.owner < 0 && dist_of(&s, MATE) < FX(1.6) && !arrive) arrive = fv2_len(s.ball.vel);
                 if (kick_t >= 0 && s.ball.owner >= 0) got = s.ball.owner;
                 (void)seat_before;
             }

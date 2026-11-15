@@ -45,6 +45,17 @@ int main(void) {
         CHECKF(got > d * 0.99 - 0.05 && got < d * 1.01 + 0.05, "roll_speed_for(%d m) rolled %.2f m", d, got);
     }
 
+    /* roll-time table agrees with the forward sim (flight times for pass solving, D-020) */
+    for (int v = 3; v <= 24; v += 7) {
+        setup_empty(&s, -1); s.seat_player[0] = -1;
+        launch(&s, FX(-18.0), FX(8.0), 0, FX_INT(v), 0, 0);
+        int t = 0;
+        while ((s.ball.vel.x || s.ball.vel.y) && t < 1200) { run_seat(&s, NOIN, 1); t++; }
+        fx want = ball_roll_time(FX_INT(v));
+        CHECKF(fx_abs(FX_INT(t) / 60 - want) < FX(0.05), "roll time %d m/s: sim %.2f s, table %.2f s", v, t / 60.0, tod(want));
+        CHECKF(fx_abs(ball_roll_speed_after(FX_INT(v), ball_roll_distance(FX_INT(v)) / 2) - ball_roll_speed_for(ball_roll_distance(FX_INT(v)) / 2)) < FX(0.01), "speed_after");
+    }
+
     /* grass bounce (D-016): a 2 m drop rebounds into FIFA's 0.6-1.0 m window */
     {
         setup_empty(&s, -1); s.seat_player[0] = -1;

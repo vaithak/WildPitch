@@ -56,3 +56,12 @@ Format:
 ## CP0.2a — 2026-11-15
 - **Feedback (verbatim):** "go ahead" (after CP0.2a + the dedication card; no specific passing/switching notes yet).
 - **Action:** CP0.2b (through balls, lofted passes, headers). CP0.2a feel questions stay open for the next playtest.
+
+## CP0.2b — 2026-11-15
+- **Feedback (verbatim):** "there is something off about the through ball power and passing/through ball reception, do a
+  deep research with other subagents to figure out how other games to do it correctly which feels more natural. Also,
+  let an agent play the game for a while with different controls and configurations, and let if figure out the
+  non-natural gameplay and report its findings."
+- **Feedback (verbatim):** "like while a ball is being received, and the moving key is pressed, player moves ahead
+  without reception, maybe this will be fixed later using AI on players, that is okay, I am just letting you know"
+- **Action:** research `reports/Through ball and pass reception.md` + headless playtest agent findings → fix plan.
