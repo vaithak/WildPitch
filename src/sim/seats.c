@@ -102,7 +102,15 @@ void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput
     s->recv_away = s->recv_gone = 0;
     s->recv_goal = meet;
     s->recv_speed = 0;
-    if (seat < 0 || seat_owns(s, receiver)) { s->pass_stick[0] = s->pass_stick[1] = -128; return; }
+    if (seat < 0 || seat_owns(s, receiver)) {
+        /* D-037: a pass from an AI team-mate (or another seat) to a seat's man gets the same receive assist; the
+         * reference stick is the receiver's own, read on his first assisted tick (sentinel -127/-128) */
+        int rs = -1;
+        for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == receiver) rs = k;
+        if (rs >= 0 && rs != seat && s->assist_level[rs] != WP_ASSIST_OFF) { s->pass_stick[0] = -127; s->pass_stick[1] = -128; }
+        else s->pass_stick[0] = s->pass_stick[1] = -128;
+        return;
+    }
     s->pass_stick[0] = in->move_x;
     s->pass_stick[1] = in->move_y;
     /* a pass to the keeper: the stick the passer was holding (toward his own goal) must not carry over */
@@ -112,6 +120,10 @@ void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput
 /* the assisted receiver's goal + speed for this tick, and the takeover rule */
 static void recv_update(SimState *s, int me, const WpSeatInput *si) {
     const WpPlayer *p = &s->players[me];
+    if (s->pass_stick[0] == -127 && s->pass_stick[1] == -128) {   /* D-037: his stick at the kick = no opinion */
+        s->pass_stick[0] = si->move_x;
+        s->pass_stick[1] = si->move_y;
+    }
     const WpBall *b = &s->ball;
     int dx = si->move_x - s->pass_stick[0], dy = si->move_y - s->pass_stick[1];
     int has = si->move_x || si->move_y;
@@ -196,7 +208,10 @@ void seats_update(SimState *s, const WpInput *in) {
         const WpSeatInput *si = &in->seat[k];
         if (s->switch_cool[k]) s->switch_cool[k]--;
         if (s->latch_ticks[k]) {                      /* inherited stick: until it changes / is released */
-            if (si->move_x != s->latch_stick[k][0] || si->move_y != s->latch_stick[k][1]) s->latch_ticks[k] = 0;
+            int dx = si->move_x - s->latch_stick[k][0], dy = si->move_y - s->latch_stick[k][1];
+            int changed = s->assist_level[k] != WP_ASSIST_OFF ? dx * dx + dy * dy > T_RECV_STICK_TOL * T_RECV_STICK_TOL
+                                                               : (dx || dy);   /* D-037: analogue jitter isn't a change */
+            if (changed) s->latch_ticks[k] = 0;
             else s->latch_ticks[k]--;
         }
         if (s->pass_target == me && s->pass_stick[0] != -128) recv_update(s, me, si);
@@ -236,6 +251,21 @@ void seats_update(SimState *s, const WpInput *in) {
             if (best >= 0 && best != me && dme - bd > T_SWITCH_DEF_HYST) do_switch(s, k, best, T_SWITCH_DEF_COOL, si, 1);
             continue;
         }
+        if (s->assist_level[k] != WP_ASSIST_OFF) {         /* D-037: by TIME to the ball, YSoccer's 0.5x hysteresis */
+            if (s->switch_cool[k] || b->owner >= 0 || s->pass_target == me) continue;
+            if (s->pass_target >= 0 && s->players[s->pass_target].team == p->team) continue;   /* our pass: let it come */
+            Meet mm = meet_choose(s, p, fv2_make(0, 0), 0);
+            fx tme = mm.found ? mm.t : FX(9.0), tb = 0;
+            int best = -1;
+            for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
+                const WpPlayer *q = &s->players[j];
+                if (j == me || q->role == WP_ROLE_KEEPER || seat_owns(s, j)) continue;
+                Meet mq = meet_choose(s, q, fv2_make(0, 0), 0);
+                if (mq.found && (best < 0 || mq.t < tb)) { best = j; tb = mq.t; }
+            }
+            if (best >= 0 && tb < fx_mul(tme, T_SWITCH_TIME_K)) do_switch(s, k, best, T_SWITCH_COOL, si, 1);
+            continue;
+        }
         if (s->switch_cool[k] || s->pass_target >= 0 || b->owner >= 0) continue;
         fx dn;
         int to = nearest_to_ball(s, p->team, me, &dn);
@@ -258,9 +288,9 @@ void seats_on_gain(SimState *s, int i, const WpInput *in) {
 
 /* Legs-only input for a seat's player (aim and buttons always stay the human's): the assisted receiver, or a
  * freshly auto-switched player chasing the loose ball while the inherited stick is still held. */
-void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io) {
+int seats_assist_receive(const SimState *s, int seat, WpSeatInput *io) {
     int me = s->seat_player[seat];
-    if (me < 0) return;
+    if (me < 0) return 0;
     const WpPlayer *p = &s->players[me];
     uint16_t buttons = io->buttons;
     if (s->pass_target == me && s->pass_stick[0] != -128) {
@@ -269,7 +299,121 @@ void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io) {
         Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
         team_steer_speed(s, p, m.pos, fx_min(fx_mul(fv2_len(fv2_sub(m.pos, p->pos)), FX(4.0)), player_top_speed(s, me, 1)), io);
     } else {
-        return;
+        return 0;
     }
     io->buttons = (uint16_t)((buttons & ~WP_BTN_SPRINT) | (io->buttons & WP_BTN_SPRINT));
+    return 1;
+}
+
+/* ---- the chase cone (D-037) ----
+ * meet_choose for the human's legs: only points he can control (<= body height), grass bounces modelled (the
+ * same law as ball.c, on a copy), reach at the speed he is actually running (the assist never sprints for him). */
+static Meet meet_chase(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref, int sprint) {
+    const WpBall *b = &s->ball;
+    fv2 pos = b->pos, v = b->vel;
+    fx z = b->z, vz = b->vz, dt = FX(0.05), best_cost = 0;
+    fx reach_v = fx_mul(player_top_speed(s, (int)(p - s->players), sprint), FX(0.8125));
+    Meet m = {b->pos, 0, 0};
+    for (int k = 1; k <= 80; k++) {
+        fx hs = fv2_len(v);
+        if (z > 0 || vz > 0) {
+            fx kd = fx_min(fx_mul(fx_mul(T_AIR_DRAG, fv2_len(fv2_make(hs, vz))), dt), FX_ONE);
+            v = fv2_sub(v, fv2_scale(v, kd));
+            vz -= fx_mul(vz, kd) + fx_mul(T_GRAVITY, dt);
+            z += fx_mul(vz, dt);
+            if (z <= 0) {                                 /* bounce (ball.c integrate) */
+                fx vin = -vz;
+                z = 0;
+                vz = fx_mul(vin, T_BOUNCE_REST) - T_BOUNCE_LIN;
+                if (vz < T_BOUNCE_CUT) vz = 0;
+                fx hsp = fv2_len(v);
+                if (hsp > 0) {
+                    fx loss = fx_min(fx_mul(fx_mul(T_BOUNCE_MU, FX_ONE + T_BOUNCE_REST), vin), fx_mul(T_BOUNCE_GRIP, hsp));
+                    v = fv2_scale(v, fx_div(hsp - loss, hsp));
+                }
+            }
+        } else if (hs > 0) {
+            fx dec = fx_mul(ball_roll_decel(hs), dt);
+            v = hs <= dec ? fv2_make(0, 0) : fv2_scale(v, fx_div(hs - dec, hs));
+        }
+        pos = fv2_add(pos, fv2_scale(v, dt));
+        if (z > WP_BAND_BODY_MAX) continue;
+        fv2 to = fv2_sub(pos, p->pos);
+        fx d = fv2_len(to), t = dt * k;
+        if (fx_div(d, reach_v) + FX(0.15) > t) continue;
+        fx cost = d;
+        if (has_pref) {
+            fx c = d < FX(0.3) ? FX_ONE : fv2_dot(pref, fv2_scale(to, fx_div(FX_ONE, d)));
+            cost = t / 2 + fx_mul(FX(0.3), FX_ONE - c);
+        }
+        if (!m.found || cost < best_cost) { m.pos = pos; m.t = t; m.found = 1; best_cost = cost; }
+    }
+    if (!m.found) m.pos = pos;
+    return m;
+}
+
+static const wp_angle CH_ANG[3] = T_CHASE_ANG_FULL;
+static const fx CH_COSF[3] = T_CHASE_COS_FULL, CH_COSE[3] = T_CHASE_COS_EDGE, CH_MAXT[3] = T_CHASE_MAX_T,
+                CH_SHARE[3] = T_CHASE_SHARE_S;
+
+/* 1 when he gets there no later than the quickest of the team-mates nearest the ball, fading to 0 when one of them is
+ * CH_SHARE quicker: it's "his" ball (continuous, so two near-equal men never make the pull flicker) */
+static fx share_weight(const SimState *s, int me, int lv) {
+    const WpPlayer *p = &s->players[me];
+    Meet mine = meet_chase(s, p, fv2_make(0, 0), 0, 1);
+    if (!mine.found) return 0;
+    int pick[T_CHASE_MATES], n = 0;
+    for (int r = 0; r < T_CHASE_MATES; r++) {             /* the few team-mates nearest the ball */
+        int best = -1; fx bd = 0;
+        for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
+            if (j == me || s->players[j].role == WP_ROLE_KEEPER) continue;
+            int used = 0;
+            for (int q = 0; q < n; q++) used |= pick[q] == j;
+            if (used) continue;
+            fx d = fv2_len(fv2_sub(s->ball.pos, s->players[j].pos));
+            if (best < 0 || d < bd) { best = j; bd = d; }
+        }
+        if (best < 0) break;
+        pick[n++] = best;
+    }
+    fx tb = FX(99.0);
+    for (int q = 0; q < n; q++) {
+        Meet m = meet_chase(s, &s->players[pick[q]], fv2_make(0, 0), 0, 1);
+        if (m.found && m.t < tb) tb = m.t;
+    }
+    if (mine.t <= tb) return FX_ONE;
+    return fx_clamp(FX_ONE - fx_div(mine.t - tb, CH_SHARE[lv]), 0, FX_ONE);
+}
+
+/* Legs only: a stick held roughly at a loose ball is turned (at most F) toward where he can meet it. Exactly zero
+ * beyond E, with the stick released, below T_CHASE_STICK_MIN, or when it isn't his ball - then the raw stick. */
+void seats_chase_assist(const SimState *s, int seat, WpSeatInput *io) {
+    int me = s->seat_player[seat];
+    if (me < 0 || s->assist_level[seat] == WP_ASSIST_OFF || s->phase != WP_PHASE_PLAY) return;
+    const WpPlayer *p = &s->players[me];
+    const WpBall *b = &s->ball;
+    if (b->owner >= 0 || b->held || p->action != WP_ACT_NONE || p->z > 0) return;
+    int mx = io->move_x, my = io->move_y;
+    if (mx * mx + my * my < T_CHASE_STICK_MIN * T_CHASE_STICK_MIN) return;
+    if (s->pass_target >= 0 && s->pass_target != me && s->players[s->pass_target].team == p->team) return;
+    int lv = s->assist_level[seat] - 1;
+    fv2 st = fv2_norm(fv2_make(FX_INT(mx), FX_INT(my)));
+    Meet m = meet_chase(s, p, st, 1, (io->buttons & WP_BTN_SPRINT) != 0);
+    if (!m.found || m.t > CH_MAXT[lv]) return;
+    fv2 tm = fv2_sub(m.pos, p->pos), tb = fv2_sub(b->pos, p->pos);
+    if (fv2_len(tm) < FX(0.05)) return;                   /* meeting it where he stands: nothing to steer */
+    fx c = fv2_dot(st, fv2_norm(tm));
+    if (fv2_len(tb) > FX(0.05)) c = fx_max(c, fv2_dot(st, fv2_norm(tb)));
+    fx w = fx_clamp(fx_div(c - CH_COSE[lv], CH_COSF[lv] - CH_COSE[lv]), 0, FX_ONE);
+    if (w == 0) return;
+    w = fx_mul(w, share_weight(s, me, lv));
+    if (w == 0) return;
+    wp_angle a = fx_atan2(st.y, st.x);
+    int32_t dl = (int16_t)(uint16_t)(fx_atan2(tm.y, tm.x) - a);
+    int32_t cap = CH_ANG[lv], turn = dl > cap ? cap : dl < -cap ? -cap : dl;
+    a = (wp_angle)(a + (int32_t)(((int64_t)turn * w) >> 16));
+    fx mag = fv2_len(fv2_make(FX_INT(mx), FX_INT(my)));   /* the human's own magnitude */
+    fv2 d = fv2_from_angle(a, mag);
+    io->move_x = (int8_t)fx_clamp(d.x / FX_ONE, -127, 127);
+    io->move_y = (int8_t)fx_clamp(d.y / FX_ONE, -127, 127);
 }

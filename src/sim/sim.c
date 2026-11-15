@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 2208  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 2216  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
  * 5.6 x 2.1 m goals (7.32/68 of the width, like a real pitch) */
@@ -129,6 +129,7 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
     s->seat_player[0] = (int8_t)(s->n_per_side - 1); /* seat 0 = team 0 striker */
     s->half_ticks = cfg->half_ticks;                 /* 0 = endless (D-036) */
     s->first_kickoff = 0;
+    for (int k = 0; k < WP_MAX_SEATS; k++) s->assist_level[k] = cfg->assist_level < WP_ASSIST_LEVELS ? cfg->assist_level : WP_ASSIST_NORMAL;
     stats_init(s, cfg->stats_mode);                  /* draws from s->rng only when stats are on (D-034) */
     s->kickoff_team = 0;
     match_place_kickoff(s);
@@ -201,6 +202,11 @@ uint64_t sim_hash(const SimState *s) {
         fnv_i(&f, s->pick_recv[k]); fnv_i(&f, s->pick_danger[k]); fnv_i(&f, s->pick_dir[k]);
         fnv_i(&f, s->pick_stick[k][0]); fnv_i(&f, s->pick_stick[k][1]); fnv_i(&f, s->pick_stick_age[k]);
         fnv_i(&f, s->pick_diag[k][0]); fnv_i(&f, s->pick_diag[k][1]); fnv_i(&f, s->pick_diag_age[k]);
+    }
+    {   /* assist levels: all OFF carries nothing (the pre-D-037 hash) */
+        int any = 0;
+        for (int k = 0; k < WP_MAX_SEATS; k++) any |= s->assist_level[k];
+        if (any) for (int k = 0; k < WP_MAX_SEATS; k++) fnv_i(&f, s->assist_level[k]);
     }
     if (s->half_ticks) {                                  /* endless matches carry no clock: unhashed (D-036) */
         fnv_i(&f, s->half_ticks); fnv_i(&f, s->clock); fnv_i(&f, s->stoppage); fnv_i(&f, s->stop_acc);

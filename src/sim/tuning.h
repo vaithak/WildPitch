@@ -73,6 +73,15 @@
 #define T_STOPPAGE_GOAL_S  45         /* game seconds of stoppage per goal ... */
 #define T_STOPPAGE_RESTART_S 8        /* ... per throw-in / corner / goal kick ... */
 #define T_STOPPAGE_MAX_MIN 4          /* ... announced as whole minutes, 1..this */
+/* movement assist toward the ball (D-037, reports/Assisted movement toward the ball.md): per level Low/Normal/High */
+#define T_CHASE_ANG_FULL   {3641, 5461, 7282}            /* F = 20/30/40 deg (wp_angle): full strength AND the turn cap */
+#define T_CHASE_COS_FULL   {FX(0.940), FX(0.866), FX(0.766)}
+#define T_CHASE_COS_EDGE   {FX(0.766), FX(0.574), FX(0.342)}   /* E = 40/55/70 deg: exactly zero beyond */
+#define T_CHASE_MAX_T      {FX(2.0), FX(3.0), FX(3.5)}  /* only meeting points this soon (s) */
+#define T_CHASE_SHARE_S    {FX(0.15), FX(0.30), FX(0.50)} /* weight fades to 0 when a team-mate is this much quicker */
+#define T_CHASE_STICK_MIN  48         /* stick magnitude (of 127) below this never chases */
+#define T_CHASE_MATES      3          /* team-mates nearest the ball compared for "is it mine" */
+#define T_SWITCH_TIME_K    FX(0.5)    /* time-based loose-ball switch: challenger needs < this x my time (YSoccer) */
 #define T_KICKOFF_R_FRAC   FX(0.0871) /* centre-circle radius / pitch length (9.15 / 105, a real pitch) */
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */

@@ -77,7 +77,8 @@ void header_assist_move(const SimState *s, int i, WpSeatInput *io);
 void seats_update(SimState *s, const WpInput *in);
 void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput *in, fv2 meet, fx t_meet,
                         uint8_t plan);
-void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io);
+int  seats_assist_receive(const SimState *s, int seat, WpSeatInput *io);   /* 1 if it steered the legs */
+void seats_chase_assist(const SimState *s, int seat, WpSeatInput *io);     /* the chase cone (D-037) */
 void seats_on_gain(SimState *s, int i, const WpInput *in);   /* a team-mate of a seat won the ball */
 /* tackle.c */
 int  tackle_wanted(const SimState *s, int i);             /* an opponent has the ball within reach of a tackle */

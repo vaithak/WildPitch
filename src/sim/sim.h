@@ -142,6 +142,8 @@ enum {
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };
 enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };
+/* movement assist toward the ball (D-037), per seat; OFF = the pre-D-037 sim bit for bit */
+enum { WP_ASSIST_OFF = 0, WP_ASSIST_LOW = 1, WP_ASSIST_NORMAL = 2, WP_ASSIST_HIGH = 3, WP_ASSIST_LEVELS };
 enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK, WP_RS_KICKOFF };
 
 /* Team plan (D-030): computed once per tick for both teams before anyone decides - a shared observation that says
@@ -218,6 +220,7 @@ typedef struct {
     uint8_t  half;                   /* 0 = first, 1 = second: team 0 attacks +x in the first half */
     uint8_t  first_kickoff;          /* who kicked off the first half (the other team starts the second) */
     uint8_t  stats_mode;             /* WP_STATS_* */
+    uint8_t  assist_level[WP_MAX_SEATS]; /* WP_ASSIST_* per seat (D-037) */
     uint8_t  stats[WP_MAX_PLAYERS][WP_STAT_N];
     WpPlayer players[WP_MAX_PLAYERS];
 } SimState;
@@ -229,6 +232,7 @@ typedef struct {
     uint8_t  ai_level[2];             /* per team; sim_default_config(): both NORMAL */
     uint8_t  stats_mode;              /* WP_STATS_*; generated from the seed (sim_default_config(): NEUTRAL) */
     uint32_t half_ticks;              /* 0 = endless (tests); the game: 2 halves of 5 min = 90' at 9x (D-036) */
+    uint8_t  assist_level;            /* WP_ASSIST_* for every seat (D-037) */
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */
