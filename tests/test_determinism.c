@@ -12,14 +12,20 @@
 
 typedef struct { SimState sim; WpRng script; } Snapshot;
 
-static int ev_count[16];
+static int ev_count[16], switches, bad_owner;
 static void advance(SimState *s, WpRng *script, uint32_t from, uint32_t to) {
     WpInput in;
     for (uint32_t t = from; t < to; t++) {
         scripted_input(script, t, s, &in);
         scripted_poke(script, t, s);
+        int8_t seat0 = s->seat_player[0];
         sim_step(s, &in);
         for (int b = 0; b < 16; b++) if (s->events & (1 << b)) ev_count[b]++;
+        if (s->seat_player[0] != seat0) switches++;
+        /* invariant: the ball is loose or owned by a seat's player (control/body rules assume it) */
+        int ok = s->ball.owner < 0;
+        for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] >= 0 && s->seat_player[k] == s->ball.owner) ok = 1;
+        if (!ok) bad_owner++;
     }
 }
 
@@ -55,6 +61,9 @@ int main(void) {
     CHECK(counts[1] >= 50);   /* touches */
     CHECK(counts[5] + counts[6] >= 3);   /* goals + outs */
     CHECK(counts[7] >= 2);    /* resets */
+    printf("seat 0 switched player %d times; bad-owner ticks %d\n", switches, bad_owner);
+    CHECK(switches >= 20);    /* switching (manual + auto + pass hand-off) is exercised */
+    CHECK(bad_owner == 0);
 
     const char *path = "tests/golden/determinism.txt";
     if (getenv("WP_UPDATE_GOLDEN")) {

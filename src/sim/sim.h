@@ -86,6 +86,8 @@ typedef struct {
     uint8_t  kind;               /* WP_KICK_* */
     uint8_t  windup;             /* ticks from action start to contact */
     uint8_t  done;               /* contact resolved (struck or missed) */
+    uint8_t  to;                 /* pass receiver = player index + 1 (0 = untargeted, so zero-init is safe);
+                                    a targeted pass is aimed and weighted at the contact tick */
 } WpKick;
 
 typedef struct {
@@ -122,6 +124,8 @@ enum {
     WP_EV_BODY   = 1 << 8,   /* ball hit a player's body */
 };
 
+enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };   /* players no seat controls stand still (statues / cones) */
+
 typedef struct {
     uint32_t tick;
     WpRng    rng;
@@ -132,9 +136,15 @@ typedef struct {
     uint16_t phase_timer;            /* ticks remaining in the current phase (e.g. goal celebration) */
     uint8_t  score[2];
     uint8_t  kickoff_team;           /* team taking the next kickoff */
+    uint8_t  flags;                  /* WP_SIMF_* (drills / isolation tests) */
     uint16_t events;                 /* WP_EV_* raised during the last sim_step */
     int8_t   seat_player[WP_MAX_SEATS]; /* player index each seat controls, -1 = none */
     uint16_t prev_buttons[WP_MAX_SEATS];/* for edge detection inside the sim */
+    uint8_t  switch_cool[WP_MAX_SEATS]; /* ticks before this seat may auto-switch again */
+    int8_t   pass_target;            /* receiver of the pass in flight (-1 none): no auto-switch meanwhile */
+    int8_t   pass_from;              /* who struck it */
+    uint16_t pass_ticks;             /* age of the pass in flight */
+    int8_t   pass_stick[2];          /* receiver's stick at the hand-off; -128 = player has taken over */
     WpPlayer players[WP_MAX_PLAYERS];
 } SimState;
 

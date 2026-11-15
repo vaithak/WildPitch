@@ -170,7 +170,7 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z, fx dt) {
 }
 
 /* distance a ground ball launched at v rolls before stopping (mirrors integrate()'s ground branch + substeps) */
-static fx roll_distance(fx v) {
+fx ball_roll_distance(fx v) {
     fx x = 0;
     for (int t = 0; t < 1200 && v > 0; t++) {
         int n = 1 + (int)(fx_mul(v, WP_DT) / T_SUBSTEP_MAX_MOVE);
@@ -190,7 +190,7 @@ fx ball_roll_speed_for(fx d) {
     fx lo = 0, hi = FX(30.0);
     for (int it = 0; it < 18; it++) {
         fx mid = (lo + hi) / 2;
-        if (roll_distance(mid) < d) lo = mid; else hi = mid;
+        if (ball_roll_distance(mid) < d) lo = mid; else hi = mid;
     }
     return hi;
 }

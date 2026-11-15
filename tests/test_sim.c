@@ -14,8 +14,12 @@ int main(void) {
 
     /* movement: +x input moves the controlled player +x, capped at walk / sprint speed, stops on release */
     sim_init(&s, &cfg);
+    s.flags |= WP_SIMF_STATIC_OTHERS;
     int me = s.seat_player[0];
     CHECK(me >= 0);
+    for (int i = 0; i < 2 * s.n_per_side; i++)            /* isolate: no ball at the feet, nobody to switch to */
+        if (i != me) s.players[i].pos = fv2_make(FX_INT(i - 10), FX(60.0));
+    s.ball.pos = fv2_make(-FX(15.0), FX(10.0));
     fx x0 = s.players[me].pos.x, y0 = s.players[me].pos.y;
     steps(&s, (WpSeatInput){127, 0, 0}, 120);
     CHECK(s.players[me].pos.x > x0 + FX(5.0));

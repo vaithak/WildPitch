@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 1520  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 1536  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 WpMatchConfig sim_default_config(void) {
     WpMatchConfig c;
@@ -48,6 +48,8 @@ void match_place_kickoff(SimState *s) {
         p->role = k == 0 ? WP_ROLE_KEEPER : WP_ROLE_OUTFIELD;
         p->charge_kind = 0xFF;
     }
+    s->pass_target = -1;
+    s->pass_from = -1;
     memset(&s->ball, 0, sizeof s->ball);
     s->ball.owner = -1;
     s->ball.last_touch = -1;
@@ -82,6 +84,7 @@ static void match_flow(SimState *s) {
         b->pos = at;
         b->owner = -1;
         b->last_touch = -1;
+        s->pass_target = -1;
         s->events |= WP_EV_RESET;
     }
     s->phase = WP_PHASE_PLAY;
@@ -115,8 +118,12 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, b->vel.x); fnv_i(&f, b->vel.y); fnv_i(&f, b->vz); fnv_i(&f, b->spin);
     fnv_i(&f, b->owner); fnv_i(&f, b->last_touch);
     fnv_i(&f, s->n_per_side); fnv_i(&f, s->phase); fnv_i(&f, s->phase_timer);
-    fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->events);
-    for (int k = 0; k < WP_MAX_SEATS; k++) { fnv_i(&f, s->seat_player[k]); fnv_i(&f, s->prev_buttons[k]); }
+    fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->events);
+    for (int k = 0; k < WP_MAX_SEATS; k++) {
+        fnv_i(&f, s->seat_player[k]); fnv_i(&f, s->prev_buttons[k]); fnv_i(&f, s->switch_cool[k]);
+    }
+    fnv_i(&f, s->pass_target); fnv_i(&f, s->pass_from); fnv_i(&f, s->pass_ticks);
+    fnv_i(&f, s->pass_stick[0]); fnv_i(&f, s->pass_stick[1]);
     for (int i = 0; i < 2 * s->n_per_side; i++) {
         const WpPlayer *p = &s->players[i];
         fnv_i(&f, p->pos.x); fnv_i(&f, p->pos.y); fnv_i(&f, p->vel.x); fnv_i(&f, p->vel.y);
@@ -126,7 +133,7 @@ uint64_t sim_hash(const SimState *s) {
         fnv_i(&f, p->touch_cooldown); fnv_i(&f, p->stamina);
         const WpKick *k = &p->kick;
         fnv_i(&f, k->power); fnv_i(&f, k->vz); fnv_i(&f, k->spin); fnv_i(&f, k->dir);
-        fnv_i(&f, k->foot); fnv_i(&f, k->kind); fnv_i(&f, k->windup); fnv_i(&f, k->done);
+        fnv_i(&f, k->foot); fnv_i(&f, k->kind); fnv_i(&f, k->windup); fnv_i(&f, k->done); fnv_i(&f, k->to);
     }
     return f.h;
 }

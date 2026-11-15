@@ -1,5 +1,6 @@
 /* scripted_match.h - deterministic input script shared by the determinism test and the benchmark.
- * Seat 0 chases the ball and mashes kick buttons (so dribbling/kicking/goals are exercised); seat 1 wanders
+ * Seat 0 chases the ball and mashes kick/pass/switch buttons (dribbling, kicks, targeted passes, switching and
+ * goals are exercised; everyone else runs the placeholder team logic); seat 1 wanders
  * randomly on team 1. The script has its own RNG (never the sim's). Every few seconds it also makes a player
  * jump and occasionally launches the ball, so airborne/header and flight code is in the golden hash. */
 #ifndef WP_SCRIPTED_MATCH_H
@@ -13,7 +14,7 @@ static void scripted_input(WpRng *r, uint32_t tick, const SimState *s, WpInput *
     static WpSeatInput held[WP_MAX_SEATS];
     memset(in, 0, sizeof *in);
     if (tick % 30 == 0) {
-        held[0].buttons = (uint16_t)(wp_rng_u32(r) & (WP_BTN_PASS | WP_BTN_SHOOT | WP_BTN_SPRINT | WP_BTN_CHIP));
+        held[0].buttons = (uint16_t)(wp_rng_u32(r) & (WP_BTN_PASS | WP_BTN_SHOOT | WP_BTN_SPRINT | WP_BTN_CHIP | WP_BTN_SWITCH));
         held[1].move_x = (int8_t)((int)wp_rng_range(r, 255) - 127);
         held[1].move_y = (int8_t)((int)wp_rng_range(r, 255) - 127);
         held[1].buttons = (uint16_t)(wp_rng_u32(r) & 0x3F);

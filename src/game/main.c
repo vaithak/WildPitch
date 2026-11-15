@@ -47,7 +47,7 @@ static WpSeatInput read_keyboard(void) {
     if (k[SDL_SCANCODE_J] || k[SDL_SCANCODE_SPACE]) in.buttons |= WP_BTN_PASS;
     if (k[SDL_SCANCODE_K]) in.buttons |= WP_BTN_SHOOT;
     if (k[SDL_SCANCODE_LSHIFT] || k[SDL_SCANCODE_RSHIFT]) in.buttons |= WP_BTN_SPRINT;
-    if (k[SDL_SCANCODE_L]) in.buttons |= WP_BTN_SWITCH;
+    if (k[SDL_SCANCODE_Q]) in.buttons |= WP_BTN_SWITCH;
     if (k[SDL_SCANCODE_I]) in.buttons |= WP_BTN_CHIP;
     return in;
 }
@@ -78,7 +78,7 @@ static void demo_input(SimState *s, WpInput *in) {
         in->seat[k].buttons = phase == 2 ? WP_BTN_SPRINT : 0;
         if ((t + (uint32_t)k * 37) % 200 == 0) sim_player_jump(s, i, WP_ACT_JUMP_HEADER);
         if ((t + (uint32_t)k * 53) % 170 == 0 && p->z == 0) {
-            WpKick kk = {FX(20.0), FX(2.0), 0, p->facing, (uint8_t)(k & 1), WP_KICK_SHOT, 6, 0};
+            WpKick kk = {FX(20.0), FX(2.0), 0, p->facing, (uint8_t)(k & 1), WP_KICK_SHOT, 6, 0, 0};
             sim_player_kick(s, i, &kk);
         }
     }
@@ -196,7 +196,7 @@ static int check_kick_pose(void) {
             WpInput in; memset(&in, 0, sizeof in);
             for (int t = 0; t < 5; t++) sim_step(&s, &in);
             uint8_t windup = kind == 0 ? 4 : 6;
-            WpKick k = {kind == 0 ? FX(12.0) : FX(22.0), kind == 2 ? FX(6.0) : 0, 0, 0, (uint8_t)foot, (uint8_t)kind, windup, 0};
+            WpKick k = {kind == 0 ? FX(12.0) : FX(22.0), kind == 2 ? FX(6.0) : 0, 0, 0, (uint8_t)foot, (uint8_t)kind, windup, 0, 0};
             sim_player_kick(&s, me, &k);
             for (int t = 0; t < 20; t++) { sim_step(&s, &in); if (s.events & WP_EV_KICK) break; }
             const WpPlayer *p = &s.players[me];
@@ -359,9 +359,10 @@ int main(int argc, char **argv) {
             }
             SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
             char buf[160];
-            snprintf(buf, sizeof buf, "WILDPITCH  %d - %d", g.cur.score[0], g.cur.score[1]);
+            unsigned secs = g.cur.tick / WP_TICK_HZ;
+            snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02u:%02u", g.cur.score[0], g.cur.score[1], secs / 60, secs % 60);
             SDL_RenderDebugText(g.ren, 12, 12, buf);
-            snprintf(buf, sizeof buf, "WASD move  Shift sprint  J pass  K shoot (hold)  I chip (hold)   [P] look: %s  [Z] zoom: %s  F3 debug",
+            snprintf(buf, sizeof buf, "WASD move  Shift sprint  J pass  Q switch  K shoot (hold)  I chip (hold)   [P] look: %s  [Z] zoom: %s  F3 debug",
                      st->name, ZOOM_NAME[g.zoom]);
             SDL_RenderDebugText(g.ren, 12, (float)h - 20, buf);
             if (g.cur.phase == WP_PHASE_GOAL) {

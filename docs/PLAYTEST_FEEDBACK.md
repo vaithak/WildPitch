@@ -47,3 +47,8 @@ Format:
 - **Action:** research report `reports/Football game ball physics.md` (games, real physics, code audit). Owner: "yes,
   go ahead. it should step up and stop the ball. 0.7m sounds right" → CP0.1d (D-016): R1 rolling ball visuals, R2
   no-magnet possession, R3 impulse bounce.
+
+## CP0.1d — 2026-11-15
+- **Feedback (verbatim):** "looks really good, move ahead now"
+- **Action:** start CP0.2, split into CP0.2a (shape, switching, aimed ground passes, clock) and CP0.2b (through ball,
+  lofted pass, headers) so passing/switching feel gets its own playtest.

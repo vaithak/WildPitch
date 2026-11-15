@@ -59,14 +59,42 @@ void sim_player_kick(SimState *s, int i, const WpKick *k) {
     p->action_timer = 0;
 }
 
+/* Best team-mate for a pass toward `dir`: within T_PASS_CONE_DEG, scored by angle off the stick and distance
+ * (nearer and straighter wins). Keeper only if nearly straight at him. -1 if nobody fits (pass into space). */
+static int pass_pick(const SimState *s, int i, wp_angle dir) {
+    const WpPlayer *p = &s->players[i];
+    int best = -1; int32_t best_score = 0;
+    for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
+        if (j == i) continue;
+        fv2 d = fv2_sub(s->players[j].pos, p->pos);
+        fx dist = fv2_len(d);
+        if (dist < FX(2.0)) continue;
+        int32_t off = ang_diff(fx_atan2(d.y, d.x), dir);
+        if (off < 0) off = -off;
+        int32_t lim = DEG_TO_ANG(s->players[j].role == WP_ROLE_KEEPER ? 20 : T_PASS_CONE_DEG);
+        if (off > lim) continue;
+        /* score: 1 degree off ~ 0.8 m further away */
+        int32_t score = (int32_t)(((int64_t)off * 360 * 10) / 65536) + (int32_t)(dist / (FX_ONE / 8));
+        if (best < 0 || score < best_score) { best = j; best_score = score; }
+    }
+    return best;
+}
+
 /* Build kick parameters from a human's input. charge01 in [0,1]. */
 static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 aim, int has_aim, WpKick *k) {
     const WpPlayer *p = &s->players[i];
     wp_angle dir = has_aim ? fx_atan2(aim.y, aim.x) : p->facing;
     k->kind = kind;
     k->spin = 0;
+    k->to = 0;
     if (kind == WP_KICK_PASS) {
         k->power = T_PASS_SPEED; k->vz = 0; k->windup = T_KICK_WINDUP_PASS;
+        int r = pass_pick(s, i, dir);
+        if (r >= 0) {                                      /* targeted: aimed & weighted again at contact */
+            fv2 d = fv2_sub(s->players[r].pos, p->pos);
+            dir = fx_atan2(d.y, d.x);
+            k->to = (uint8_t)(r + 1);
+        }
     } else if (kind == WP_KICK_SHOT) {
         k->power = fx_lerp(T_SHOT_MIN, T_SHOT_MAX, charge01);
         k->vz = fx_lerp(T_SHOT_VZ_MIN, T_SHOT_VZ_MAX, fx_mul(charge01, charge01));
@@ -104,7 +132,18 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
     k->foot = ang_diff(dir, p->facing) > DEG_TO_ANG(20) ? 0 : 1;   /* far left -> left foot, else right */
 }
 
-static void contact(SimState *s, int i) {
+/* Targeted ground pass, resolved at contact from where the ball and receiver ARE: aim at the receiver a little
+ * ahead, launch so it arrives at T_PASS_ARRIVE (inverse roll model). Clean: no inherited run velocity. */
+static fv2 pass_velocity(const SimState *s, int r) {
+    const WpPlayer *q = &s->players[r];
+    fv2 aim = fv2_add(q->pos, fv2_scale(q->vel, T_PASS_LEAD_S));
+    fv2 d = fv2_sub(aim, s->ball.pos);
+    fx dist = fv2_len(d);
+    fx v0 = fx_min(ball_roll_speed_for(dist + ball_roll_distance(T_PASS_ARRIVE)), T_PASS_MAX);
+    return fv2_scale(fv2_norm(d), v0);
+}
+
+static void contact(SimState *s, int i, const WpSeatInput *in) {
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
     p->kick.done = 1;
@@ -118,7 +157,8 @@ static void contact(SimState *s, int i) {
     fv2 spot = fv2_add(p->pos, fv2_from_angle(cd, FOOT_SPOT));
     fx off = fx_min(fx_div(fv2_len(fv2_sub(b->pos, spot)), KICK_REACH), FX_ONE);
     fx q = fx_max(FX_ONE - across / 4 - off / 4, FX(0.75));
-    b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(p->kick.power, q)), fv2_scale(p->vel, INHERIT_VEL));
+    if (p->kick.to) b->vel = pass_velocity(s, p->kick.to - 1);
+    else b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(p->kick.power, q)), fv2_scale(p->vel, INHERIT_VEL));
     b->vz = p->kick.vz;
     b->spin = p->kick.spin;
     b->owner = -1;
@@ -126,6 +166,7 @@ static void contact(SimState *s, int i) {
     p->immune = T_KICK_IMMUNE;
     p->touch_cooldown = 18;
     s->events |= WP_EV_KICK;
+    if (p->kick.to) seats_pass_handoff(s, i, p->kick.to - 1, in);
 }
 
 static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t prev) {
@@ -280,6 +321,7 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
     if (rs > T_CONTROL_MAX_REL) return;                    /* too hot: body collision deflects it */
     /* first touch: kills most of the relative speed; harder balls spill further (visible cause) */
     fx spill = fx_mul(fx_div(rs, T_CONTROL_MAX_REL), FX(0.45));
+    if (in->buttons & WP_BTN_SPRINT) spill += T_SPRINT_SPILL;     /* receiving at a sprint: heavier touch */
     b->vel = fv2_add(p->vel, fv2_scale(rel, spill));
     if (b->z > WP_BAND_FEET_MAX) b->vz = 0;                /* chest/thigh: drop it to the feet */
     b->spin = 0;
@@ -315,20 +357,26 @@ void sim_player_jump(SimState *s, int i, uint8_t action) {
 }
 
 void players_step(SimState *s, const WpInput *in) {
-    static const WpSeatInput idle = {0, 0, 0};
     int np = 2 * s->n_per_side;
+    /* pin = what the player DOES (raw human input, or placeholder AI); mv = how he moves (an assisted receive steers
+     * the legs only - aim and buttons always come from the human's real stick) */
+    WpSeatInput pin[WP_MAX_PLAYERS], mv[WP_MAX_PLAYERS];
+    seats_update(s, in);                                  /* switching first: this tick's inputs go to the new player */
     for (int i = 0; i < np; i++) {
         int seat = seat_of(s, i);
-        const WpSeatInput *si = seat >= 0 ? &in->seat[seat] : &idle;
-        if (seat >= 0) handle_buttons(s, i, si, s->prev_buttons[seat]);
-        move(s, i, si);
+        if (seat >= 0) { pin[i] = mv[i] = in->seat[seat]; seats_assist_receive(s, seat, &mv[i]); }
+        else if (s->flags & WP_SIMF_STATIC_OTHERS) pin[i] = mv[i] = (WpSeatInput){0, 0, 0};
+        else { team_input(s, i, &pin[i]); mv[i] = pin[i]; }
+    }
+    for (int i = 0; i < np; i++) {
+        int seat = seat_of(s, i);
+        if (seat >= 0) handle_buttons(s, i, &pin[i], s->prev_buttons[seat]);
+        move(s, i, &mv[i]);
         WpPlayer *p = &s->players[i];
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
-        if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i);
+        if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
         air_and_timers(p);
     }
-    for (int i = 0; i < np; i++) {
-        int seat = seat_of(s, i);
-        if (seat >= 0) control(s, i, &in->seat[seat]);
-    }
+    for (int i = 0; i < np; i++)
+        if (seat_of(s, i) >= 0) control(s, i, &pin[i]);
 }

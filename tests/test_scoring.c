@@ -10,6 +10,7 @@ static char shoot(int x, int y, int8_t sx, int8_t sy, int charge, int jog, int c
     static SimState s;
     WpMatchConfig cfg = sim_default_config();
     sim_init(&s, &cfg);
+    s.flags |= WP_SIMF_STATIC_OTHERS;                 /* aim-assist calibration vs statue keeper/defenders */
     int me = s.seat_player[0];
     s.players[me].pos = fv2_make(FX_INT(x), FX_INT(y));
     s.ball.pos = fv2_make(FX_INT(x) + FX(0.4), FX_INT(y));

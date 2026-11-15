@@ -13,7 +13,12 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
   sim.c                 orchestration: config, init, kickoff reset, tick order, match flow, sim_hash
   ball.c                substepped ball physics (drag, curl, bounce, roll), posts/crossbar, bodies,
                         net box, interpolated goal-line crossing, touchline/out
-  player.c              movement + turn rate, buttons -> parametric kicks, control, dribbling
+  player.c              movement + turn rate, buttons -> parametric kicks (targeted/weighted passes), control,
+                        dribbling; players_step builds every player's WpSeatInput (human / assisted / team.c)
+  seats.c               which player each seat controls: manual/auto switch, pass hand-off on contact, pass in
+                        flight, assisted receive (legs only; aim stays the human's stick)
+  team.c                PLACEHOLDER movement for non-human players (shape, runs, keepers, passive cones) ->
+                        WpSeatInput; replaced by the CP0.3 instinct AI. SimState.flags WP_SIMF_STATIC_OTHERS = statues
 src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   main.c                window, input -> WpInput, fixed-step loop, camera, HUD, flags (--demo --gallery
                         --style --zoom --screenshot --frames), retro low-res render target, 60 fps vsync pacing
@@ -24,6 +29,8 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
 tests/                  headless tests (test_*.c auto-registered with ctest), bench_sim.c
   test_ball.c           physics, curl, roll distances + inverse, bounce (drop/continuity/chip), posts/bar, goals, net, outs
   test_ball_control.c   dribble feel targets, never-whiff kicks, height bands, no-magnet checks, shot table (prints)
+  test_passing.c        targeted passes reach the receiver (standing/jog/sprint), hand-off timing, one-two aim,
+                        switching rules (never off the carrier, manual, auto, charge cleared)
   sim_test_helpers.h    setup_empty(), run_seat()
   scripted_match.h      deterministic input script shared by determinism test + bench
   golden/determinism.txt  golden final-state hash of the scripted 10-min match

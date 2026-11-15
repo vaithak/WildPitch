@@ -11,6 +11,7 @@ static inline double tod(fx v) { return (double)v / 65536.0; }
 static inline void setup_empty(SimState *s, int keep) {
     WpMatchConfig cfg = sim_default_config();
     sim_init(s, &cfg);
+    s->flags |= WP_SIMF_STATIC_OTHERS;
     for (int i = 0; i < 2 * s->n_per_side; i++)
         if (i != keep) s->players[i].pos = fv2_make(FX(-15.0) + i * FX(2.0), FX(60.0));
     s->events = 0;

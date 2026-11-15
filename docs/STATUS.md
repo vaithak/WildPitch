@@ -3,11 +3,14 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.1d — Ball looks physical: ✅ done, waiting for the owner's playtest.** Owner: "ball physics still looks a bit
-weird" → research (`reports/Football game ball physics.md`) → owner chose R1+R2+R3, "step up and stop the ball",
-"0.7 m sounds right" (D-016). Next: **CP0.2 "Pass and move"**.
+**CP0.2a — Pass and switch: ✅ done, waiting for the owner's playtest.** (CP0.1d ball visuals/physics: owner "looks
+really good, move ahead now".) Next: **CP0.2b** — through balls, lofted passes, headers (ROADMAP).
 
 ## What works now
+- **CP0.2a:** full 5-a-side team. J = pass to the best team-mate toward the stick (weighted to arrive ~6 m/s), control
+  jumps to the receiver when the ball is struck and he runs to meet it; Q = switch; auto-switch to the team-mate
+  nearest a loose ball; team-mates hold shape + make runs (placeholder, team.c); opposition = passive shuffling
+  "cones"; match clock in the HUD. Receiving at a sprint = heavier first touch.
 - Build: CMake + Ninja, SDL 3.4.8 vendored and statically linked.
 - **Sim (modular, D-012/D-013):** `sim.c` orchestration · `ball.c` substepped physics (drag, Magnus curl, bounce,
   roll), posts/crossbar, player bodies, net box, interpolated goal-line crossing, outs · `player.c` movement with
@@ -18,10 +21,11 @@ weird" → research (`reports/Football game ball physics.md`) → owner chose R1
   driven by kick params (foot/kind/wind-up), GOAL banner, OUT label, no interpolation across resets, net drawn as
   the physics box, F3 shows ball speed/height/spin/owner/phase/events, control hints on screen.
 - Flags: `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (7 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_scoring, test_determinism
-  (golden `a37fa7337e665483`; scripted seat chases the ball: ~130 kicks, 450 touches, 13 goals per 10 min, asserted),
+- **Tests (8 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_scoring, test_determinism
+  (golden `07feb9343617ebcb`; scripted seat chases the ball + mashes pass/switch: ~100 kicks, 440 touches, 11 goals, 650 switches, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
-- Perf: full game loop ~5% of one core; `bench_sim` ~22,700× real time.
+- Perf: full game loop ~5% of one core; `bench_sim` ~8,300× real time (2 µs/tick; was 22,700× before team logic + pass solver — fine for play, revisit with a
+  lookup table before RL training).
 
 ### Feel numbers (from test_ball_control; update when tuning changes)
 Dribble numbers (D-014). Direction-change rows are the WORST case over 16 start offsets and over 40–180-tick run-ups:
@@ -56,19 +60,28 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Log the owner's CP0.1d playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; adjust `src/sim/tuning.h` if needed.
-2. Re-plan and start CP0.2 per ROADMAP: aimed passing (tap short / hold through ball), switch player, teammates
-   holding shape with basic runs, receiving/first touch from passes, **playable contextual headers** (D-010:
-   pass/shoot while a reachable ball is in the air → jump/stand header with head-band contact), HUD clock.
+1. Log the owner's CP0.2a playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; tune `src/sim/tuning.h` (switch/pass block).
+2. CP0.2b: through ball (hold J, power by hold; decide tap-latency trade-off), lofted pass (L key, airborne inverse
+   model + agreement test), playable contextual headers (D-010; exempt header-action players from the body cylinder),
+   pass power bar. Scripted match must press the new buttons.
 
 ## Known issues / environment notes
 - **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
   `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build` (needed by CP0.4/CP0.5).
-- Other players are statues (no AI until CP0.3); they block the ball with their bodies, keepers included.
+- Opposition = passive shuffling cones (no tackling/stealing, keepers don't dive) until CP0.3. Team-mates use
+  placeholder positioning (team.c), not real AI.
 - Headers: height bands exist; the trigger is CP0.2.
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Playtest guide (CP0.2a — focus: passing & switching)
+`./build/wildpitch`. You're red, attacking right. New: **J** passes to the team-mate most in line with your stick
+(nearer + straighter wins); the camera/marker moves to him as the ball is struck and he runs to meet it — move the
+stick to take over. **Q** switches to the team-mate nearest the ball. When the ball is loose, control auto-switches
+to whoever's nearest. Team-mates spread out and the striker runs beyond the ball; blue are passive cones.
+Judge: do passes go to who you expected? Pace right (not too slow/fast to receive)? Is auto-switching helpful or
+jumpy? Is the hand-off moment clear? Does the receiver's run feel natural?
 
 ## Playtest guide (CP0.1d — focus: does the ball look physical now?)
 `./build/wildpitch` (try `Z` for the close zoom). Watch: the ball visibly rolls (panels turn, blur when fast, streak

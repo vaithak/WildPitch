@@ -57,7 +57,15 @@ Not playable; invisible plumbing every later CP depends on.
 - Impulse grass bounce, no-magnet possession (step-up + sole trap, capped gather, contact quality), rolling
   panels/blur/streak/shadow (D-016). Optional later: R4 topspin/skid-to-roll, R5 drag crisis (see report).
 
-### CP0.2 — "Pass and move" ⏭ 🔵
+### CP0.2a — Pass and switch ✅ 🔵  (first half of CP0.2, split for a focused playtest)
+- Targeted, weighted ground passes; control hand-off; manual (Q) + auto switching; assisted receive; team-mates
+  hold a 2-1-1 shape and make simple runs; passive opposition shuffles; match clock (D-017).
+
+### CP0.2b — Through balls, lofted passes, headers ⏭ 🔵
+- Hold pass = through ball into space (power by hold); lofted pass (L) with an airborne inverse model; playable
+  contextual headers (D-010) incl. body-cylinder exemption during a header; pass power bar.
+
+### CP0.2 — "Pass and move" (original plan, now CP0.2a + CP0.2b) 🔵
 **Playable:** your full 5-a-side team (4 + keeper) vs. a passive opposition (cones that move a bit).
 - Pass: tap = short ground pass to the best teammate in the stick direction; hold = through ball
   into space (power by hold time). Lofted pass.

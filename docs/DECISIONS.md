@@ -119,3 +119,16 @@ From the ball-physics research (`reports/Football game ball physics.md`, steps R
   3→9 m/s (no wagon-wheel); streak above 15 m/s; shadow slides out with height. No spin state in the sim yet
   (R4 skid-to-roll/topspin is optional later).
 - `ball_roll_speed_for(d)` (inverse roll model) exists for CP0.2 weighted passes.
+
+## D-017 — Passing & switching model (2026-11-15, CP0.2a)
+- **Tap pass = targeted ground pass:** receiver = best team-mate within 55° of the stick (angle + distance score;
+  keeper only within 20°). Aimed and weighted at the CONTACT tick from where ball and receiver are (0.25 s lead), so
+  the passer's run never spoils it: launch = inverse roll model so it arrives at 5.5 m/s (measured ~6.0). No receiver
+  in the cone → untargeted 12 m/s pass along the stick (+ inherited run). Through ball / lofted pass: CP0.2b.
+- **Control follows the ball:** hand-off to the receiver on the contact tick (a whiff doesn't switch); no auto-switch
+  while the pass is in flight; never switch away from the ball carrier (invariant asserted in the scripted match:
+  owner is -1 or a seat's player). Loose ball → auto-switch to the nearest outfield team-mate (2 m hysteresis,
+  0.5 s cooldown). Q = manual switch (nearest to ball other than you; locks auto 1.5 s).
+- **Assisted receive:** the receiver runs to meet the ball on its path until the human moves the stick away from
+  where it was at the pass; it steers the legs only — aim/buttons always use the human's real stick.
+- Non-human movement is generated as WpSeatInput (team.c placeholder) through the same move() physics as humans.

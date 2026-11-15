@@ -66,6 +66,17 @@
 #define T_GATHER_MAX_DEG   75         /* contact point: at most this far round the body from where the ball is */
 #define T_BODY_HIT_COOLDOWN 12        /* after a ball smacks into you, you can't control it for this long */
 
+/* ---- switching & passing (CP0.2) ---- */
+#define T_SWITCH_COOL      30         /* ticks between auto-switches */
+#define T_SWITCH_LOCK_MANUAL 90       /* after a manual switch, no auto-switch for this long */
+#define T_SWITCH_HYST      FX(2.0)    /* auto-switch only to a team-mate this much nearer the ball */
+#define T_PASS_FLIGHT_MAX  240        /* a pass in flight stops blocking auto-switch after this many ticks */
+#define T_PASS_ARRIVE      FX(5.5)    /* targeted ground pass arrives at the receiver at this speed */
+#define T_PASS_MAX         FX(22.0)   /* hardest ground pass */
+#define T_PASS_CONE_DEG    55         /* receivers within this angle of the stick are candidates */
+#define T_PASS_LEAD_S      FX(0.25)   /* aim at the receiver's position this far ahead */
+#define T_SPRINT_SPILL     FX(0.12)   /* extra first-touch spill when receiving at a sprint */
+
 /* ---- kicks ---- */
 #define T_CHARGE_MAX_TICKS 36         /* full power after 0.6 s */
 #define T_KICK_WINDUP_PASS 4
