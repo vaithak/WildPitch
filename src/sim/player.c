@@ -59,36 +59,6 @@ void sim_player_kick(SimState *s, int i, const WpKick *k) {
     p->action_timer = 0;
 }
 
-/* Best team-mate for a pass toward `dir`: within T_PASS_CONE_DEG, scored by angle off the stick and distance
- * (nearer and straighter wins). Keeper only if nearly straight at him. -1 if nobody fits (pass into space). */
-int pass_pick(const SimState *s, int i, wp_angle dir) {
-    const WpPlayer *p = &s->players[i];
-    int best = -1; int32_t best_score = 0;
-    fx hl = s->pitch.length / 2 - FX(1.0), hw = s->pitch.width / 2 - FX(1.0);
-    /* outfield team-mates first; the keeper only when nobody else fits (no firm back-passes to him by accident) */
-    for (int pass = 0; pass < 2 && best < 0; pass++)
-    for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
-        if (j == i || (s->players[j].role == WP_ROLE_KEEPER) != (pass == 1)) continue;
-        const WpPlayer *q = &s->players[j];
-        fx d0 = fv2_len(fv2_sub(q->pos, p->pos));
-        if (d0 > T_PASS_MAX_DIST + FX(4.0)) continue;
-        /* judge him where he'll be when the ball gets there (flight ~ distance / 12 m/s), kept on the pitch */
-        fv2 qp = fv2_add(q->pos, fv2_scale(q->vel, fx_div(d0, FX(12.0))));
-        qp = fv2_make(fx_clamp(qp.x, -hl, hl), fx_clamp(qp.y, -hw, hw));
-        fv2 d = fv2_sub(qp, p->pos);
-        fx dist = fv2_len(d);
-        if (dist < FX(2.0) || dist > T_PASS_MAX_DIST) continue;
-        int32_t off = ang_diff(fx_atan2(d.y, d.x), dir);
-        if (off < 0) off = -off;
-        int32_t lim = DEG_TO_ANG(q->role == WP_ROLE_KEEPER ? 20 : T_PASS_CONE_DEG);
-        if (off > lim) continue;
-        /* score: 1 degree off ~ 0.8 m further away; long balls scored down from T_PASS_PENALTY_M */
-        int32_t score = (int32_t)(((int64_t)off * 360 * 10) / 65536) + (int32_t)(dist / (FX_ONE / 8));
-        if (dist > T_PASS_PENALTY_M) score += (int32_t)((dist - T_PASS_PENALTY_M) / (FX_ONE / 16));
-        if (best < 0 || score < best_score) { best = j; best_score = score; }
-    }
-    return best;
-}
 
 /* Aim assist (D-013): roughly toward goal, the stick picks a TARGET rather than an exact angle — up/down = that
  * side of the goal, straight/none = the far post from where you stand. A share of the stick's angular error
@@ -110,15 +80,26 @@ wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int ha
 }
 
 /* Build kick parameters from a human's input. charge01 in [0,1]. */
+/* receiver for a pass kind: the previewed pick (what the ring shows) - the keeper never for through balls/lobs */
+static int kick_receiver(const SimState *s, int i, int seat, uint8_t kind, wp_angle dir) {
+    int r = seat >= 0 ? s->pick_recv[seat] : pass_pick(s, i, dir);
+    if (r >= 0 && kind != WP_KICK_PASS && s->players[r].role == WP_ROLE_KEEPER)
+        r = pass_pick_ex(s, i, dir, PICK_DIGITAL, -1, 0);
+    return r;
+}
+
 static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 aim, int has_aim, WpKick *k) {
     const WpPlayer *p = &s->players[i];
     wp_angle dir = has_aim ? fx_atan2(aim.y, aim.x) : p->facing;
+    int seat = seat_of(s, i);
+    if ((kind == WP_KICK_PASS || kind == WP_KICK_THROUGH || kind == WP_KICK_LOB) && seat >= 0)
+        dir = s->pick_dir[seat];                          /* stick, latched diagonal, memory, facing (D-021) */
     k->kind = kind;
     k->spin = 0;
     k->to = 0;
     if (kind == WP_KICK_PASS) {
         k->power = T_PASS_SPEED; k->vz = 0; k->windup = T_KICK_WINDUP_PASS;
-        int r = pass_pick(s, i, dir);
+        int r = kick_receiver(s, i, seat, kind, dir);
         if (r >= 0) {                                      /* targeted: aimed & weighted again at contact */
             fv2 d = fv2_sub(s->players[r].pos, p->pos);
             dir = fx_atan2(d.y, d.x);
@@ -129,7 +110,7 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
         k->power = charge01;
         k->vz = 0;
         k->windup = kind == WP_KICK_LOB ? T_KICK_WINDUP_CHIP : T_KICK_WINDUP_PASS;
-        int r = pass_pick(s, i, dir);
+        int r = kick_receiver(s, i, seat, kind, dir);
         if (r >= 0) {
             fv2 d = fv2_sub(s->players[r].pos, p->pos);
             dir = fx_atan2(d.y, d.x);
@@ -290,9 +271,19 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     if (p->kick.kind == WP_KICK_LOB) b->vel = lob_velocity(s, r, p->kick.dir, &vz);
     else if (p->kick.kind == WP_KICK_THROUGH && r >= 0) b->vel = through_solve(s, r, p->kick.power, &meet, &t_meet, &plan);
     else if (r >= 0) b->vel = pass_solve(s, r, &meet, &t_meet, &plan);
-    else if (p->kick.kind == WP_KICK_THROUGH)               /* hold with nobody in the cone: the hold is power */
-        b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(fx_lerp(T_THROUGH_FREE_MIN, T_THROUGH_FREE_MAX, p->kick.power), q)),
-                         fv2_scale(p->vel, INHERIT_VEL));
+    else if (p->kick.kind == WP_KICK_PASS || p->kick.kind == WP_KICK_THROUGH) {
+        /* nobody fits: a deliberate ball into space, weighted to stop inside the pitch (no inherited run, so a
+         * sideways run can't carry it out). Hold = longer, up to the line (D-021). */
+        fv2 u = fv2_from_angle(p->kick.dir, FX_ONE);
+        fx hl = s->pitch.length / 2, hw = s->pitch.width / 2;
+        fx d_tap = fx_clamp(ray_exit_dist(b->pos, u, hl - T_FREE_MARGIN_X, hw - T_FREE_MARGIN_Y), T_FREE_MIN_ROLL, T_FREE_MAX_ROLL);
+        fx d = d_tap;
+        if (p->kick.kind == WP_KICK_THROUGH) {
+            fx d_max = fx_max(d_tap, fx_min(ray_exit_dist(b->pos, u, hl, hw), ball_roll_distance(T_THROUGH_FREE_MAX)));
+            d = fx_lerp(d_tap, d_max, p->kick.power);
+        }
+        b->vel = fv2_scale(u, ball_roll_speed_for(d));
+    }
     else b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(p->kick.power, q)), fv2_scale(p->vel, INHERIT_VEL));
     b->vz = vz;
     b->spin = p->kick.spin;
@@ -543,6 +534,7 @@ void players_step(SimState *s, const WpInput *in) {
         int seat = seat_of(s, i);
         if (seat >= 0) {
             pin[i] = mv[i] = in->seat[seat];
+            pass_pick_update(s, seat, i, &pin[i]);            /* the receiver preview the HUD shows */
             if (s->latch_ticks[seat] && s->ball.owner == i) {   /* inherited stick: don't dribble with it */
                 pin[i].move_x = pin[i].move_y = 0;
                 mv[i] = pin[i];

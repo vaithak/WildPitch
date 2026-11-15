@@ -193,3 +193,26 @@ received, and the moving key is pressed, player moves ahead without reception". 
 - Not built from the report's plan (yet): the 200 ms first-touch stick buffer (the touch already follows the stick
   held at control), time-based (0.25 s) switch hysteresis (still 2 m distance). CP0.3 AI: one-twos / passer
   follow-up runs, off-ball run timing, pass-lane scoring (passes still hit cones standing in lanes).
+
+## D-021 — Pass receiver selection: coverage, two bearings, stick memory, preview ring (2026-11-15, CP0.2d)
+Owner asked whether our receiver pick matches the best games → research `reports/Pass receiver selection.md`
+(commercial, open-source code, HCI/aim-assist + pass analytics, empirical audit) → owner: "yes, go ahead".
+Structure kept (cone + one score, as SWOS/YSoccer/GRF); ranking was fine (~2.5% wrong-mate). Changes, all in
+`src/sim/pass_pick.c`:
+- **Two bearings:** the stick counts as pointing at a mate if it points at him now OR where he'll be.
+- **Stage B** (only when nobody is within 55°): keyboard (8-way) input also takes outfield mates to 70°, never one
+  > 1 m behind the passer on a key with a forward/back component; the keeper only here, within 25° (reachable from
+  some key at every bearing), never for through balls or lobs.
+- **Nobody fits = a deliberate ball into space:** weighted at contact to stop 2.5 m / 1.5 m inside the lines
+  (6–18 m roll), no inherited run; a held J is longer up to the line (monotone in the hold). Amends D-017/D-020.
+- **Stick memory:** a keyboard diagonal released one key at a time stays diagonal for 4 ticks; a released stick keeps
+  the last direction for 0.5 s before falling back to facing; reset on any switch.
+- **Preview ring:** `pick_recv` per seat is recomputed every tick the player could pass (sim-owned, hashed); a pass
+  reads it, so the ring under a team-mate's feet IS who gets the ball (test: 92/92 releases). Hysteresis 40 points.
+- **Lane danger:** an opponent within 1.5 m of the lane costs ≤ 150 points (near-tie breaker only, never overrides
+  the stick — eFootball's lane override drew a petition) and tints the ring amber.
+- Ties: fewer degrees off, then lower index. All weights/constants in tuning.h.
+Measured (`tools/playtest/sel.c`, opposition on, settle 60/300): keyboard pick rate 61.8 → 69.2/69.5%; untargeted
+taps out of play 77 → 11.8/12.0%; stick at a mate's visible bearing → him 83.7 → 90.8/93.7%; keeper bearings
+reachable 100%. CP0.3: the striker's forward key still finds nobody (team.c puts no one ahead of him); AI pass choice
+(forwardness + interception race) will reuse the lane function.

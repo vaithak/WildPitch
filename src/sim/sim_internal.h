@@ -3,6 +3,7 @@
  *   player.c  movement, turning, buttons -> parametric kicks, ball control & dribbling
  *   ball.c    ball physics (substepped), posts/crossbar/net, bodies, goal & out detection
  *   seats.c   which player each human seat controls (switching), pass in flight, assisted receive
+ *   pass_pick.c  who receives a pass (stick cone + score, preview, stick memory)
  *   header.c  contextual headers: trigger, take-off timing, head-band contact
  *   team.c    placeholder movement for non-human players (shape, runs, keepers) -> WpSeatInput (CP0.3: AI)
  */
@@ -36,7 +37,13 @@ fx ball_lob_speed_for(fx d, fx vz);          /* horizontal launch speed so a bal
 fx ball_carry_distance(fx vh, fx vz);        /* forward model: where (horizontally) it first lands */
 
 /* player.c helpers shared with header.c */
-int      pass_pick(const SimState *s, int i, wp_angle dir);
+/* pass_pick.c */
+enum { PICK_DIGITAL = 1, PICK_KEEPER = 2 };
+int      pass_pick(const SimState *s, int i, wp_angle dir);        /* stateless (digital + keeper) */
+int      pass_pick_ex(const SimState *s, int i, wp_angle dir, int flags, int prev, uint8_t *danger);
+void     pass_pick_update(SimState *s, int seat, int i, const WpSeatInput *in);   /* per tick: preview */
+void     pass_pick_reset(SimState *s, int seat);
+fx       ray_exit_dist(fv2 from, fv2 dir, fx X, fx Y);
 wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim);
 /* header.c */
 int  header_wanted(const SimState *s, int i, int *jump);

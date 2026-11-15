@@ -116,6 +116,24 @@ void wp_render_reset_anim(WpRenderCtx *ctx) {
     wp_ball_vis_reset(&ctx->ball);
 }
 
+/* thin elliptical ring on the grass (annulus as a triangle strip) */
+static void draw_ring(SDL_Renderer *r, float cx, float cy, float rx, float ry, float th, SDL_FColor col) {
+    enum { N = 28 };
+    SDL_Vertex v[2 * N + 2];
+    int idx[6 * N];
+    for (int k = 0; k <= N; k++) {
+        float a = (float)k / N * 6.2831853f, c = cosf(a), s = sinf(a);
+        v[2 * k] = (SDL_Vertex){{cx + c * rx, cy + s * ry}, col, {0, 0}};
+        v[2 * k + 1] = (SDL_Vertex){{cx + c * (rx - th), cy + s * (ry - th * ry / rx)}, col, {0, 0}};
+    }
+    for (int k = 0; k < N; k++) {
+        int a = 2 * k;
+        idx[6 * k] = a; idx[6 * k + 1] = a + 1; idx[6 * k + 2] = a + 2;
+        idx[6 * k + 3] = a + 1; idx[6 * k + 4] = a + 3; idx[6 * k + 5] = a + 2;
+    }
+    SDL_RenderGeometry(r, NULL, v, 2 * N + 2, idx, 6 * N);
+}
+
 /* Pose clock for actions. Header attempts start by waiting for the ball, so their pose is timed from take-off
  * (jump) or contact (stand); while waiting hold the "ready" part of the pose (arms up, before the nod). */
 static float header_pose_t(const WpPlayer *p, float alpha) {
@@ -175,6 +193,17 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                      (SDL_FColor){0, 0, 0, 0.30f * sh});
     }
     wp_ball_draw_shadow(r, ctx->soft, cam, bx, by, bz);
+    /* pass receiver preview (D-021): the sim's pick, so the ring is exactly who a pass goes to. White, tinting to
+     * amber when an opponent is near that lane. */
+    for (int k = 0; k < WP_MAX_SEATS && !ctx->hide_markers; k++) {
+        int pr = cur->pick_recv[k];
+        if (pr < 0 || cur->seat_player[k] < 0) continue;
+        float dg = (float)cur->pick_danger[k] / 255.0f;
+        WpScreenPt g = wp_project(cam, px[pr], py[pr], 0);
+        float rad = 0.55f * cam->ppm * g.s;
+        draw_ring(r, g.x, g.y, rad, rad * cam->tilt, fmaxf(1.5f, 0.07f * cam->ppm * g.s),
+                  (SDL_FColor){1.0f, 1.0f - 0.25f * dg, 1.0f - 0.75f * dg, 0.85f});
+    }
     for (int k = 0; k < n; k++) {
         if (items[k].kind == 0) {
             int i = items[k].idx;

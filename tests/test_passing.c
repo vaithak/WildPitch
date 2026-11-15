@@ -213,5 +213,57 @@ int main(void) {
         printf("live passes to moving team-mates: %d/%d completed\n", ok, tries);
         CHECKF(tries >= 15 && ok * 100 >= tries * 80, "live pass completion %d/%d", ok, tries);
     }
+    /* 10. D-021: the keeper is reachable from SOME key at every bearing (25-degree band > half the 45-degree key gap) */
+    {
+        int reach = 0;
+        static const int8_t K[8][2] = {{127,0},{127,127},{0,127},{-127,127},{-127,0},{-127,-127},{0,-127},{127,-127}};
+        for (int a = 0; a < 360; a++) {
+            setup_empty(&s, ME); s.seat_player[0] = ME;
+            s.players[ME].pos = fv2_make(0, 0);
+            s.players[0].pos = fv2_from_angle((wp_angle)(a * 65536 / 360), FX(8.0));
+            int ok = 0;
+            for (int k = 0; k < 8 && !ok; k++) ok = pass_pick(&s, ME, fx_atan2(FX_INT(K[k][1]), FX_INT(K[k][0]))) == 0;
+            reach += ok;
+        }
+        printf("keeper reachable from some key at %d/360 bearings\n", reach);
+        CHECK(reach == 360);
+    }
+    /* 11. the preview ring IS the receiver: at every pass release in live play, kick.to == pick_recv */
+    {
+        int n = 0, bad = 0;
+        WpMatchConfig cfg = sim_default_config();
+        sim_init(&s, &cfg);
+        WpRng r; wp_rng_seed(&r, 99, 1);
+        WpSeatInput in = {0, 0, 0};
+        for (int t = 0; t < 60 * 120; t++) {
+            if (t % 20 == 0) {
+                static const int8_t v[3] = {-127, 0, 127};
+                uint32_t k1 = wp_rng_range(&r, 3);
+                uint32_t k2 = wp_rng_range(&r, 3);
+                in.move_x = v[k1]; in.move_y = v[k2];
+            }
+            int me = s.seat_player[0];
+            WpSeatInput keep = in;
+            if (s.ball.owner != me) {                 /* go and get the ball */
+                fv2 d = fv2_sub(s.ball.pos, s.players[me].pos);
+                in.move_x = (int8_t)(d.x > FX(0.3) ? 127 : d.x < -FX(0.3) ? -127 : 0);
+                in.move_y = (int8_t)(d.y > FX(0.3) ? 127 : d.y < -FX(0.3) ? -127 : 0);
+            }
+            int tap = (t % 37) < 3, lob = (t % 97) == 50;
+            in.buttons = (uint16_t)((tap ? WP_BTN_PASS : 0) | (lob ? WP_BTN_LOB : 0));
+            run_seat(&s, in, 1);
+            if (s.ball.owner != me) in = keep;
+            const WpPlayer *p = &s.players[me];
+            if (p->action == WP_ACT_KICK && p->action_timer == 1 &&   /* started this tick */
+                (p->kick.kind == WP_KICK_PASS || p->kick.kind == WP_KICK_LOB)) {
+                n++;
+                int want = s.pick_recv[0];
+                if (p->kick.kind == WP_KICK_LOB && want >= 0 && s.players[want].role == WP_ROLE_KEEPER) continue;
+                bad += (int)p->kick.to - 1 != want;
+            }
+        }
+        printf("preview == receiver at %d/%d pass releases\n", n - bad, n);
+        CHECKF(n >= 20 && bad == 0, "preview mismatched %d/%d", bad, n);
+    }
     return TEST_DONE();
 }

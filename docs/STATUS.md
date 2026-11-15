@@ -3,11 +3,15 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.2c — Passing & reception that feel natural: ✅ done, waiting for the owner's playtest.** Owner said through-ball
-power and reception felt off and that pressing a key while receiving made the player run past the ball → research
-(`reports/Through ball and pass reception.md`) + headless playtest agent → D-020. Next: **CP0.3 "Instinct AI"**.
+**CP0.2d — Passes always go somewhere sensible, and you can see who: ✅ done, waiting for the owner's playtest.**
+(CP0.2c decisions: hold = deeper kept, no separate key, standing receivers can be taken over to make a run.) Owner
+asked for research on receiver selection → `reports/Pass receiver selection.md` → D-021. Next: **CP0.3 "Instinct AI"**.
 
 ## What works now
+- **CP0.2d (D-021):** a white ring under the team-mate a pass would go to right now (amber = an opponent near that
+  lane) — the pass always goes to the ringed man; diagonals and wide team-mates are easier to hit on a keyboard;
+  the keeper is reachable but only as a last resort; a pass with nobody there rolls into space and stops inside
+  the pitch (77% → 12% went out); releasing the stick just before J keeps the last direction for 0.5 s.
 - **CP0.2c (D-020):** through balls land just ahead of a running receiver (hold = deeper/softer, never weaker than a
   tap), taps lead runners by the real flight time and pace grows with distance, receivers keep running and are never
   abandoned when you press or release keys (the stick picks where he meets it), 1 m swept reach, deflections switch
@@ -33,9 +37,9 @@ power and reception felt off and that pressing a key while receiving made the pl
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (9 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_scoring, test_determinism
-  (golden `60e936cfc3d5b8d1`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+  (golden `a1bebf61d7ddd972`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
-- Perf: full game loop ~5% of one core; `bench_sim` ~4,900× real time (3.4 µs/tick). Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
+- Perf: full game loop ~5% of one core; `bench_sim` ~4,500× real time (3.7 µs/tick; per-tick receiver preview added). Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
   receiver prediction ~4% → perf pass = a faster EXACT isqrt (bit-identical, golden unchanged); was 22,700× before team logic + pass solver — fine for play, revisit with a
   lookup table before RL training).
 
@@ -88,6 +92,12 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Playtest guide (CP0.2d — focus: who gets the pass)
+Watch the white ring: it sits under whoever J would pass to right now (amber when a blue player is near the lane).
+Try diagonals and wide team-mates on the keyboard, letting go of the stick just before J, passing with nobody in
+that direction (the ball should roll into space and stay in), and back toward your keeper (only if nobody else).
+Questions: does the ring ever surprise you? Is it too busy / should it only show while J is held? Amber useful?
 
 ## Playtest guide (CP0.2c — focus: does passing/receiving feel natural now?)
 Same controls. Try: through balls (hold J) to a running striker — he should keep running and meet it just ahead,

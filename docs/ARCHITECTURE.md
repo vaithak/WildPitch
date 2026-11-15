@@ -17,6 +17,8 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
                         dribbling; players_step builds every player's WpSeatInput (human / assisted / team.c)
   seats.c               which player each seat controls: manual/auto switch, pass hand-off on contact, pass in
                         flight, assisted receive (legs only; aim stays the human's stick)
+  pass_pick.c           who receives a pass (D-021): two-bearing cone + score, keyboard stage B, keeper band, lane
+                        danger, stick memory, per-tick preview (pick_recv) that passes read
   header.c              contextual headers (D-010/D-019): trigger on J/K at a high ball, legs step under it while
                         the stick aims, jump timed so the apex meets it, head-band contact, header pass/shot
   team.c                PLACEHOLDER movement for non-human players (shape, runs, keepers, passive cones) ->
@@ -29,7 +31,7 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   dedication.h/.c       the owner's dedication card on launch (D-018; wording is fixed)
   ball_draw.h/.c        the ball: visual orientation rolled from drawn motion, 12 panels, speed blur/streak, shadow
   avatar.h/.c           procedural skeleton footballers (D-009): looks, styles, pose solver, soft-capsule drawing
-tools/playtest/         headless playtest harnesses (scripted seat inputs) used to find/verify passing feel issues
+tools/playtest/         headless playtest harnesses (sel.c = pass receiver sweep: pick rate, out-of-play, reach) (scripted seat inputs) used to find/verify passing feel issues
 tests/                  headless tests (test_*.c auto-registered with ctest), bench_sim.c
   test_ball.c           physics, curl, roll distances + inverse, bounce (drop/continuity/chip), posts/bar, goals, net, outs
   test_ball_control.c   dribble feel targets, never-whiff kicks, height bands, no-magnet checks, shot table (prints)

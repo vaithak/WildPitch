@@ -77,6 +77,25 @@
 #define T_PASS_ARR_MAX     FX(9.0)
 #define T_PASS_MAX         FX(22.0)   /* hardest ground pass */
 #define T_PASS_CONE_DEG    55         /* receivers within this angle of the stick are candidates */
+#define T_PASS_W_ANGLE     10         /* pass pick points per degree off the stick ... */
+#define T_PASS_W_DIST      8          /* ... per metre of distance (1 m ~ 0.8 deg) ... */
+#define T_PASS_W_FAR       16         /* ... and extra per metre beyond T_PASS_PENALTY_M */
+#define T_PASS_MIN_DIST    FX(2.0)    /* nearer than this isn't a pass */
+#define T_PASS_PREFILTER_M FX(4.0)    /* skip players this much beyond the max distance before predicting */
+#define T_PICK_FLIGHT_V    FX(12.0)   /* pass pick judges receivers at distance / this (s) ahead */
+#define T_PASS_CONE_WIDE_DEG 70       /* nobody within the cone: keyboard (8-way) input also accepts mates to here */
+#define T_PASS_WIDE_BACK_M FX(1.0)    /* ... but never one more than this behind the passer on a forward/back key */
+#define T_PASS_KEEPER_CONE_DEG 25     /* the keeper (only when no outfield mate fits; never for through/lob) */
+#define T_PICK_DIAG_LATCH  4          /* a keyboard diagonal released one key at a time stays diagonal this long */
+#define T_PICK_STICK_MEM   30         /* stick released: the pass still uses the last direction for this long */
+#define T_PASS_STICKY      40         /* points the previewed receiver keeps (hysteresis, ~4 deg / 5 m) */
+#define T_PASS_W_LANE_M    100        /* points per metre an opponent is inside T_LANE_CLEAR of the lane (cap 150) */
+#define T_LANE_CLEAR       FX(1.5)
+#define T_LANE_LOOK        FX(0.3)    /* opponents advanced along their velocity up to this (s) */
+#define T_FREE_MARGIN_X    FX(2.5)    /* a ball into space (nobody fits) is weighted to stop this far inside ... */
+#define T_FREE_MARGIN_Y    FX(1.5)    /* ... the goal lines / touchlines */
+#define T_FREE_MIN_ROLL    FX(6.0)    /* ... but rolls at least this far */
+#define T_FREE_MAX_ROLL    FX(18.0)
 #define T_PASS_PENALTY_M   FX(18.0)   /* receivers further than this are scored down ... */
 #define T_PASS_MAX_DIST    FX(26.0)   /* ... and beyond this not picked at all */
 #define T_PASS_RUNNER_MS   FX(2.0)    /* receiver moving away from the passer faster than this = a runner */

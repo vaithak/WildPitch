@@ -159,6 +159,14 @@ typedef struct {
     fx       recv_speed;             /* ... and how fast (m/s) */
     int8_t   latch_stick[WP_MAX_SEATS][2]; /* stick held at an auto-switch: treated as neutral until it changes */
     uint8_t  latch_ticks[WP_MAX_SEATS];
+    /* pass receiver preview (D-021): the sim owns the pick, the HUD only draws it, so the ring always matches */
+    int8_t   pick_recv[WP_MAX_SEATS];    /* who a pass would go to right now (-1 = nobody: a ball into space) */
+    uint8_t  pick_danger[WP_MAX_SEATS];  /* 0..255: an opponent near that passing lane (ring tint) */
+    wp_angle pick_dir[WP_MAX_SEATS];     /* the effective pass direction (stick, latched diagonal, memory, facing) */
+    int8_t   pick_stick[WP_MAX_SEATS][2];/* last non-zero stick ... */
+    uint8_t  pick_stick_age[WP_MAX_SEATS];/* ... and ticks since (255 = none) */
+    int8_t   pick_diag[WP_MAX_SEATS][2]; /* last keyboard diagonal ... */
+    uint8_t  pick_diag_age[WP_MAX_SEATS];
     WpPlayer players[WP_MAX_PLAYERS];
 } SimState;
 

@@ -191,14 +191,18 @@ int main(void) {
 
     /* ---- G. hold with nobody in the cone = more power (finding 4) ---- */
     {
+        /* along the pitch (space ahead); D-021: a hold is longer up to the line, a tap stops 2.5 m inside it */
         fx prev = 0;
-        for (int hold = 14; hold <= 36; hold += 11) {
-            scene(fv2_make(-FX(10.0), 0), fv2_make(-FX(10.0), -FX(9.0)));
-            for (int t = 0; t < hold; t++) step2((WpSeatInput){0, 127, WP_BTN_PASS}, NOIN);
-            for (int t = 0; t < 12 && !(step2((WpSeatInput){0, 127, 0}, NOIN) & WP_EV_KICK); t++) {}
+        for (int hold = 6; hold <= 36; hold += 10) {
+            scene(fv2_make(-FX(10.0), FX(6.0)), fv2_make(-FX(10.0), -FX(9.0)));
+            for (int t = 0; t < hold; t++) step2((WpSeatInput){127, 0, WP_BTN_PASS}, NOIN);
+            for (int t = 0; t < 12 && !(step2((WpSeatInput){127, 0, 0}, NOIN) & WP_EV_KICK); t++) {}
             fx v = fv2_len(s.ball.vel);
-            printf("untargeted hold %d: %.1f m/s\n", hold, tod(v));
+            uint16_t ev = 0;
+            for (int t = 0; t < 600 && (s.ball.vel.x || s.ball.vel.y); t++) ev |= step2(NOIN, NOIN);
+            printf("untargeted hold %d: %.1f m/s, stops at x %.1f, out %d\n", hold, tod(v), tod(s.ball.pos.x), (ev & WP_EV_OUT) != 0);
             CHECKF(v > prev + FX(1.0), "untargeted hold %d not firmer (%.1f)", hold, tod(v));
+            CHECKF(!(ev & (WP_EV_OUT | WP_EV_GOAL)), "untargeted hold %d went out", hold);
             prev = v;
         }
     }

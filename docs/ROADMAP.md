@@ -82,6 +82,10 @@ Not playable; invisible plumbing every later CP depends on.
 - Intercept-solved through balls and tap passes, steered (never abandoned) receivers, swept 1.0 m reach, deflection
   switching, untargeted hold power, 200 ms tap window (D-020). Acceptance tests: test_reception.
 
+### CP0.2d — Passes always go somewhere sensible, and you can see who ✅ 🔵  (owner: research receiver pick)
+- Two-bearing pick, wider keyboard stage, keeper band, safe ball into space, stick memory, preview ring with lane
+  tint (D-021). Sweep harness `tools/playtest/sel.c`.
+
 ### CP0.3 — "Instinct AI" ⏭ 🟡
 **Playable:** first real 5v5 match vs AI.
 - **Instinct layer** as *candidate actions × utility scores* over an observation vector

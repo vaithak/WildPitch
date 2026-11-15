@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 1584  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 1664  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 WpMatchConfig sim_default_config(void) {
     WpMatchConfig c;
@@ -62,7 +62,11 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
     s->pitch = cfg->pitch;
     s->n_per_side = cfg->n_per_side < 1 ? 1 : (cfg->n_per_side > WP_MAX_PER_SIDE ? WP_MAX_PER_SIDE : cfg->n_per_side);
     for (int i = 0; i < WP_MAX_PLAYERS; i++) s->players[i].stamina = FX_ONE;
-    for (int i = 0; i < WP_MAX_SEATS; i++) s->seat_player[i] = -1;
+    for (int i = 0; i < WP_MAX_SEATS; i++) {
+        s->seat_player[i] = -1;
+        s->pick_recv[i] = -1;
+        s->pick_stick_age[i] = s->pick_diag_age[i] = 255;
+    }
     s->seat_player[0] = (int8_t)(s->n_per_side - 1); /* seat 0 = team 0 striker */
     s->kickoff_team = 0;
     match_place_kickoff(s);
@@ -129,6 +133,9 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, s->recv_goal.x); fnv_i(&f, s->recv_goal.y); fnv_i(&f, s->recv_speed);
     for (int k = 0; k < WP_MAX_SEATS; k++) {
         fnv_i(&f, s->latch_stick[k][0]); fnv_i(&f, s->latch_stick[k][1]); fnv_i(&f, s->latch_ticks[k]);
+        fnv_i(&f, s->pick_recv[k]); fnv_i(&f, s->pick_danger[k]); fnv_i(&f, s->pick_dir[k]);
+        fnv_i(&f, s->pick_stick[k][0]); fnv_i(&f, s->pick_stick[k][1]); fnv_i(&f, s->pick_stick_age[k]);
+        fnv_i(&f, s->pick_diag[k][0]); fnv_i(&f, s->pick_diag[k][1]); fnv_i(&f, s->pick_diag_age[k]);
     }
     for (int i = 0; i < 2 * s->n_per_side; i++) {
         const WpPlayer *p = &s->players[i];
