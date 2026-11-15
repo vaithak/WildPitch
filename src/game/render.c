@@ -113,6 +113,7 @@ void wp_render_ctx_init(WpRenderCtx *ctx, SDL_Renderer *r, uint64_t seed) {
 
 void wp_render_reset_anim(WpRenderCtx *ctx) {
     for (int i = 0; i < WP_MAX_PLAYERS; i++) ctx->anim[i].init = false;
+    wp_ball_vis_reset(&ctx->ball);
 }
 
 typedef struct { float y; int kind, idx; } DrawItem;   /* depth-sorted sprites */
@@ -149,6 +150,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
     float bx = lerpf(tof(prev->ball.pos.x), tof(cur->ball.pos.x), alpha);
     float by = lerpf(tof(prev->ball.pos.y), tof(cur->ball.pos.y), alpha);
     float bz = lerpf(tof(prev->ball.z), tof(cur->ball.z), alpha);
+    wp_ball_vis_update(&ctx->ball, bx, by, bz);
     items[n++] = (DrawItem){by, 1, 0};
     for (int i = 1; i < n; i++) {   /* far (large y) first */
         DrawItem t = items[i]; int j = i - 1;
@@ -162,12 +164,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
         wp_soft_disc(r, ctx->soft, g.x, g.y, 0.42f * cam->ppm * g.s * sh, 0.42f * cam->ppm * g.s * cam->tilt * sh,
                      (SDL_FColor){0, 0, 0, 0.30f * sh});
     }
-    {
-        WpScreenPt g = wp_project(cam, bx, by, 0);
-        float sh = 1.0f / (1.0f + bz * 0.25f);
-        wp_soft_disc(r, ctx->soft, g.x, g.y, 0.16f * cam->ppm * g.s * sh, 0.16f * cam->ppm * g.s * cam->tilt * sh,
-                     (SDL_FColor){0, 0, 0, 0.35f * sh});
-    }
+    wp_ball_draw_shadow(r, ctx->soft, cam, bx, by, bz);
     for (int k = 0; k < n; k++) {
         if (items[k].kind == 0) {
             int i = items[k].idx;
@@ -216,11 +213,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                     }
                 }
         } else {
-            WpScreenPt b = wp_project(cam, bx, by, bz + 0.11f);
-            float br = 0.11f * cam->ppm * b.s * 1.5f;  /* slightly exaggerated for readability */
-            wp_soft_disc(r, ctx->soft, b.x, b.y, br + 1.0f, br + 1.0f, (SDL_FColor){0.07f, 0.07f, 0.09f, 1});
-            wp_soft_disc(r, ctx->soft, b.x, b.y, br, br, (SDL_FColor){0.98f, 0.98f, 0.98f, 1});
-            wp_soft_disc(r, ctx->soft, b.x + br * 0.2f, b.y + br * 0.15f, br * 0.38f, br * 0.38f, (SDL_FColor){0.25f, 0.25f, 0.3f, 1});
+            wp_ball_draw(r, ctx->soft, cam, &ctx->ball, bx, by, bz, tof(cur->ball.vel.x), tof(cur->ball.vel.y));
         }
     }
     draw_goal(r, cam, &cur->pitch, 1);

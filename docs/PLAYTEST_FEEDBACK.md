@@ -40,3 +40,10 @@ Format:
 - **Action (CP0.1c, D-015):** decel = 0.9 + 0.35·v + 0.013·v² (rolling + grass + air drag). 12 m/s pass → 18 m / 4.5 s;
   3 m/s → 2.8 m; 22 m/s → 34 m. Dribble touch sizing uses the same model (feel unchanged; sprint max gap 0.88→0.91 m).
   Pass *weight* by distance (tap vs hold) still comes in CP0.2.
+
+## CP0.1c — 2026-11-15
+- **Feedback (verbatim):** "the ball physics still looks a bit weird, do a thorough deep research on how the ball
+  physics is implemented in other soccer games, also think from physics point of view deeply."
+- **Action:** research report `reports/Football game ball physics.md` (games, real physics, code audit). Owner: "yes,
+  go ahead. it should step up and stop the ball. 0.7m sounds right" → CP0.1d (D-016): R1 rolling ball visuals, R2
+  no-magnet possession, R3 impulse bounce.

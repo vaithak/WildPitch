@@ -104,3 +104,18 @@ Ground-ball deceleration = `T_ROLL_DECEL + T_ROLL_LIN·v + T_AIR_DRAG·v²` (`ba
 by ball physics AND dribble-touch sizing so they never disagree. Fast balls bleed speed, slow balls creep to a stop.
 Why: owner said a constant-decel pass "doesn't stop" (12 m/s rolled 55 m). Future pitch surfaces (wet/dry/long grass,
 procedural world) = different values of these three numbers.
+
+## D-016 — Ball looks physical: impulse bounce, no-magnet possession, visible rotation (2026-11-15, CP0.1d)
+From the ball-physics research (`reports/Football game ball physics.md`, steps R1-R3).
+- **Bounce:** vz' = 0.62·vin − 0.06 (0 below 0.5 m/s); horizontal loss = min(0.45·(1+0.62)·vin, 0.39·|v|).
+  Continuous in landing speed (no threshold cliff); 2 m drop → 0.69 m (FIFA turf 0.6–1.0).
+- **Possession never moves the ball "by magic":** stick released → step up if out of reach, then a reach-limited
+  sole trap to a spot on the ball's own side (capped 2.5 m/s relative). Kick wind-up gathers to a contact point on
+  the ball's side (≤ 75° round the body toward the kick), capped 6 m/s; no height teleport; body turns to meet the
+  ball. Contact quality (across-body angle + off-spot distance) scales kick power, floor 0.75. Rule: any new code
+  that sets ball velocity for a touch must be reach-limited, capped, and never route the ball through the body
+  (tests in test_ball_control "no magnet").
+- **Rendering:** presentation-only orientation rolled from the drawn displacement; 12 pentagon panels fading out
+  3→9 m/s (no wagon-wheel); streak above 15 m/s; shadow slides out with height. No spin state in the sim yet
+  (R4 skid-to-roll/topspin is optional later).
+- `ball_roll_speed_for(d)` (inverse roll model) exists for CP0.2 weighted passes.
