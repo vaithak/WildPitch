@@ -264,7 +264,7 @@ static void apply_vsync(Game *g) {
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, autoplay = false, force_card = false, menu_shot = false, five = false;
+    bool gallery = false, demo = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
@@ -272,6 +272,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--zoom") && i + 1 < argc) start_zoom = atoi(argv[++i]) % 3;
         else if (!strcmp(argv[i], "--gallery")) gallery = true;
         else if (!strcmp(argv[i], "--dedication")) force_card = true;   /* with --screenshot: capture the card */
+        else if (!strcmp(argv[i], "--boards")) board_sheet = true;      /* with --screenshot: the board faces */
         else if (!strcmp(argv[i], "--demo")) demo = true;
         else if (!strcmp(argv[i], "--autoplay")) autoplay = true;
         else if (!strcmp(argv[i], "--autoplay-chip")) { autoplay = true; autoplay_chip = true; }
@@ -296,6 +297,17 @@ int main(int argc, char **argv) {
     apply_vsync(&g);
     wp_keymap_defaults(&g.km);
     if (!(shot_path || autoplay || demo || gallery)) wp_keymap_load(&g.km);   /* the player's saved controls */
+    if (board_sheet && shot_path) {                      /* visual check of the advertising-board faces (D-033) */
+        int w, h;
+        WpStadium st = {0};
+        SDL_GetRenderOutputSize(g.ren, &w, &h);
+        wp_stadium_draw_sheet(g.ren, &st, w, h);
+        SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
+        if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
+        wp_stadium_free(&st);
+        SDL_Quit();
+        return 0;
+    }
     if (force_card && shot_path) {                       /* visual check of the dedication card (mid-hold) */
         int w, h;
         SDL_GetRenderOutputSize(g.ren, &w, &h);
@@ -315,6 +327,7 @@ int main(int argc, char **argv) {
     g.menu.difficulty = (shot_path || autoplay || demo || gallery) ? WP_AI_NORMAL : wp_settings_load_difficulty();
     cfg.ai_level[1] = (uint8_t)g.menu.difficulty;          /* the opposition; our AI team-mates stay NORMAL */
     sim_init(&g.cur, &cfg);
+    if (!(autoplay || demo || gallery)) sim_kickoff_setpiece(&g.cur);   /* a real kick-off (D-032) */
     g.demo = demo;
     if (demo) demo_setup(&g.cur);
     if (autoplay)   /* harness only: clear the statues out of the striker's path */
@@ -355,6 +368,7 @@ int main(int argc, char **argv) {
                 if (res == WP_MENU_RESTART) {                 /* new match, same format, chosen difficulty */
                     cfg.ai_level[1] = (uint8_t)g.menu.difficulty;
                     sim_init(&g.cur, &cfg);
+                    sim_kickoff_setpiece(&g.cur);
                     g.prev = g.cur;
                     wp_render_reset_anim(&g.rctx);
                 }
@@ -469,8 +483,8 @@ int main(int argc, char **argv) {
                 SDL_SetRenderScale(g.ren, 1, 1);
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
             } else if (g.cur.phase == WP_PHASE_OUT || g.cur.restart_kind) {
-                static const char *RS[4] = {"OUT", "THROW-IN", "CORNER", "GOAL KICK"};
-                const char *lab = RS[g.cur.restart_kind < 4 ? g.cur.restart_kind : 0];
+                static const char *RS[5] = {"OUT", "THROW-IN", "CORNER", "GOAL KICK", "KICK-OFF"};
+                const char *lab = RS[g.cur.restart_kind < 5 ? g.cur.restart_kind : 0];
                 char rb[48];
                 snprintf(rb, sizeof rb, "%s - %s", lab, g.cur.restart_team == 0 ? "RED" : "BLUE");
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(rb), 40, rb);

@@ -72,7 +72,7 @@ void match_place_kickoff(SimState *s) {
         fx px = fx_mul(fxl, hl), py = fx_mul(fyl, hw);
         if (team == 1) { px = -px; py = -py; }
         if (k == s->n_per_side - 1 && s->n_per_side >= 5 && team != s->kickoff_team)   /* striker: outside the circle */
-            px = team == 0 ? -FX(3.5) : FX(3.5);
+            px = team == 0 ? -(kickoff_r(s) + FX(0.5)) : kickoff_r(s) + FX(0.5);
         fx stamina = p->stamina;
         memset(p, 0, sizeof *p);
         p->stamina = stamina;
@@ -91,6 +91,23 @@ void match_place_kickoff(SimState *s) {
     s->ball.owner = -1;
     s->ball.last_touch = -1;
     s->events |= WP_EV_RESET;
+}
+
+/* the kick-off as a set piece (D-032): the kicking team's striker stands on the ball and must play it (no dribbling
+ * off); everyone stays in his own half and the other team outside the centre circle until then. Applied after every
+ * goal; the game also calls it for the opening kick-off (sim_init leaves a free ball for tests and drills). */
+void sim_kickoff_setpiece(SimState *s) {
+    int taker = s->kickoff_team * s->n_per_side + s->n_per_side - 1;
+    WpPlayer *tp = &s->players[taker];
+    tp->pos = fv2_make(s->kickoff_team == 0 ? -FX(0.45) : FX(0.45), 0);
+    s->ball.owner = (int8_t)taker;
+    s->ball.last_touch = (int8_t)taker;
+    s->restart_kind = WP_RS_KICKOFF;
+    s->restart_team = s->kickoff_team;
+    s->restart_taker = (int8_t)taker;
+    s->restart_ticks = 0;
+    for (int k = 0; k < WP_MAX_SEATS; k++)                /* a seat on the kicking team takes it */
+        if (s->seat_player[k] >= 0 && s->players[s->seat_player[k]].team == s->kickoff_team) s->seat_player[k] = (int8_t)taker;
 }
 
 void sim_init(SimState *s, const WpMatchConfig *cfg) {
@@ -118,6 +135,7 @@ static void match_flow(SimState *s, const WpInput *in) {
     if (--s->phase_timer) return;
     if (s->phase == WP_PHASE_GOAL) {
         match_place_kickoff(s);
+        sim_kickoff_setpiece(s);
     } else if (s->phase == WP_PHASE_OUT) {
         restart_place(s, in);                             /* throw-in / corner / goal kick (D-029) */
     }
@@ -150,7 +168,7 @@ uint64_t sim_hash(const SimState *s) {
     const WpBall *b = &s->ball;
     fnv_i(&f, b->pos.x); fnv_i(&f, b->pos.y); fnv_i(&f, b->z);
     fnv_i(&f, b->vel.x); fnv_i(&f, b->vel.y); fnv_i(&f, b->vz); fnv_i(&f, b->spin);
-    fnv_i(&f, b->owner); fnv_i(&f, b->last_touch); fnv_i(&f, b->held); fnv_i(&f, b->held_ticks);
+    fnv_i(&f, b->owner); fnv_i(&f, b->last_touch); fnv_i(&f, b->held); fnv_i(&f, b->held_ticks); fnv_i(&f, b->no_hands);
     fnv_i(&f, s->n_per_side); fnv_i(&f, s->phase); fnv_i(&f, s->phase_timer);
     fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->ai_level[0]); fnv_i(&f, s->ai_level[1]);
     fnv_i(&f, s->restart_kind); fnv_i(&f, s->restart_team); fnv_i(&f, s->restart_taker); fnv_i(&f, s->restart_ticks);

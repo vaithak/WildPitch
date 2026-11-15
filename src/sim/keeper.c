@@ -27,7 +27,8 @@ void keeper_step(SimState *s, int i, const WpInput *in) {
     fx reach = fx_mul(T_DIVE_REACH, fx_min(FX_INT(p->action_timer) / T_DIVE_EXTEND, FX_ONE));
     fx u = fx_clamp(fv2_dot(rel, dir), 0, reach);
     fx d = fv2_len(fv2_sub(rel, fv2_scale(dir, u)));
-    if (d > T_DIVE_HANDS) return;
+    if (d > T_DIVE_HANDS || b->no_hands == p->team + 1) return;   /* a back-pass: no hands (D-032) */
+    b->no_hands = 0;
     fx speed = fv2_len(fv2_sub(b->vel, p->vel));
     p->kick.done = 1;
     b->last_touch = (int8_t)i;
@@ -36,7 +37,7 @@ void keeper_step(SimState *s, int i, const WpInput *in) {
         b->vz = 0;
         if (b->z > WP_BAND_FEET_MAX) b->z = WP_BAND_FEET_MAX;
         b->owner = (int8_t)i;
-        if (in_own_box(s, p->team, p->pos)) ball_to_hands(s, i);
+        if (keeper_hands(s, i)) ball_to_hands(s, i);
         b->held_ticks = 0;
         p->touch_cooldown = 0;
         s->events |= WP_EV_TOUCH;

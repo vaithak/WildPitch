@@ -4,7 +4,7 @@
 #include <string.h>
 #include "game/dedication.h"
 
-static void draw_heart(SDL_Renderer *r, float cx, float cy, float size, float a) {
+void wp_draw_heart(SDL_Renderer *r, float cx, float cy, float size, float a) {
     enum { N = 48 };
     SDL_Vertex v[N + 1];
     int idx[N * 3];
@@ -37,7 +37,7 @@ void wp_dedication_draw(SDL_Renderer *r, int w, int h, float t) {
     SDL_SetRenderDrawColor(r, 236, 232, 222, (Uint8)(255.0f * a));
     SDL_RenderDebugText(r, x0, y0, msg);
     SDL_SetRenderScale(r, 1.0f, 1.0f);
-    draw_heart(r, (x0 + len + 6.0f + heart * 0.5f) * sc, (y0 + 4.0f) * sc, heart * sc, a);
+    wp_draw_heart(r, (x0 + len + 6.0f + heart * 0.5f) * sc, (y0 + 4.0f) * sc, heart * sc, a);
 }
 
 bool wp_dedication_run(SDL_Renderer *r) {

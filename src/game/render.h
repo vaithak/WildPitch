@@ -9,12 +9,14 @@
 #include "game/camera.h"
 #include "game/avatar.h"
 #include "game/ball_draw.h"
+#include "game/stadium.h"
 
 /* Render context: presentation-only state that persists across frames. */
 typedef struct {
     SDL_Texture  *soft;                  /* soft disc for antialiased shapes */
     WpAvatarAnim  anim[WP_MAX_PLAYERS];
     WpAvatarLook  look[WP_MAX_PLAYERS];
+    WpStadium     stadium;               /* boards, flags, stands (D-033) */
     WpBallVis     ball;                  /* visual ball orientation (rolls with the drawn motion) */
     uint64_t      look_seed;
     bool          looks_ready;

@@ -118,3 +118,18 @@ Format:
 - **Feedback (verbatim):** "this is really good"
 - **Action:** CP0.3b+ accepted. Next: CP0.3c player stats. Open (no complaint yet): AI shot conversion ~50%, pass
   completion 62%.
+
+## 2026-11-15 — questions + fixes before CP0.3c
+- **Feedback (verbatim):** "put thiese into the stats work of CP0.3c, but before that help me answer some questions and
+  fix somr things: 1. what is the difference in the difficulty levels? 2. create an artifact explaining me the compete
+  system design and main loop, also explain in the artifact how AI works? 3. fix these things: goalkeeper picking up
+  ball when defender pass back should not be allowed, have corner flags, have billboards outside the field area like
+  are generally on actual matches, don't allow players to cross those boards, the board should have banner of the
+  game name with football logo at the end, then on the right corner of each board should be the dedication message in
+  a smaller font"
+- "one more question is the speed of AI opponent more than my player in normal mode?"
+- "also make sure the kickoffs are alternate, and on goal, the other team should take the kickoff (not the one who
+  scored the goal), and kickoff should only be a pass, no possibility of just taking the ball"
+- **Action:** AI conversion / pass completion moved into CP0.3c. Answered difficulty (D-028) and speed (same top
+  speeds; AI sprints freely until stamina in CP0.3c). Explainer artifact: https://claude.ai/artifact/YT1ERDs2HvaMoz3udPpqT6.
+  Back-pass rule + kick-off set piece (D-032); boards, stands, corner flags (D-033).

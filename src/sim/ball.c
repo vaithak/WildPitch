@@ -109,6 +109,7 @@ static void collide_bodies(SimState *s) {
         b->vel = fv2_add(rel, p->vel);
         b->pos = fv2_add(p->pos, fv2_scale(n, r));
         b->last_touch = (int8_t)i;
+        b->no_hands = 0;                                  /* a deflection: the keeper may handle it */
         if (p->touch_cooldown < T_BODY_HIT_COOLDOWN) p->touch_cooldown = T_BODY_HIT_COOLDOWN;
         s->events |= WP_EV_BODY;
     }
@@ -272,6 +273,23 @@ fx ball_lob_speed_for(fx d, fx vz) {
     return hi;
 }
 
+/* the advertising boards (D-033): a ball below their top rebounds softly back toward the pitch */
+static void boards(SimState *s) {
+    WpBall *b = &s->ball;
+    if (b->z >= T_BOARD_H) return;
+    fx bx = s->pitch.length / 2 + T_BOARD_END - T_BALL_R, by = s->pitch.width / 2 + T_BOARD_SIDE - T_BALL_R;
+    if (fx_abs(b->pos.x) > bx && fx_mul(b->vel.x, b->pos.x) > 0) {
+        b->pos.x = b->pos.x > 0 ? bx : -bx;
+        b->vel.x = -fx_mul(b->vel.x, T_BOARD_REST);
+        b->spin = 0;
+    }
+    if (fx_abs(b->pos.y) > by && fx_mul(b->vel.y, b->pos.y) > 0) {
+        b->pos.y = b->pos.y > 0 ? by : -by;
+        b->vel.y = -fx_mul(b->vel.y, T_BOARD_REST);
+        b->spin = 0;
+    }
+}
+
 void ball_step(SimState *s) {
     WpBall *b = &s->ball;
     if (b->held) return;                                  /* in a keeper's hands: carried by control_owner, no physics */
@@ -286,5 +304,6 @@ void ball_step(SimState *s) {
         collide_frame(s);
         collide_bodies(s);
         lines_and_net(s, prev, prev_z, dt);
+        boards(s);
     }
 }

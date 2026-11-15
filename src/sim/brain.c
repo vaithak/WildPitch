@@ -532,7 +532,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         return;
     }
     /* kickoff: the team not kicking off holds its shape until the ball is first touched */
-    if (b->last_touch < 0 && b->owner < 0 && b->pos.x == 0 && b->pos.y == 0 && p->team != s->kickoff_team) {
+    if (s->restart_kind == WP_RS_KICKOFF && p->team != s->restart_team) {
         fv2 at = home_spot(&x, 0);
         p->ai_act = AI_SHAPE;
         p->ai_goal = at;

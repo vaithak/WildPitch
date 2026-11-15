@@ -318,6 +318,7 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     b->spin = p->kick.spin;
     b->owner = -1;
     b->last_touch = (int8_t)i;
+    b->no_hands = p->kick.kind == WP_KICK_HEADER ? 0 : (uint8_t)(p->team + 1);
     p->immune = T_KICK_IMMUNE;
     p->touch_cooldown = 18;
     s->events |= WP_EV_KICK;
@@ -460,6 +461,10 @@ static void control_owner(SimState *s, int i, const WpSeatInput *in) {
         }
         return;
     }
+    if (restart_is_taker(s, i) && p->action == WP_ACT_NONE) {   /* set piece: the ball sits dead on its spot */
+        b->vel = fv2_make(0, 0);
+        return;
+    }
     fv2 d = fv2_sub(b->pos, p->pos);
     fx dist = fv2_len(d);
     int has;
@@ -492,6 +497,7 @@ static void control_owner(SimState *s, int i, const WpSeatInput *in) {
             fv2 nv = fv2_add(p->vel, fv2_clamp_len(rel, T_TRAP_MAX_REL));
             if (fv2_len(fv2_sub(nv, b->vel)) > FX(0.6)) {          /* a visible touch, not just the sole riding it */
                 b->last_touch = (int8_t)i;
+                b->no_hands = (uint8_t)(p->team + 1);
                 s->events |= WP_EV_TOUCH;
             }
             b->vel = nv;
@@ -522,6 +528,7 @@ static void control_owner(SimState *s, int i, const WpSeatInput *in) {
         if (b->vz > 0) b->vz = 0;
         p->touch_cooldown = (uint16_t)gap;
         b->last_touch = (int8_t)i;
+        b->no_hands = (uint8_t)(p->team + 1);
         s->events |= WP_EV_TOUCH;
         return;
     }
@@ -534,7 +541,7 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
     const WpBall *b = &s->ball;
     if (s->phase != WP_PHASE_PLAY || !player_can_control(s, i)) return -1;
     if (b->owner >= 0 || p->touch_cooldown || p->action != WP_ACT_NONE || p->z > 0) return -1;
-    int gk = p->role == WP_ROLE_KEEPER && in_own_box(s, p->team, p->pos);   /* hands only in his own box */
+    int gk = keeper_hands(s, i);                          /* hands: own box, no back-pass (D-032) */
     if (b->z > (gk ? T_KEEPER_HANDS_Z : WP_BAND_BODY_MAX)) return -1;
     /* reach is SWEPT over the coming tick (ball.pos .. ball.pos + vel*dt): a ball passing between ticks counts.
      * The pass's receiver may also stretch beyond clean reach, with a heavier touch. */
@@ -585,7 +592,9 @@ static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const
     b->last_touch = (int8_t)i;
     p->touch_cooldown = 6;
     s->events |= WP_EV_TOUCH;
-    if (p->role == WP_ROLE_KEEPER && in_own_box(s, p->team, p->pos)) {   /* gathered into his hands */
+    int hands = keeper_hands(s, i);
+    b->no_hands = 0;                                      /* controlled: a new deliberate touch sets it again */
+    if (hands) {                                          /* gathered into his hands */
         ball_to_hands(s, i);
         b->held_ticks = 0;
     }
@@ -675,6 +684,11 @@ void players_step(SimState *s, const WpInput *in) {
         move(s, i, &mv[i]);
         WpPlayer *p = &s->players[i];
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
+        {   /* the advertising boards (D-033): nobody walks through them */
+            fx lx = s->pitch.length / 2 + T_BOARD_END - T_BOARD_BODY, ly = s->pitch.width / 2 + T_BOARD_SIDE - T_BOARD_BODY;
+            if (fx_abs(p->pos.x) > lx) { p->pos.x = p->pos.x > 0 ? lx : -lx; p->vel.x = 0; }
+            if (fx_abs(p->pos.y) > ly) { p->pos.y = p->pos.y > 0 ? ly : -ly; p->vel.y = 0; }
+        }
         if (s->ball.held && s->ball.owner == i && p->role == WP_ROLE_KEEPER && !restart_is_taker(s, i))
             p->pos = clamp_own_box(s, p->team, p->pos);   /* can't carry it out of his box */
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);

@@ -4,7 +4,8 @@
  * During the OUT pause everyone repositions; then the ball is placed at the spot and the nearest player of the
  * restart team (the keeper for a goal kick) takes it: he stands still with it (a throw-in from the hands), the other
  * team is held T_RESTART_DIST away until it's played, and control jumps to him if he's a seat's team-mate. The
- * set piece ends when he plays it (or after T_RESTART_MAX). Kick-offs are separate (match_place_kickoff). */
+ * set piece ends when he plays it (or after T_RESTART_MAX). Kick-offs (D-032) are placed by match_place_kickoff and
+ * held here: everyone in his own half, the other team outside the centre circle. */
 #include <string.h>
 #include "sim/sim_internal.h"
 
@@ -49,6 +50,7 @@ void restart_place(SimState *s, const WpInput *in) {
     b->pos = at;
     b->owner = -1;
     b->last_touch = -1;
+    b->no_hands = 0;
     s->pass_target = -1;
     if (taker >= 0) {
         WpPlayer *p = &s->players[taker];
@@ -75,19 +77,28 @@ void restart_place(SimState *s, const WpInput *in) {
 void restart_step(SimState *s) {
     if (!s->restart_kind || s->restart_taker < 0) return;
     WpBall *b = &s->ball;
-    if (b->owner != s->restart_taker || s->phase != WP_PHASE_PLAY || ++s->restart_ticks > T_RESTART_MAX) {
+    int moved = s->restart_kind == WP_RS_KICKOFF && fv2_len(b->pos) > FX(1.0);   /* (tests/drills place the ball) */
+    if (b->owner != s->restart_taker || s->phase != WP_PHASE_PLAY || ++s->restart_ticks > T_RESTART_MAX || moved) {
         s->restart_kind = 0;                              /* played (or abandoned) */
         s->restart_taker = -1;
         return;
     }
-    int other = 1 - s->restart_team;
+    int other = 1 - s->restart_team, ko = s->restart_kind == WP_RS_KICKOFF;
+    if (ko)                                               /* kick-off: everyone in his own half until it's played */
+        for (int j = 0; j < 2 * s->n_per_side; j++) {
+            WpPlayer *q = &s->players[j];
+            if (j == s->restart_taker) continue;
+            if (q->team == 0 && q->pos.x > -FX(0.2)) q->pos.x = -FX(0.2);
+            if (q->team == 1 && q->pos.x < FX(0.2)) q->pos.x = FX(0.2);
+        }
+    fx keep = ko ? kickoff_r(s) : T_RESTART_DIST;
     for (int j = other * s->n_per_side; j < (other + 1) * s->n_per_side; j++) {
         WpPlayer *q = &s->players[j];
         fv2 d = fv2_sub(q->pos, b->pos);
         fx l = fv2_len(d);
-        if (l >= T_RESTART_DIST) continue;
+        if (l >= keep) continue;
         if (l < FX(0.05)) d = fv2_make(0, FX_ONE), l = FX_ONE;
-        q->pos = fv2_add(b->pos, fv2_scale(d, fx_div(T_RESTART_DIST, l)));
+        q->pos = fv2_add(b->pos, fv2_scale(d, fx_div(keep, l)));
     }
 }
 

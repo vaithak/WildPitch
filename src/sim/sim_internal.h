@@ -21,6 +21,7 @@
 void players_step(SimState *s, const WpInput *in);
 void ball_step(SimState *s);
 void match_place_kickoff(SimState *s);
+static inline fx kickoff_r(const SimState *s) { return fx_mul(s->pitch.length, T_KICKOFF_R_FRAC); }   /* centre circle */
 void formation_frac(int n_per_side, int k, fx *fxl, fx *fyl);   /* formation spot (sim.c) */
 
 /* signed shortest difference a - b between binary angles */
@@ -98,10 +99,18 @@ void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSe
 void team_steer_speed(const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed */
 
 /* Is `at` inside `team`'s own penalty area? (depth 15% of the length, half-width 24% of the width; render matches) */
+/* back-pass rule (D-032): a keeper uses his hands only in his own box and not on a ball his team-mate deliberately
+ * kicked or threw to him (headers, chests and deflections are fine) */
+static inline int in_own_box(const SimState *s, int team, fv2 at);
+static inline int keeper_hands(const SimState *s, int i);
 static inline int in_own_box(const SimState *s, int team, fv2 at) {
     fx hl = s->pitch.length / 2, depth = fx_mul(s->pitch.length, FX(0.15)), hw = fx_mul(s->pitch.width, FX(0.24));
     fx x = team == 0 ? at.x : -at.x;
     return x <= -hl + depth && x >= -hl - FX(0.5) && at.y >= -hw && at.y <= hw;
+}
+static inline int keeper_hands(const SimState *s, int i) {
+    const WpPlayer *p = &s->players[i];
+    return p->role == WP_ROLE_KEEPER && in_own_box(s, p->team, p->pos) && s->ball.no_hands != p->team + 1;
 }
 static inline fv2 clamp_own_box(const SimState *s, int team, fv2 at) {
     fx hl = s->pitch.length / 2, depth = fx_mul(s->pitch.length, FX(0.15)), hw = fx_mul(s->pitch.width, FX(0.24));

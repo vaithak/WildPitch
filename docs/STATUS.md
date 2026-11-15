@@ -3,23 +3,25 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3b+ — Team play + bigger pitches (D-030/D-031): ✅ done, owner: "this is really good".**
-Next: **CP0.3c player stats** (own hand-over: it shifts calibrated numbers). Open polish from the team-shape report:
-slot swaps (players exchanging positions on runs), an F3 overlay of plan roles, shape thresholds as CI checks,
-AI shot conversion is high (~45-50% of AI shots score, mostly 1v1s under 10 m; arcade games ~30-40%) - tune the
-keeper / defending after the owner's playtest. `tools/playtest/mirror.c`: first different decision at tick ~240-270
-(fixed-point rounding drift; was tick 1 from the team-staggered plan update, fixed).
+**CP0.3b++ — Back-pass rule, kick-off set piece, boards + flags (D-032/D-033): ✅ done, waiting for the owner's
+playtest.** CP0.3b+ (team play, bigger pitches) was accepted ("this is really good").
+Next: **CP0.3c player stats**, now also covering (owner) AI shot conversion (~45-50%, arcade ~30-40%) and pass
+completion (~63%). Open polish: slot swaps, F3 overlay of plan roles, shape CI thresholds.
+Explainer for the owner (system design, main loop, AI): https://claude.ai/artifact/YT1ERDs2HvaMoz3udPpqT6
 
-### Playtest guide (CP0.3b+)
-1. `./build/wildpitch` — 7v7 on the new 80 × 52 m pitch (5v5: `--5v5`, 60 × 39 m). Is the size right? Zoom with C.
-2. Watch the blue team without the ball: ONE man presses, one covers behind him, the rest hold a block that slides
-   with the ball and stays between it and their goal — no swarm.
-3. When blue wins it: the block stretches (width, a runner, a man showing short), 1–3 stay back.
-4. Your red team-mates do the same: lose the ball and see who presses / who drops; with it, look for the far-side
-   runner and the short option.
-5. Does it feel like football? Too passive / too compact / too stretched? Do teams still score enough?
+### Playtest guide (CP0.3b++)
+1. Kick-off: you can't dribble off - press S (pass) to start; blue waits outside the circle. After a goal the team
+   that conceded kicks off (the HUD says KICK-OFF - RED/BLUE).
+2. Pass back to your keeper with your feet: he plays it with his feet (no pick-up). Head it back: he may pick it up.
+3. Run at the side or end of the pitch: the boards stop you; a rolling ball bounces back off them.
+4. Boards: WILDPITCH + football panels, the dedication at the right-hand end of each board; corner flags at the
+   four corners. Zoom in (C) to read the dedication on the near board.
+5. Still in from CP0.3b+: does the team play feel right on the 80 x 52 m pitch?
 
 ## What works now
+- **D-032/D-033:** back-pass rule (keeper can't handle a team-mate's kicked pass), kick-off = pass-only set piece
+  (own halves, opponents outside the circle), advertising boards players can't cross (ball rebounds), stands,
+  corner flags; boards carry WILDPITCH + football and the dedication. `--boards --screenshot F.bmp`.
 - **Team play (D-030):** both teams play from a team plan: one ball-winner, a cover, capped markers, rest defence,
   near-support and a far-side runner; formation blocks for in/out of possession slide with the ball. AI vs AI 7v7:
   team length ~25 m, ~2 players within 10 m of the ball (was 4 = the swarm), AI vs AI 7v7 (30 × 5 min): goals 58–53, shots
@@ -72,7 +74,7 @@ keeper / defending after the owner's playtest. `tools/playtest/mirror.c`: first 
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (12 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `fd23a2b711d2e5bd`, 7v7 `b5f5025c79a205ee`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+  (golden 5v5 `5e4945c3aa0067a4`, 7v7 `262ed61eac28055a`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

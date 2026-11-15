@@ -177,6 +177,59 @@ int main(void) {
         s.ball.pos = fv2_make(FX(7.0), 0); s.ball.z = FX(1.2); s.ball.vz = 0; s.ball.owner = -1; s.ball.vel = fv2_make(FX(9.0), 0);
         for (int t = 0; t < 30; t++) step1(NOIN);
         CHECKF(!(s.ball.owner == kp && s.ball.held), "keeper held it outside his box");
+        /* back-pass rule (D-032): a team-mate's pass to him in his box is played with the feet, never held; the same
+         * ball after an opponent's deflection may be picked up */
+        for (int defl = 0; defl < 2; defl++) {
+            sim_init(&s, &c7);
+            s.seat_player[0] = -1;
+            for (int j = 0; j < 2 * s.n_per_side; j++) if (j != kp) s.players[j].pos = fv2_make(-FX(20.0) + FX_INT(j), FX(15.0));
+            s.players[kp].pos = fv2_make((s.pitch.length / 2) - FX(2.0), 0);
+            s.ball.pos = fv2_make((s.pitch.length / 2) - FX(12.0), FX(1.0)); s.ball.owner = -1; s.ball.vel = fv2_make(FX(7.0), 0);
+            s.ball.last_touch = (int8_t)(kp + 1);
+            s.ball.no_hands = defl ? 0 : (uint8_t)(s.players[kp].team + 1);
+            int got = 0, held = 0;
+            for (int t = 0; t < 120; t++) { step1(NOIN); if (s.ball.owner == kp) got = 1; if (s.ball.held) held = 1; }
+            printf("back-pass %s: keeper got it %d, held %d\n", defl ? "(deflected)" : "(team-mate kick)", got, held);
+            CHECKF(got, "keeper didn't take the ball");
+            CHECKF(held == defl, "back-pass hands rule: held %d", held);
+        }
+    }
+    /* 7b. kick-off (D-032): a set piece - the taker can't dribble off, everyone in his own half, the other team out
+     *     of the centre circle; it ends with a kick. After a goal the team that conceded kicks off. */
+    {
+        WpMatchConfig c7 = sim_config_7v7();
+        sim_init(&s, &c7);
+        sim_kickoff_setpiece(&s);
+        int tk = s.restart_taker;
+        CHECK(s.restart_kind == WP_RS_KICKOFF && tk == s.seat_player[0] && s.ball.owner == tk && s.players[tk].team == 0);
+        fv2 p0 = s.players[tk].pos;
+        int bad_half = 0; fx closest = FX(99.0);
+        for (int t = 0; t < 120; t++) {                      /* push the stick forward and sprint: no dribbling off */
+            step1((WpSeatInput){127, 0, WP_BTN_SPRINT});
+            for (int j = 0; j < 2 * s.n_per_side; j++) {
+                if (j == tk) continue;
+                if ((s.players[j].team == 0) != (s.players[j].pos.x < 0)) bad_half++;
+                if (s.players[j].team == 1) { fx d = fv2_len(s.players[j].pos); if (d < closest) closest = d; }
+            }
+        }
+        printf("kick-off: taker moved %.2f m, ball at (%.2f, %.2f) owner %d, wrong-half samples %d, nearest blue %.1f m\n",
+               tod(fv2_len(fv2_sub(s.players[tk].pos, p0))), tod(s.ball.pos.x), tod(s.ball.pos.y), s.ball.owner, bad_half, tod(closest));
+        CHECK(s.ball.owner == tk && fv2_len(s.ball.pos) < FX(0.6) && fv2_len(fv2_sub(s.players[tk].pos, p0)) < FX(0.05));
+        CHECK(bad_half == 0);
+        CHECKF(closest >= kickoff_r(&s) - FX(0.1), "blue %.1f m from the ball", tod(closest));
+        uint16_t ev = 0;
+        for (int t = 0; t < 30 && !(ev & WP_EV_KICK); t++) ev = step1((WpSeatInput){0, 127, t < 5 ? WP_BTN_PASS : 0});
+        CHECK((ev & WP_EV_KICK) && s.restart_kind == 0);
+        /* AI kick-off for blue after we score: blue's striker plays it within ~1.5 s */
+        sim_init(&s, &c7);
+        s.seat_player[0] = -1;
+        s.kickoff_team = 1;
+        match_place_kickoff(&s);
+        sim_kickoff_setpiece(&s);
+        int kicked = -1;
+        for (int t = 0; t < 180 && kicked < 0; t++) if (step1(NOIN) & WP_EV_KICK) kicked = t;
+        printf("  blue AI kick-off played after %d ticks by team %d\n", kicked, s.players[s.ball.last_touch].team);
+        CHECK(kicked >= 0 && kicked < 100 && s.players[s.ball.last_touch].team == 1);
     }
     /* 8. restarts (D-029, 7v7) */
     {

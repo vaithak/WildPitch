@@ -50,8 +50,9 @@ static void line3(SDL_Renderer *r, const WpCamera *c, float x0, float y0, float 
 
 static void draw_pitch(SDL_Renderer *r, const WpCamera *c, const WpPitch *p) {
     float hl = tof(p->length) / 2, hw = tof(p->width) / 2;
-    /* surround */
-    quad(r, c, -hl - 6, -hw - 6, hl + 6, hw + 6, (SDL_FColor){0.16f, 0.36f, 0.18f, 1});
+    /* grass out to the advertising boards (D-033) */
+    quad(r, c, -hl - tof(T_BOARD_END), -hw - tof(T_BOARD_SIDE), hl + tof(T_BOARD_END), hw + tof(T_BOARD_SIDE),
+         (SDL_FColor){0.16f, 0.36f, 0.18f, 1});
     /* mown stripes */
     int stripes = 10;
     for (int i = 0; i < stripes; i++) {
@@ -64,7 +65,7 @@ static void draw_pitch(SDL_Renderer *r, const WpCamera *c, const WpPitch *p) {
     line3(r, c, -hl, -hw, 0, -hl, hw, 0); line3(r, c, hl, -hw, 0, hl, hw, 0);
     line3(r, c, 0, -hw, 0, 0, hw, 0);
     /* centre circle + penalty areas */
-    float cr = hl * 0.15f;                                /* 3 m on the 40 m pitch, scales with the format */
+    float cr = tof(p->length) * tof(T_KICKOFF_R_FRAC);    /* the sim's kick-off circle (9.15/105 of the length) */
     for (int i = 0; i < 32; i++) {
         float a0 = (float)i * 6.2831853f / 32, a1 = (float)(i + 1) * 6.2831853f / 32;
         line3(r, c, cosf(a0) * cr, sinf(a0) * cr, 0, cosf(a1) * cr, sinf(a1) * cr, 0);
@@ -158,7 +159,9 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
     }
     const WpAvatarStyle *style = &wp_avatar_styles[ctx->style];
 
+    wp_stadium_draw_ground(r, cam, &cur->pitch);
     draw_pitch(r, cam, &cur->pitch);
+    wp_stadium_draw_back(r, &ctx->stadium, cam, &cur->pitch, ctx->time);
     draw_goal(r, cam, &cur->pitch, -1);
 
     DrawItem items[WP_MAX_PLAYERS + 1];
@@ -265,4 +268,5 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
         }
     }
     draw_goal(r, cam, &cur->pitch, 1);
+    wp_stadium_draw_front(r, &ctx->stadium, cam, &cur->pitch, ctx->time);
 }

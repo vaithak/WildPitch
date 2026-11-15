@@ -54,6 +54,7 @@ typedef struct {
     int8_t owner;                /* player index dribbling it, or -1 */
     int8_t last_touch;           /* player index, or -1 */
     uint8_t held;                /* 1 = in the owner's (keeper's) hands: carried at chest height, can't be tackled */
+    uint8_t no_hands;            /* back-pass rule: team+1 whose keeper may not handle it (a team-mate kicked/threw it), 0 */
     uint16_t held_ticks;         /* how long he has held it (release limit) */
 } WpBall;
 
@@ -139,7 +140,7 @@ enum {
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };
 enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };
-enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK };
+enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK, WP_RS_KICKOFF };
 
 /* Team plan (D-030): computed once per tick for both teams before anyone decides - a shared observation that says
  * who goes for the ball, who covers, who marks whom, who stays back - so the brain stops swarming the ball. */
@@ -219,6 +220,7 @@ void     sim_player_jump(SimState *s, int i, uint8_t action);
 /* Start a kick action with explicit parameters (used by AI later, tests and --demo). No-op if busy. */
 void     sim_player_kick(SimState *s, int i, const WpKick *k);
 void     sim_init(SimState *s, const WpMatchConfig *cfg);
+void     sim_kickoff_setpiece(SimState *s);   /* opening kick-off as a set piece (D-032; goals do it themselves) */
 void     sim_step(SimState *s, const WpInput *in);
 uint64_t sim_hash(const SimState *s);   /* field-wise FNV-1a; independent of struct padding */
 

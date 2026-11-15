@@ -122,6 +122,7 @@ void header_contact(SimState *s, int i, const WpSeatInput *in) {
     b->spin = 0;
     b->owner = -1;
     b->last_touch = (int8_t)i;
+    b->no_hands = 0;                                      /* headers back to the keeper are allowed */
     p->immune = T_KICK_IMMUNE;
     p->touch_cooldown = 18;
     p->kick.dir = dir;

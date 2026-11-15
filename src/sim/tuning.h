@@ -32,6 +32,13 @@
 #define T_GOAL_PAUSE_TICKS 120        /* celebration before kickoff reset */
 #define T_OUT_PAUSE_TICKS  45         /* pause before a throw-in / corner / goal kick is set (players reposition) */
 #define T_RESTART_DIST     FX(4.0)    /* opponents keep this far from a set piece until it's played */
+/* advertising boards around the pitch (owner request, D-033): players can't cross them, a low ball rebounds */
+#define T_BOARD_SIDE       FX(3.0)    /* boards this far outside the touchlines ... */
+#define T_BOARD_END        FX(4.5)    /* ... and behind the goal lines (room for the nets) */
+#define T_BOARD_H          FX(0.9)    /* board height: a ball below it rebounds */
+#define T_BOARD_REST       FX(0.3)    /* rebound speed kept */
+#define T_BOARD_BODY       FX(0.35)   /* players stay this far inside the boards */
+#define T_KICKOFF_R_FRAC   FX(0.0871) /* centre-circle radius / pitch length (9.15 / 105, a real pitch) */
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */
 #define T_AI_RESTART_DELAY 40         /* AI takers line it up this long first ... */

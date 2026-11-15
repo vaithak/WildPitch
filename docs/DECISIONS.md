@@ -350,3 +350,25 @@ fields". Real pitch 105 × 68 = 1.544. **7v7: 80 × 52 m** (was 55 × 35), goal 
 of AI shots score). Boxes, circle and markings scale with the pitch; zoom view scales with length. The 40 × 25
 `sim_default_config` stays ONLY as the regression/harness pitch (5v5 golden, scripted tests); test_ai_match now
 plays the real game formats. AI shooting range 22 m, cross zone 16 m, shot utility re-weighted for the longer field.
+
+## D-032 — Back-pass rule; the kick-off is a pass-only set piece (2026-11-15, owner request)
+- **Back-pass:** `WpBall.no_hands` (= team+1, hashed; fits the struct's padding) is set when a player kicks the ball
+  with his feet or throws it in (and on his dribble touches), and cleared by a header, a body deflection, a tackle,
+  anyone controlling it, or a restart. A keeper (`keeper_hands()`) uses his hands only in his own box AND when
+  `no_hands` isn't his team's: a team-mate's deliberate pass is played with the feet (no catch, no dive save).
+  Headers / chests / deflections back to him may be picked up, as in Law 12.
+- **Kick-off:** after every goal (and, in the game, at the start) `sim_kickoff_setpiece()` makes it a set piece
+  (`WP_RS_KICKOFF`): the kicking team's striker stands on the ball (it's dead, can't be dribbled), every player stays
+  in his own half and the other team outside the centre circle (radius 9.15/105 of the pitch length, drawn the same)
+  until it's played; control jumps to the taker if his team has a seat; the AI taker passes after ~0.7 s. The team
+  that conceded kicks off (unchanged). `sim_init` keeps a free ball for tests/drills. Halves (CP0.4) will alternate
+  the opening kick-off.
+
+## D-033 — Advertising boards, stands, corner flags (2026-11-15, owner request)
+Boards stand 3 m outside the touchlines and 4.5 m behind the goal lines (room for the nets), 0.9 m tall
+(`T_BOARD_*`). In the sim players are clamped inside them and a ball below their top rebounds (30% speed kept); a
+higher ball flies over. `src/game/stadium.c` draws the stands' concourse, the boards and four corner flags (flags
+blow outward). Each board is panels of "WILDPITCH" + a football logo, and at its right-hand end (as seen from the
+pitch) the owner's dedication, two lines in a smaller font with the red heart: the exact D-018 words. Board faces
+are two textures made once with the debug font (no new dependency); `--boards --screenshot F.bmp` captures them.
+At the wide zoom the far boards are small; the dedication reads best on the near board and at closer zooms.

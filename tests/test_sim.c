@@ -2,6 +2,7 @@
 #include <string.h>
 #include "test_util.h"
 #include "sim/sim.h"
+#include "sim/tuning.h"
 
 static void steps(SimState *s, WpSeatInput in, int n) {
     WpInput all; memset(&all, 0, sizeof all); all.seat[0] = in;
@@ -18,8 +19,9 @@ int main(void) {
     int me = s.seat_player[0];
     CHECK(me >= 0);
     for (int i = 0; i < 2 * s.n_per_side; i++)            /* isolate: no ball at the feet, nobody to switch to */
-        if (i != me) s.players[i].pos = fv2_make(FX_INT(i - 10), FX(60.0));
+        if (i != me) s.players[i].pos = fv2_make(FX_INT(i * 3 + 5), -FX(15.0))   /* by the far boards (D-033), away from the ball */;
     s.ball.pos = fv2_make(-FX(15.0), FX(10.0));
+    s.players[me].pos = fv2_make(-FX(22.0), -FX(3.0));      /* room for a 4 s run before the boards (D-033) */
     fx x0 = s.players[me].pos.x, y0 = s.players[me].pos.y;
     steps(&s, (WpSeatInput){127, 0, 0}, 120);
     CHECK(s.players[me].pos.x > x0 + FX(5.0));
@@ -73,5 +75,23 @@ int main(void) {
     CHECK(s.ball.vel.x == 0 && s.ball.vel.y == 0);   /* at rest after 20 s */
     CHECK(s.ball.pos.x > FX(10.0));                   /* travelled forward */
     /* first-flight peak should be physically plausible: v^2/2g = 64/19.6 ~ 3.26 m */
+    /* advertising boards (D-033): a player can't run through them; a low ball rebounds off them, a high one clears */
+    sim_init(&s, &cfg);
+    s.flags |= WP_SIMF_STATIC_OTHERS;
+    me = s.seat_player[0];
+    for (int i = 0; i < 2 * s.n_per_side; i++) if (i != me) s.players[i].pos = fv2_make(FX_INT(i * 3 - 15), -FX(14.0));
+    s.ball.pos = fv2_make(-FX(18.0), FX(12.0));          /* nearest to me: no auto-switch */
+    s.players[me].pos = fv2_make(0, FX(10.0));
+    steps(&s, (WpSeatInput){0, 127, WP_BTN_SPRINT}, 180);
+    fx ylim = s.pitch.width / 2 + T_BOARD_SIDE - T_BOARD_BODY;
+    CHECKF(s.players[me].pos.y <= ylim && s.players[me].pos.y > ylim - FX(0.2), "player at y %.2f (boards %.2f)",
+           (double)s.players[me].pos.y / 65536.0, (double)ylim / 65536.0);
+    sim_init(&s, &cfg);
+    s.flags |= WP_SIMF_STATIC_OTHERS;
+    for (int i = 0; i < 2 * s.n_per_side; i++) s.players[i].pos = fv2_make(FX_INT(i * 3 - 15), -FX(14.0));
+    s.ball.pos = fv2_make(0, FX(11.0)); s.ball.vel = fv2_make(0, FX(8.0));
+    steps(&s, (WpSeatInput){0, 0, 0}, 120);
+    CHECKF(s.ball.pos.y < s.pitch.width / 2 + T_BOARD_SIDE && s.ball.vel.y <= 0, "ball through the boards: y %.2f",
+           (double)s.ball.pos.y / 65536.0);
     return TEST_DONE();
 }

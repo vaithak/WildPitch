@@ -49,5 +49,6 @@ void tackle_step(SimState *s, int i) {
     b->spin = 0;
     b->owner = -1;
     b->last_touch = (int8_t)i;
+    b->no_hands = 0;
     s->events |= WP_EV_TOUCH;
 }

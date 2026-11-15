@@ -38,7 +38,7 @@ Golden hash changes are only OK when sim behaviour changed on purpose:
 - **AI = candidate actions × utility scores** (DECISIONS D-008) — this is where learned brains plug in later.
 - **Runs cool:** the frame loop must never busy-wait; menus redraw only on change. Measure, don't guess.
 - **Dedication (D-018):** "In the memory of my brother Shubham Thakkar ❤️" — the owner's exact words. Keep the
-  launch card, README line and (later) title/credits line; never edit the wording, never remove it.
+  launch card, README line, the right-hand end of every pitch-side board (D-033) and (later) title/credits line; never edit the wording, never remove it.
 - No new third-party dependencies without asking the owner. No licensed names/likenesses; football only.
 - Code is C17, warnings-clean (`-Wall -Wextra -Wconversion -Wshadow`).
 - **Keep it modular without costing efficiency** (owner request): one responsibility per file (see

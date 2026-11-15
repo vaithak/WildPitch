@@ -30,6 +30,8 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
                         WpSeatInput; replaced by the CP0.3 instinct AI. SimState.flags WP_SIMF_STATIC_OTHERS = statues
 src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   main.c                window, input -> WpInput, fixed-step loop, camera, HUD, flags (--demo --gallery
+  stadium.c             stands, advertising boards (WILDPITCH + football, dedication at each board's right end), corner
+                        flags (D-033); board positions from tuning.h T_BOARD_* (the sim's walls)
                         --style --zoom --screenshot --frames), retro low-res render target, 60 fps vsync pacing
   camera.h              WpCamera + wp_project (tilted 2.5D projection)
   render.h/.c           WpRenderCtx (presentation state), pitch/goals/shadows, depth sort, sim -> avatar pose adapter
