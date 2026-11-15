@@ -3,11 +3,19 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3b++ — Back-pass rule, kick-off set piece, boards + flags (D-032/D-033): ✅ done, waiting for the owner's
-playtest.** CP0.3b+ (team play, bigger pitches) was accepted ("this is really good").
-Next: **CP0.3c player stats**, now also covering (owner) AI shot conversion (~45-50%, arcade ~30-40%) and pass
-completion (~63%). Open polish: slot swaps, F3 overlay of plan roles, shape CI thresholds.
-Explainer for the owner (system design, main loop, AI): https://claude.ai/artifact/YT1ERDs2HvaMoz3udPpqT6
+**CP0.3c — Player stats: 🚧 in progress** (CP0.3b++ committed 492bbc1, awaiting playtest).
+Plan (advisor-reviewed): (1) baseline ✅ (below); (2) plumbing with ALL configs neutral - `WpStats` in SimState
+(not wiped by kick-offs), one top-speed helper at every speed assumption - both goldens must stay unchanged; commit;
+(3) effects one at a time (pace, stamina + stamina-aware AI, control, AI passing/shooting scatter, tackling,
+keeping) - no random scatter on the HUMAN's passes/shots without asking the owner (D-021); update the 7v7 golden on
+purpose; (4) tune completion/conversion in mirrored mode vs the baseline; HUD stamina + stats; mirror.c swaps stats;
+D-020 reception cases re-run with slow/fast/tired receivers.
+**Baseline at 492bbc1** (`tools/playtest/passfail.c`, `goals.c`, 12 x 3 min, no jitter):
+- 7v7 passes: <10 m 83% complete, 10-20 m 66% (24% cut out in flight), >20 m 28% (61% cut out) - all 61%.
+  5v5: 83% / 65% / 7% (75% cut out) - all 69%. => completion is pass SELECTION (long balls through traffic).
+- 7v7 shots 46: 28 goals (61%); 17 with nobody within 3 m => conversion is mostly defending, not keeper stats.
+- 5v5 leans to team 0 with no jitter: goals 23-10, shots 54-34, tackles 42-76 (also seen in 4 earlier runs) -
+  pre-existing, not caused by stats.
 
 ### Playtest guide (CP0.3b++)
 1. Kick-off: you can't dribble off - press S (pass) to start; blue waits outside the circle. After a goal the team
