@@ -65,6 +65,6 @@ int main(void) {
                 for (int y = 4; y >= -4; y -= 4)
                     for (int x = 10; x <= 16; x += 3) { n2++; g2 += shoot(x, y, dirs[d][0], dirs[d][1], c ? 36 : 18, jog, 0) == 'G'; }
     printf("natural shots, LIVE (CP0.3: real keeper + defending AI): %d/%d goals (%.0f%%)\n", g2, n2, 100.0 * g2 / n2);
-    CHECKF(g2 * 100 >= n2 * 15, "live scoring collapsed");   /* 22% with the CP0.3 keeper + defenders */
+    CHECKF(g2 * 100 >= n2 * 30, "live scoring collapsed");   /* 40% with the CP0.3a keeper + defenders */
     return TEST_DONE();
 }

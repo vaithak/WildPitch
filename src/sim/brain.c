@@ -325,15 +325,23 @@ static void keeper(Ctx *x, WpSeatInput *out) {
     fv2 at = fv2_add(g, fv2_scale(fv2_norm(to_ball), out_d));
     fx gw = s->pitch.goal_width / 2;
     at.y = clampf(at.y, -gw, gw);
-    /* a shot coming: get across to where it will cross my line */
+    /* a shot coming: after reacting (T_KEEPER_REACT), shuffle across to where it will cross my line */
     fx vin = -b->vel.x * x->sg;                           /* speed toward my goal */
+    fx cap = T_SPRINT_SPEED;
+    int shot = 0;
     if (b->owner < 0 && vin > FX(4.0)) {
         fx t = fx_div(fx_abs(b->pos.x - p->pos.x), vin);
         fx cy = b->pos.y + fx_mul(b->vel.y, t);
-        if (t < FX(1.5) && fx_abs(cy) < gw + FX(1.0)) at = fv2_make(p->pos.x, clampf(cy, -gw - FX(0.5), gw + FX(0.5)));
+        if (t < FX(1.5) && fx_abs(cy) < gw + FX(1.0)) {
+            shot = 1;
+            if (p->ai_wait < T_KEEPER_REACT) { p->ai_wait++; at = p->ai_goal; }        /* still reading it */
+            else at = fv2_make(p->pos.x, clampf(cy, -gw - FX(0.5), gw + FX(0.5)));
+            cap = T_KEEPER_SHUFFLE;
+        }
     }
-    /* a loose ball in front of me that I get to first: come and take it */
-    if (b->owner < 0 && db < FX(7.0) && ball_rank(x) >= 0) {
+    if (!shot) p->ai_wait = 0;
+    /* a loose, slow ball in front of me that I get to first: come and take it (never to cut out a shot) */
+    if (!shot && b->owner < 0 && db < FX(7.0) && fv2_len(b->vel) < T_KEEPER_RUSH_V) {
         Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
         fx mine = m.found ? m.t : FX(9.0), theirs = FX(9.0);
         int o0 = (1 - x->team) * s->n_per_side;
@@ -346,7 +354,7 @@ static void keeper(Ctx *x, WpSeatInput *out) {
     p->ai_act = AI_KEEP;
     p->ai_goal = at;
     fx d = dist(at, p->pos);
-    team_steer_speed(p, at, fx_min(fx_mul(d, FX(5.0)), T_SPRINT_SPEED), out);
+    team_steer_speed(p, at, fx_min(fx_mul(d, FX(5.0)), cap), out);
 }
 
 void brain_input(SimState *s, int i, WpSeatInput *out) {

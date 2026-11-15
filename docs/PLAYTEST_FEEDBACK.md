@@ -89,3 +89,5 @@ Format:
   following as default: arrow keys for movement, e for spring, s for pass, d for shoot, a for lobs, c for zoom change"
 - **Action:** keymap module + Esc pause menu with a Controls screen (rebind, reset), saved to the user pref dir.
   Defaults as asked ("spring" read as sprint); chip W, switch Q, look P (my picks, rebindable).
+- **Feedback (verbatim):** "now the shoot is getting intercepted in between"
+- **Action:** measure live shot outcomes (goal / keeper / body block / defender control / wide), fix the cause.

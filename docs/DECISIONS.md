@@ -249,7 +249,11 @@ Passing vs AI (owner: "passes very slow, intercepted almost every time"; measure
 intercepted, 22% even with clear lanes, launch 10 m/s): tap arrival 8 + 0.3/m (max 12; was 5.5 + 0.25, max 9,
 amends D-020), AI defenders react to a struck pass after 0.2 s, cutting out the other team's pass needs the ball
 within 0.8 m (the receiver keeps 1.0). Now 20% intercepted (6% with clear lanes), launch 12.9 m/s; AI-vs-AI pass
-completion 60% → 77%. Not yet (CP0.3b): player
+completion 60% → 77%.
+Shots vs the keeper (owner: "the shoot is getting intercepted in between"; measured: keeper took 77% of live shots,
+running out to cut shots off and reacting instantly): keepers come out only for balls < 8 m/s, react to a shot
+after 0.2 s and shuffle across at ≤ 5 m/s (dives: CP0.3b), catch ≤ 16 m/s within 1.0 m, body-block radius 0.36
+(was 0.48). Live natural shots now score 40% (was 20%); vs a statue keeper 53%. Not yet (CP0.3b): player
 stats, AI aerial duels, keeper dives/poses/hands, difficulty, AI set pieces.
 
 ## D-024 — Rebindable controls + pause menu (2026-11-15, owner request)

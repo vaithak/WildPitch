@@ -43,7 +43,7 @@
 #define T_TURN_DEG_S_BALL  540
 #define T_TURN_DEG_S_SPRINT 420
 #define T_BODY_R           FX(0.30)   /* body blocking radius */
-#define T_KEEPER_BODY_R    FX(0.48)
+#define T_KEEPER_BODY_R    FX(0.36)
 #define T_BODY_H           FX(1.80)
 #define T_BODY_REST        FX(0.30)
 
@@ -145,9 +145,12 @@
 #define T_AI_TACKLE_SHIELD FX(0.3)    /* ... or (carrier slow < 2 m/s, holding it) this far */
 #define T_AI_PASS_REACT    12         /* AI defenders react to a pass being struck after this many ticks (0.2 s) */
 #define T_INTERCEPT_REACH  FX(0.8)    /* cutting out someone else's pass needs the ball this close (the receiver: 1.0) */
-#define T_KEEPER_REACH     FX(1.3)    /* keepers take a loose ball within this (hands) ... */
+#define T_KEEPER_REACH     FX(1.0)    /* keepers take a loose ball within this (hands) ... */
 #define T_KEEPER_HANDS_Z   FX(1.45)   /* ... up to this high (body height until CP0.3b adds hands: higher = parry) ... */
-#define T_KEEPER_CATCH_REL FX(22.0)   /* ... arriving at up to this speed (faster: it beats/bounces off him) */
+#define T_KEEPER_CATCH_REL FX(16.0)   /* ... arriving at up to this speed (faster: it beats/bounces off him) */
+#define T_KEEPER_REACT     12         /* a keeper reacts to a shot 0.2 s after it is struck ... */
+#define T_KEEPER_SHUFFLE   FX(5.0)    /* ... and shuffles across his line at most this fast (dives: CP0.3b) */
+#define T_KEEPER_RUSH_V    FX(8.0)    /* he only comes out for loose balls slower than this (never to cut out a shot) */
 
 /* ---- kicks ---- */
 #define T_CHARGE_MAX_TICKS 36         /* full power after 0.6 s */
