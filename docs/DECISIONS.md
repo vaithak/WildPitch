@@ -6,7 +6,10 @@ Never delete entries; supersede them with a new entry.
 **D-001 · 2026-11-14 · Language: C17** (owner). Plain C17, no engine. Matches design doc recommendation.
 
 **D-002 · 2026-11-14 · Team size: 5v5 first, then 7v7 default, 11v11 later for cups** (owner).
-The sim supports N players per side from the start (compile-time max 11).
+The sim supports N players per side from the start (compile-time max 11). Pitch size/goal size are per-match
+config (`WpMatchConfig.pitch`), verified headless with 11v11 on 105×68 m. Still 5v5-specific (to generalise when
+formats arrive): kickoff formation table (players 6–11 use a placeholder spread), pitch markings in render.c
+(fixed 6 m box, 3 m circle), camera zoom presets in metres (main.c).
 
 **D-003 · 2026-11-14 · Art: tilted 2.5D "tabletop"** (owner). Mild perspective tilt; ball height shown by
 lift above a ground shadow.
@@ -47,6 +50,24 @@ the air triggers `WP_ACT_JUMP_HEADER` (or `WP_ACT_STAND_HEADER` at head height).
 + jump height — never by 2D distance alone (a ball flying overhead must not be "controlled"). Delivery plan:
 jump physics + avatar poses now (CP0.0b); contact bands in CP0.1 dribble/kick code; playable headers from lofted
 passes/crosses in CP0.2; AI aerial duels CP0.3; corners CP0.4. Owner may still ask for a dedicated jump button.
+
+**D-011 · 2026-11-14 · Look = Modern, default zoom = wide, headers = contextual (no jump button)** (owner).
+Arcade/Retro stay selectable with P (may become a player setting).
+
+**D-012 · 2026-11-14 · Moves are parametric, data-described actions; bodies stay kinematic** (Claude, from owner's
+question about bicycle kicks / rabonas / "Messi + Neymar" styles). Three separable layers:
+1. *What a move does* (sim, deterministic): an action type + small parameter vector (e.g. kick: foot L/R,
+   behind-standing-leg flag, contact height band, swing direction, power, spin) + integer timing metadata
+   (wind-up ticks, contact window, recovery ticks, airborne?). A rabona or bicycle kick is a new action
+   entry/region of parameter space, not new engine code paths.
+2. *Which move, when* (decision layer, D-008): instinct utility + learned per-player brain score candidate
+   (action, params). "Style" (close control, flair, risk appetite) lives here and is what training changes.
+3. *How it looks* (presentation): pose keyframes per action (code now; data-driven move library later),
+   timed by the same metadata so the visual contact frame matches the sim's.
+Player bodies are NOT physically simulated (no ragdoll/muscle RL): orders of magnitude more compute, breaks
+"runs cool" and one-core deterministic training. Emergent techniques = new sequences/parameter combos of
+primitives (design doc layer 5). New body state (e.g. body pitch for overhead kicks/dives) is added as sim fields
+when a move needs it. Applies from CP0.1: kicks are implemented as parameterised actions, not hard-coded shot/pass types.
 
 ## Open (owner to decide later)
 - Name: keep WILDPITCH? (working title in use)

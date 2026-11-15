@@ -17,3 +17,9 @@ Format:
 - **Action:** CP0.0b "Human avatars" inserted before CP0.1 — procedural 3D-skeleton players (D-009), presets to
   compare by eye, pose gallery + demo mode. Headers: jump state added to the sim now (D-010); playable header
   in CP0.2, AI aerial duels CP0.3, corners CP0.4.
+
+## CP0.0b — 2026-11-14
+- **Feedback:** "modern look, wide zoom, contextual headers fine." Asked whether the architecture supports (1) bigger /
+  per-format pitch sizes and (2) future training of flair moves (bicycle kicks, rabonas, "Messi + Neymar" style).
+- **Action:** defaults set (D-011). (1) answered: pitch is config; formations/markings/camera to be made format-aware
+  (D-002 note). (2) answered with walkthrough; committed to parametric moves (D-012) starting CP0.1.

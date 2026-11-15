@@ -3,9 +3,9 @@
 _Last updated: 2026-11-14 by Claude session #1_
 
 ## Current checkpoint
-**CP0.0b — Human avatars: ✅ done** (inserted after owner feedback on CP0.0). Waiting for the owner to:
-(1) pick an avatar look preset, (2) pick a default camera zoom, (3) OK contextual headers (D-010),
-(4) give the go-ahead for **CP0.1 "Ball on grass"**.
+**CP0.0b — Human avatars: ✅ done.** Owner chose Modern look, wide zoom, contextual headers (D-011, defaults set).
+Owner asked architecture questions (pitch sizes, flair-move training) → answered; D-012 (parametric moves).
+Waiting for the owner's explicit go-ahead for **CP0.1 "Ball on grass"**.
 
 ## What works now
 - Build: CMake + Ninja, SDL 3.4.8 vendored and statically linked.
@@ -22,9 +22,8 @@ _Last updated: 2026-11-14 by Claude session #1_
   `test_determinism` (golden `632e624d8c1b6fc0`; script now includes jumps); `tools/check_determinism.sh` identical across gcc/clang × -O0/-O2.
 
 ## Next step (exact)
-1. Record the owner's answers (look preset → `WpRenderCtx.style` default in `main.c`; zoom → `start_zoom`;
-   header decision) in DECISIONS/PLAYTEST_FEEDBACK.
-2. Start CP0.1 per `docs/ROADMAP.md`: split ball physics into `src/sim/ball.c` (+ spin/curl); possession/dribble
+1. (done) owner's look/zoom/header answers recorded.
+2. Start CP0.1 (kicks as parametric actions per D-012) per `docs/ROADMAP.md`: split ball physics into `src/sim/ball.c` (+ spin/curl); possession/dribble
    with **height-band contact** (D-010); turn rate in the sim; shoot (charge) + chip; goal detection with
    posts/crossbar/net; score + kickoff reset; HUD power bar; F3 ball speed/height. Avatar: dribble-touch pose.
 3. Tests: kicked-ball ranges, goal detection, overhead ball not controllable; update golden; playtest guide; commit.

@@ -34,6 +34,8 @@ Not playable; invisible plumbing every later CP depends on.
 - Tilted tabletop camera that follows play; pitch markings, goals with nets, shadows.
 - Ball physics in 3D (x, y, height): gravity, bounce with energy loss, rolling friction, air drag,
   spin/curl hook (basic).
+- Kicks as **parametric actions** (D-012): foot, contact band, swing direction, power, spin + tick timings shared
+  by sim and avatar pose.
 - Controlled player: accelerate/turn with momentum, **dribble** (ball kept at feet with small touches),
   **sprint**, **shoot** (hold to charge power; release), **chip** (modifier).
 - Goal detection (ball fully over line, under bar) → score + reset to kickoff.
@@ -80,6 +82,10 @@ Not playable; invisible plumbing every later CP depends on.
 - Title screen + quick match setup. **Gate 1 playtest with others.**
 
 ---
+
+### Format support (whenever 7v7/11v11 arrive; likely early Phase 1) ⚪
+Formation tables per format, pitch markings scaled from pitch config, camera framing from pitch size,
+pitch/goal presets per format (5v5 40×25, 7v7 ~55×35, 11v11 105×68).
 
 ## Phase 1 — LEARN ⚪ (gate: after a week of a pressing drill, testers see the squad press differently, untold)
 Rough order (will be re-planned after Gate 1):

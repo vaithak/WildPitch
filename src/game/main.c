@@ -155,7 +155,7 @@ static void apply_vsync(Game *g) {
 
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
-    int shot_frame = 60, start_style = 0, start_zoom = 1;
+    int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
     bool gallery = false, demo = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
