@@ -216,3 +216,15 @@ Measured (`tools/playtest/sel.c`, opposition on, settle 60/300): keyboard pick r
 taps out of play 77 → 11.8/12.0%; stick at a mate's visible bearing → him 83.7 → 90.8/93.7%; keeper bearings
 reachable 100%. CP0.3: the striker's forward key still finds nobody (team.c puts no one ahead of him); AI pass choice
 (forwardness + interception race) will reuse the lane function.
+
+## D-022 — Possession rules for a match with AI players (2026-11-15, CP0.3a)
+- **Anyone can win the ball** (AI included); with `WP_SIMF_STATIC_OTHERS` non-seat players stay statues (and
+  ghosts for body contact) so isolation tests keep their meaning.
+- **Contested loose ball:** the eligible player with the smallest swept distance wins (not the lowest index).
+- **Possession is owner-only:** a dribbled ball is blocked by other bodies; nobody can kick a ball someone else owns —
+  you **tackle** it: J pressed while an opponent has the ball within 1.6 m = lunge (+3 m/s toward the ball), the
+  foot arrives 6 ticks later; ball within 0.8 m of it → knocked on the way you came in, the carrier stunned 24 ticks;
+  otherwise a miss and you're committed (≤ 2.5 m/s) until the 30-tick action ends. Geometry + timing, no dice.
+- **Bodies block:** players never overlap closer than 0.6 m (pushed apart equally, closing speed removed).
+- **Owner decisions:** when an AI team-mate (or the keeper) of a seat wins the ball, control jumps to him with the
+  held stick latched; the human controls the keeper with the ball.

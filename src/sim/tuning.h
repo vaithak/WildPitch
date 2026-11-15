@@ -125,6 +125,15 @@
 #define T_HEADER_SHOT_VZ   -FX(0.8)   /* nodded down */
 #define T_HEADER_PASS_MAX  FX(12.0)
 
+/* ---- tackles & bodies (CP0.3) ---- */
+#define T_TACKLE_START     FX(1.6)    /* J with an opponent on the ball this close = a standing tackle */
+#define T_TACKLE_WINDUP    6          /* ticks from the lunge to the foot arriving */
+#define T_TACKLE_LUNGE     FX(3.0)    /* extra speed toward the ball when lunging (m/s) */
+#define T_TACKLE_REACH     FX(0.8)    /* the ball must be this close to the tackling foot at contact */
+#define T_TACKLE_STUN      24         /* the tackled player can't touch the ball again for this long */
+#define T_TACKLE_TICKS     30         /* whole tackle action (recovery included) */
+#define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
+
 /* ---- kicks ---- */
 #define T_CHARGE_MAX_TICKS 36         /* full power after 0.6 s */
 #define T_KICK_WINDUP_PASS 4

@@ -221,6 +221,18 @@ void seats_update(SimState *s, const WpInput *in) {
     }
 }
 
+/* Player i (not a seat's) just won the ball: a seat on his team takes him over (owner decision CP0.3: control
+ * jumps to the AI team-mate - or the keeper - who wins it), the held stick latched so he doesn't run off with it. */
+void seats_on_gain(SimState *s, int i, const WpInput *in) {
+    if (seat_owns(s, i)) return;
+    int team = s->players[i].team, seat = -1;
+    for (int k = 0; k < WP_MAX_SEATS; k++)
+        if (s->seat_player[k] >= 0 && s->players[s->seat_player[k]].team == team) { seat = k; break; }
+    if (seat < 0) return;
+    if (s->pass_target == s->seat_player[seat]) s->pass_target = -1;
+    do_switch(s, seat, i, T_SWITCH_COOL, &in->seat[seat], 1);
+}
+
 /* Legs-only input for a seat's player (aim and buttons always stay the human's): the assisted receiver, or a
  * freshly auto-switched player chasing the loose ball while the inherited stick is still held. */
 void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io) {

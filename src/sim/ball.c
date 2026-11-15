@@ -101,7 +101,7 @@ static void collide_bodies(SimState *s) {
         fx dist = fv2_len(d);
         if (dist >= r || dist == 0) continue;
         fv2 rel = fv2_sub(b->vel, p->vel);
-        if (s->phase == WP_PHASE_PLAY && player_can_control(s, i) && p->touch_cooldown == 0 &&
+        if (s->phase == WP_PHASE_PLAY && b->owner < 0 && player_can_control(s, i) && p->touch_cooldown == 0 &&
             b->z <= WP_BAND_BODY_MAX && fv2_len(rel) <= T_CONTROL_MAX_REL && p->action == WP_ACT_NONE)
             continue;
         fv2 n = fv2_scale(d, fx_div(FX_ONE, dist));

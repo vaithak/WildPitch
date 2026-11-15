@@ -51,6 +51,7 @@ int main(void) {
 
     /* ball: a lobbed ball never goes below ground, bounces lower each time, and comes to rest */
     sim_init(&s, &cfg);
+    s.flags |= WP_SIMF_STATIC_OTHERS;                 /* nobody fields it: pure ball physics */
     s.ball.vel = fv2_make(FX(10.0), 0);
     s.ball.vz = FX(8.0);
     fx peak = 0, last_peak = FX(100.0);

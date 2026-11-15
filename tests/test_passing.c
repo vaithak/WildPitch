@@ -195,7 +195,11 @@ int main(void) {
             WpMatchConfig cfg = sim_default_config();
             sim_init(&s, &cfg);
             int me = s.seat_player[0];
-            run_seat(&s, (WpSeatInput){127, (int8_t)((trial % 3 - 1) * 90), 0}, 20 + trial * 6);   /* dribble, let them move */
+            /* opposition parked off the pitch (this checks receiving by MOVING team-mates, not defending) */
+            for (int t = 0; t < 20 + trial * 6; t++) {
+                for (int j = s.n_per_side; j < 2 * s.n_per_side; j++) s.players[j].pos = fv2_make(FX_INT(j * 3), FX(40.0));
+                run_seat(&s, (WpSeatInput){127, (int8_t)((trial % 3 - 1) * 90), 0}, 1);
+            }
             if (s.ball.owner != me) continue;
             int j = 1 + trial % 3;                           /* a defender or the midfielder */
             fv2 to = fv2_norm(fv2_sub(s.players[j].pos, s.players[me].pos));
@@ -204,6 +208,7 @@ int main(void) {
             run_seat(&s, (WpSeatInput){sx, sy, 0}, 1);
             int got = -1, kicked = 0;
             for (int t = 0; t < 300 && got < 0; t++) {
+                for (int jj = s.n_per_side; jj < 2 * s.n_per_side; jj++) s.players[jj].pos = fv2_make(FX_INT(jj * 3), FX(40.0));
                 kicked |= (run_seat(&s, NOIN, 1) & WP_EV_KICK) != 0;
                 if (kicked && s.ball.owner >= 0) got = s.ball.owner;
             }

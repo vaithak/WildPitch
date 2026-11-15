@@ -124,6 +124,7 @@ enum {
     WP_EV_RESET  = 1 << 7,   /* players/ball teleported: don't interpolate this tick */
     WP_EV_BODY   = 1 << 8,   /* ball hit a player's body */
     WP_EV_HEADER = 1 << 9,   /* head contact (also sets WP_EV_KICK) */
+    WP_EV_TACKLE = 1 << 10,  /* a tackle won the ball off its owner */
 };
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };   /* players no seat controls stand still (statues / cones) */

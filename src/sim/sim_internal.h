@@ -5,6 +5,7 @@
  *   seats.c   which player each human seat controls (switching), pass in flight, assisted receive
  *   pass_pick.c  who receives a pass (stick cone + score, preview, stick memory)
  *   header.c  contextual headers: trigger, take-off timing, head-band contact
+ *   tackle.c  standing tackles (human J when they have the ball nearby; AI later)
  *   team.c    placeholder movement for non-human players (shape, runs, keepers) -> WpSeatInput (CP0.3: AI)
  */
 #ifndef WP_SIM_INTERNAL_H
@@ -57,13 +58,22 @@ void seats_update(SimState *s, const WpInput *in);
 void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput *in, fv2 meet, fx t_meet,
                         uint8_t plan);
 void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io);
+void seats_on_gain(SimState *s, int i, const WpInput *in);   /* a team-mate of a seat won the ball */
+/* tackle.c */
+int  tackle_wanted(const SimState *s, int i);             /* an opponent has the ball within reach of a tackle */
+void tackle_start(SimState *s, int i);
+void tackle_step(SimState *s, int i);
+/* player.c */
+void bodies_separate(SimState *s);
 /* team.c */
 void team_input(const SimState *s, int i, WpSeatInput *out);
 void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSeatInput *out);
 void team_steer_speed(const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed */
 
-/* Can player i take control of a loose ball? (CP0.1: only human-controlled players; AI joins in CP0.3) */
+/* Can player i take control of a loose ball? Everyone in a real match (AI included, CP0.3); with
+ * WP_SIMF_STATIC_OTHERS (drills / isolation tests) only seat players - the others are statues. */
 static inline int player_can_control(const SimState *s, int i) {
+    if (!(s->flags & WP_SIMF_STATIC_OTHERS)) return 1;
     for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == i) return 1;
     return 0;
 }

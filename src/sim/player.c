@@ -31,6 +31,7 @@ static fv2 stick_dir(const WpSeatInput *in, int *has) {
 static int ball_reachable(const SimState *s, int i, fx reach) {
     const WpBall *b = &s->ball;
     if (b->owner == i) return 1;
+    if (b->owner >= 0) return 0;                          /* someone else's ball: tackle it, don't kick it */
     if (b->z > WP_BAND_FEET_MAX) return 0;
     fv2 d = fv2_sub(b->pos, s->players[i].pos);
     return fv2_len(d) <= reach;
@@ -302,6 +303,11 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     fv2 aim = stick_dir(in, &has);
     if (s->phase != WP_PHASE_PLAY) { p->kick_charge = 0; p->charge_kind = 0xFF; return; }
 
+    /* contextual tackle: J pressed while an opponent has the ball close by */
+    if ((pressed & WP_BTN_PASS) && p->action == WP_ACT_NONE && tackle_wanted(s, i)) {
+        tackle_start(s, i);
+        return;
+    }
     /* contextual header (D-010): pass/shoot pressed while a ball comes in above body height */
     int jump;
     if ((pressed & (WP_BTN_PASS | WP_BTN_SHOOT)) && p->action == WP_ACT_NONE && header_wanted(s, i, &jump)) {
@@ -350,6 +356,10 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     }
     int winding = p->action == WP_ACT_KICK && !p->kick.done;
     if (winding) top = fx_mul(top, T_KICK_SPEED_MUL);
+    if (p->action == WP_ACT_TACKLE) {                     /* lunging, then committed: can't turn or accelerate */
+        p->vel = fv2_clamp_len(p->vel, p->kick.done ? FX(2.5) : T_SPRINT_SPEED);
+        return;
+    }
     int step_up = 0;
     if (!has && s->ball.owner == i && p->action == WP_ACT_NONE &&
         fv2_len(fv2_sub(s->ball.pos, p->pos)) > T_TOUCH_REACH - FX(0.15)) {
@@ -382,7 +392,8 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
 }
 
 /* Possession, first touch, dribble touches, gather during own kick wind-up. */
-static void control(SimState *s, int i, const WpSeatInput *in) {
+/* the ball's owner: lose it, gather for a kick, sole trap, or the rhythmic dribble touch */
+static void control_owner(SimState *s, int i, const WpSeatInput *in) {
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
     if (s->phase != WP_PHASE_PLAY) return;
@@ -391,7 +402,7 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
     int has;
     fv2 sdir = stick_dir(in, &has);
 
-    if (b->owner == i) {
+    {
         if (dist > T_LOSE_DIST || b->z > WP_BAND_BODY_MAX) { b->owner = -1; return; }
         if (p->action == WP_ACT_KICK && !p->kick.done) {   /* gather: the foot brings the ball to the contact point */
             if (b->z > WP_BAND_FEET_MAX) return;            /* a dropping ball falls by itself (volley) */
@@ -451,16 +462,22 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
         s->events |= WP_EV_TOUCH;
         return;
     }
-    /* gain control of a loose ball */
-    if (b->owner >= 0 || p->touch_cooldown || p->action != WP_ACT_NONE || p->z > 0) return;
-    if (b->z > WP_BAND_BODY_MAX) return;
+}
+
+/* Can player i take the loose ball this tick? Returns the swept distance to it, or -1. (The closest eligible
+ * player wins a contest - not the lowest index.) */
+static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
+    const WpPlayer *p = &s->players[i];
+    const WpBall *b = &s->ball;
+    if (s->phase != WP_PHASE_PLAY || !player_can_control(s, i)) return -1;
+    if (b->owner >= 0 || p->touch_cooldown || p->action != WP_ACT_NONE || p->z > 0) return -1;
+    if (b->z > WP_BAND_BODY_MAX) return -1;
     /* reach is SWEPT over the coming tick (ball.pos .. ball.pos + vel*dt): a ball passing between ticks counts.
      * The pass's receiver may also stretch beyond clean reach, with a heavier touch. */
     fv2 seg = fv2_scale(b->vel, WP_DT);
     fx sl2 = fv2_dot(seg, seg), u = 0;
     if (sl2 > 0) u = fx_clamp(fx_div(fv2_dot(fv2_sub(p->pos, b->pos), seg), sl2), 0, FX_ONE);
     fx dseg = fv2_len(fv2_sub(p->pos, fv2_add(b->pos, fv2_scale(seg, u))));
-    (void)dist;
     fx reach = T_CONTROL_REACH;
     if (s->pass_target == i && dseg > T_CONTROL_REACH) {
         /* stretch (heavier touch) only for a ball that would otherwise pass him out of clean reach;
@@ -470,7 +487,7 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
         fx closest = fv2_len(fv2_sub(p->pos, fv2_add(b->pos, fv2_scale(b->vel, tc))));
         if (closest > T_CONTROL_REACH) reach = T_CONTROL_STRETCH;
     }
-    if (dseg > reach) return;
+    if (dseg > reach) return -1;
     if (s->pass_target == i && s->pass_plan != WP_PLAN_CLOSEST && s->pass_stick[0] != -128) {
         /* a runner on a planned meet lets a ball passing clear of him run until shortly before the meeting point
          * (he'd otherwise trap a through ball that passes him early) - unless the human is steering him */
@@ -478,11 +495,18 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
         int opinion = (in->move_x || in->move_y) && dx * dx + dy * dy > T_RECV_STICK_TOL * T_RECV_STICK_TOL;
         int32_t left = (int32_t)(int16_t)(uint16_t)(s->pass_meet_tick - (uint16_t)s->tick);
         /* ...but a ball coming through his body/feet is taken in stride (never rolls through him, D-016) */
-        if (!opinion && left > 12 && dseg > FX(0.5)) return;
+        if (!opinion && left > 12 && dseg > FX(0.5)) return -1;
     }
+    if (fv2_len(fv2_sub(b->vel, p->vel)) > T_CONTROL_MAX_REL) return -1;   /* too hot: body collision deflects it */
+    return dseg;
+}
+
+/* first touch: kills most of the relative speed; harder balls spill further (visible cause) */
+static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const WpInput *all) {
+    WpPlayer *p = &s->players[i];
+    WpBall *b = &s->ball;
     fv2 rel = fv2_sub(b->vel, p->vel);
     fx rs = fv2_len(rel);
-    if (rs > T_CONTROL_MAX_REL) return;                    /* too hot: body collision deflects it */
     /* first touch: kills most of the relative speed; harder balls spill further (visible cause) */
     fx spill = fx_mul(fx_div(rs, T_CONTROL_MAX_REL), FX(0.45));
     if (in->buttons & WP_BTN_SPRINT) spill += T_SPRINT_SPILL;     /* receiving at a sprint: heavier touch */
@@ -495,6 +519,7 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
     b->last_touch = (int8_t)i;
     p->touch_cooldown = 6;
     s->events |= WP_EV_TOUCH;
+    seats_on_gain(s, i, all);                             /* our AI team-mate / keeper won it: control jumps */
 }
 
 static void air_and_timers(WpPlayer *p) {
@@ -506,6 +531,7 @@ static void air_and_timers(WpPlayer *p) {
     if (p->action != WP_ACT_NONE) {
         p->action_timer++;
         int ends = p->action == WP_ACT_KICK ? p->action_timer >= T_KICK_TOTAL_TICKS
+                 : p->action == WP_ACT_TACKLE ? p->action_timer >= T_TACKLE_TICKS
                  : (p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) ? header_action_ends(p)
                  : p->action_timer > 30;
         if (ends) { p->action = WP_ACT_NONE; p->action_timer = 0; }
@@ -522,6 +548,32 @@ void sim_player_jump(SimState *s, int i, uint8_t action) {
     p->action_timer = 0;
     p->kick.done = 1;                                     /* a plain jump: no header contact attempt */
     p->kick.windup = 1;
+}
+
+/* Players block each other: overlapping bodies are pushed apart equally and their closing speed removed.
+ * Statues (WP_SIMF_STATIC_OTHERS) are ghosts, as before, so isolation tests keep their meaning. */
+void bodies_separate(SimState *s) {
+    int np = 2 * s->n_per_side;
+    for (int i = 0; i < np; i++)
+        for (int j = i + 1; j < np; j++) {
+            WpPlayer *a = &s->players[i], *c = &s->players[j];
+            if ((s->flags & WP_SIMF_STATIC_OTHERS) && (!player_can_control(s, i) || !player_can_control(s, j))) continue;
+            if (a->z > FX(0.5) || c->z > FX(0.5)) continue;
+            fv2 d = fv2_sub(c->pos, a->pos);
+            if (fx_abs(d.x) >= T_PLAYER_GAP || fx_abs(d.y) >= T_PLAYER_GAP) continue;
+            fx dist = fv2_len(d);
+            if (dist >= T_PLAYER_GAP) continue;
+            fv2 n = dist > FX(0.01) ? fv2_scale(d, fx_div(FX_ONE, dist)) : fv2_make(FX_ONE, 0);
+            fv2 half = fv2_scale(n, (T_PLAYER_GAP - dist) / 2);
+            a->pos = fv2_sub(a->pos, half);
+            c->pos = fv2_add(c->pos, half);
+            fx closing = fv2_dot(fv2_sub(a->vel, c->vel), n);          /* > 0 = moving into each other */
+            if (closing > 0) {
+                fv2 cut = fv2_scale(n, closing / 2);
+                a->vel = fv2_sub(a->vel, cut);
+                c->vel = fv2_add(c->vel, cut);
+            }
+        }
 }
 
 void players_step(SimState *s, const WpInput *in) {
@@ -553,8 +605,18 @@ void players_step(SimState *s, const WpInput *in) {
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
         if (seat >= 0) header_step(s, i, &pin[i]);
+        tackle_step(s, i);
         air_and_timers(p);
     }
-    for (int i = 0; i < np; i++)
-        if (seat_of(s, i) >= 0) control(s, i, &pin[i]);
+    bodies_separate(s);                                   /* players block each other */
+    if (s->ball.owner >= 0) {
+        control_owner(s, s->ball.owner, &pin[s->ball.owner]);
+    } else {                                              /* loose ball: the closest eligible player gets it */
+        int best = -1; fx bd = 0;
+        for (int i = 0; i < np; i++) {
+            fx d = gain_check(s, i, &pin[i]);
+            if (d >= 0 && (best < 0 || d < bd)) { best = i; bd = d; }
+        }
+        if (best >= 0) gain_apply(s, best, &pin[best], bd, in);
+    }
 }
