@@ -33,7 +33,8 @@ power and reception felt off and that pressing a key while receiving made the pl
 - **Tests (9 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_scoring, test_determinism
   (golden `ef60beafb1e050e8`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
-- Perf: full game loop ~5% of one core; `bench_sim` ~4,900× real time (3.4 µs/tick; receiver ball prediction each tick; was 22,700× before team logic + pass solver — fine for play, revisit with a
+- Perf: full game loop ~5% of one core; `bench_sim` ~4,900× real time (3.4 µs/tick). Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
+  receiver prediction ~4% → perf pass = a faster EXACT isqrt (bit-identical, golden unchanged); was 22,700× before team logic + pass solver — fine for play, revisit with a
   lookup table before RL training).
 
 ### Feel numbers (from test_ball_control; update when tuning changes)
