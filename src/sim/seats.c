@@ -103,7 +103,8 @@ void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput
     if (seat < 0 || seat_owns(s, receiver)) { s->pass_stick[0] = s->pass_stick[1] = -128; return; }
     s->pass_stick[0] = in->move_x;
     s->pass_stick[1] = in->move_y;
-    do_switch(s, seat, receiver, T_SWITCH_COOL, 0, 0);
+    /* a pass to the keeper: the stick the passer was holding (toward his own goal) must not carry over */
+    do_switch(s, seat, receiver, T_SWITCH_COOL, in, s->players[receiver].role == WP_ROLE_KEEPER);
 }
 
 /* the assisted receiver's goal + speed for this tick, and the takeover rule */
@@ -161,6 +162,11 @@ static void deflect_switch(SimState *s, const WpInput *in, int team) {
             if (best < 0 || t < bt) { best = j; bt = t; }
         }
         if (best >= 0 && best != me) do_switch(s, k, best, T_SWITCH_COOL, &in->seat[k], 1);
+        else if (in->seat[k].move_x || in->seat[k].move_y) {   /* same man: still ignore the stale pass stick */
+            s->latch_stick[k][0] = in->seat[k].move_x;
+            s->latch_stick[k][1] = in->seat[k].move_y;
+            s->latch_ticks[k] = T_SWITCH_LATCH_TICKS;
+        }
     }
 }
 

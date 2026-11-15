@@ -11,7 +11,9 @@ power and reception felt off and that pressing a key while receiving made the pl
 - **CP0.2c (D-020):** through balls land just ahead of a running receiver (hold = deeper/softer, never weaker than a
   tap), taps lead runners by the real flight time and pace grows with distance, receivers keep running and are never
   abandoned when you press or release keys (the stick picks where he meets it), 1 m swept reach, deflections switch
-  you to the best-placed man at once, hold J with nobody ahead = harder ball.
+  you to the best-placed man at once, hold J with nobody ahead = harder ball. Verified by re-running the playtest
+  agent's harnesses (`tools/playtest/`): stick held through a pass 162/240 failed → 0/240; through-ball receivers
+  6.0 m/s (were 0–0.5) never turning back; no-deflection pass failures 12 → 0; its 4 new findings fixed + tested.
 - **CP0.2b:** hold J = through ball (white bar = how far ahead; receiver runs onto it), L = lofted pass over
   defenders, J/K at a ball coming in high = header (stand or timed jump; K at goal, J to a team-mate).
 - **CP0.2a:** full 5-a-side team. J = pass to the best team-mate toward the stick (weighted to arrive ~6 m/s), control
@@ -31,7 +33,7 @@ power and reception felt off and that pressing a key while receiving made the pl
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (9 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_scoring, test_determinism
-  (golden `ef60beafb1e050e8`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+  (golden `60e936cfc3d5b8d1`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~4,900× real time (3.4 µs/tick). Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
   receiver prediction ~4% → perf pass = a faster EXACT isqrt (bit-identical, golden unchanged); was 22,700× before team logic + pass solver — fine for play, revisit with a

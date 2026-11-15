@@ -29,6 +29,7 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   dedication.h/.c       the owner's dedication card on launch (D-018; wording is fixed)
   ball_draw.h/.c        the ball: visual orientation rolled from drawn motion, 12 panels, speed blur/streak, shadow
   avatar.h/.c           procedural skeleton footballers (D-009): looks, styles, pose solver, soft-capsule drawing
+tools/playtest/         headless playtest harnesses (scripted seat inputs) used to find/verify passing feel issues
 tests/                  headless tests (test_*.c auto-registered with ctest), bench_sim.c
   test_ball.c           physics, curl, roll distances + inverse, bounce (drop/continuity/chip), posts/bar, goals, net, outs
   test_ball_control.c   dribble feel targets, never-whiff kicks, height bands, no-magnet checks, shot table (prints)

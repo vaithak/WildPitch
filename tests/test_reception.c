@@ -175,7 +175,7 @@ int main(void) {
             }
             (void)d0; (void)seat;
             printf("after the deflection: %d more switches, %d ticks moving away from the loose ball\n", switches, away);
-            CHECKF(switches <= 1 && away <= 18, "deflection follow-through: %d switches, %d ticks away", switches, away);
+            CHECKF(switches <= 1 && away <= 6, "deflection follow-through: %d switches, %d ticks away", switches, away);
         }
         CHECKF(defl_t >= 0 && switched_t >= 0 && switched_t - defl_t <= 6, "deflection switch: defl %d switch %d", defl_t, switched_t);
     }
@@ -233,6 +233,55 @@ int main(void) {
         }
         printf("live short room: %d/%d through balls received, %d out of play, %d backward runs > 1 m\n", ok, n, outs, back_runs);
         CHECKF(n >= 18 && ok * 10 >= n * 9 && back_runs == 0, "short room: %d/%d received, %d back runs", ok, n, back_runs);
+    }
+    /* ---- re-test findings (N1-N3) ---- */
+    {   /* N1: from kickoff, tap J west toward the midfielder while holding W: never a firm ball to our own keeper,
+         * and holding W after the hand-off doesn't dribble into our own net */
+        int own_goals = 0, to_keeper = 0;
+        for (int run = 0; run < 12; run++) {
+            WpMatchConfig cfg = sim_default_config();
+            sim_init(&s, &cfg);
+            for (int t = 0; t < 20 + run * 3; t++) step2((WpSeatInput){127, 0, 0}, NOIN);
+            step2((WpSeatInput){-127, 0, WP_BTN_PASS}, NOIN);
+            for (int t = 0; t < 12; t++) {
+                if (step2((WpSeatInput){-127, 0, 0}, NOIN) & WP_EV_KICK) to_keeper += s.pass_target == 0;
+            }
+            for (int t = 0; t < 150; t++) step2((WpSeatInput){-127, 0, 0}, NOIN);
+            own_goals += s.score[1];
+        }
+        printf("tap west from kickoff (x12): %d passes to our keeper, %d own goals while holding W\n", to_keeper, own_goals);
+        CHECKF(to_keeper == 0 && own_goals == 0, "N1: %d to keeper, %d own goals", to_keeper, own_goals);
+    }
+    {   /* N2: a pass coming straight to a standing receiver rolls in to his foot (no stretch at 1.3 m) */
+        fx worst = 0;
+        for (int d = 6; d <= 16; d += 5) {
+            scene(fv2_make(-FX(10.0), 0), fv2_make(-FX(10.0) + FX_INT(d), FX(0.5)));
+            pass_to_mate(6, NOIN, 0, fv2_make(0, 0));
+            fx last = 0;
+            for (int t = 0; t < 200 && s.ball.owner < 0; t++) {
+                last = fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos));
+                step2(NOIN, NOIN);
+            }
+            if (last > worst) worst = last;
+        }
+        printf("pass to a standing receiver: controlled at <= %.2f m\n", tod(worst));
+        CHECKF(worst <= FX(1.2), "N2: controlled at %.2f m (stretch for a ball coming to him)", tod(worst));
+    }
+    {   /* N3: striker sprinting toward the byline wide right is still the target (prediction kept on the pitch) */
+        setup_empty(&s, ME);
+        s.seat_player[0] = 3;
+        s.players[3].pos = fv2_make(FX(0.4), 0);
+        s.ball.pos = fv2_make(FX(0.8), 0);
+        s.players[4].pos = fv2_make(FX(15.0), FX(8.5));
+        run_seat(&s, NOIN, 3);
+        s.players[4].vel = fv2_make(FX(7.0), 0);
+        step2((WpSeatInput){127, 127, WP_BTN_PASS}, NOIN);
+        int tgt = -2; uint16_t ev = 0;
+        for (int t = 0; t < 12; t++) { s.players[4].vel = fv2_make(FX(7.0), 0);
+            uint16_t e = step2((WpSeatInput){127, 127, 0}, NOIN); if (e & WP_EV_KICK) tgt = s.pass_target; }
+        for (int t = 0; t < 240 && s.ball.owner < 0; t++) ev |= step2(NOIN, NOIN);
+        printf("NE tap to a striker running at the byline: target %d, out %d, owner %d\n", tgt, (ev & WP_EV_OUT) != 0, s.ball.owner);
+        CHECKF(tgt == 4 && !(ev & WP_EV_OUT), "N3: target %d, out %d", tgt, (ev & WP_EV_OUT) != 0);
     }
     return TEST_DONE();
 }

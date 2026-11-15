@@ -64,12 +64,18 @@ void sim_player_kick(SimState *s, int i, const WpKick *k) {
 int pass_pick(const SimState *s, int i, wp_angle dir) {
     const WpPlayer *p = &s->players[i];
     int best = -1; int32_t best_score = 0;
+    fx hl = s->pitch.length / 2 - FX(1.0), hw = s->pitch.width / 2 - FX(1.0);
+    /* outfield team-mates first; the keeper only when nobody else fits (no firm back-passes to him by accident) */
+    for (int pass = 0; pass < 2 && best < 0; pass++)
     for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
-        if (j == i) continue;
+        if (j == i || (s->players[j].role == WP_ROLE_KEEPER) != (pass == 1)) continue;
         const WpPlayer *q = &s->players[j];
         fx d0 = fv2_len(fv2_sub(q->pos, p->pos));
-        /* judge him where he'll be when the ball gets there (flight ~ distance / 12 m/s) */
-        fv2 d = fv2_sub(fv2_add(q->pos, fv2_scale(q->vel, fx_div(d0, FX(12.0)))), p->pos);
+        if (d0 > T_PASS_MAX_DIST + FX(4.0)) continue;
+        /* judge him where he'll be when the ball gets there (flight ~ distance / 12 m/s), kept on the pitch */
+        fv2 qp = fv2_add(q->pos, fv2_scale(q->vel, fx_div(d0, FX(12.0))));
+        qp = fv2_make(fx_clamp(qp.x, -hl, hl), fx_clamp(qp.y, -hw, hw));
+        fv2 d = fv2_sub(qp, p->pos);
         fx dist = fv2_len(d);
         if (dist < FX(2.0) || dist > T_PASS_MAX_DIST) continue;
         int32_t off = ang_diff(fx_atan2(d.y, d.x), dir);
@@ -464,7 +470,15 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
     if (sl2 > 0) u = fx_clamp(fx_div(fv2_dot(fv2_sub(p->pos, b->pos), seg), sl2), 0, FX_ONE);
     fx dseg = fv2_len(fv2_sub(p->pos, fv2_add(b->pos, fv2_scale(seg, u))));
     (void)dist;
-    fx reach = s->pass_target == i ? T_CONTROL_STRETCH : T_CONTROL_REACH;
+    fx reach = T_CONTROL_REACH;
+    if (s->pass_target == i && dseg > T_CONTROL_REACH) {
+        /* stretch (heavier touch) only for a ball that would otherwise pass him out of clean reach;
+         * one coming to him rolls in to his foot */
+        fx bs2 = fv2_dot(b->vel, b->vel);
+        fx tc = bs2 > 0 ? fx_max(fx_div(fv2_dot(fv2_sub(p->pos, b->pos), b->vel), bs2), 0) : 0;
+        fx closest = fv2_len(fv2_sub(p->pos, fv2_add(b->pos, fv2_scale(b->vel, tc))));
+        if (closest > T_CONTROL_REACH) reach = T_CONTROL_STRETCH;
+    }
     if (dseg > reach) return;
     if (s->pass_target == i && s->pass_plan != WP_PLAN_CLOSEST && s->pass_stick[0] != -128) {
         /* a runner on a planned meet lets a ball passing clear of him run until shortly before the meeting point
@@ -529,6 +543,10 @@ void players_step(SimState *s, const WpInput *in) {
         int seat = seat_of(s, i);
         if (seat >= 0) {
             pin[i] = mv[i] = in->seat[seat];
+            if (s->latch_ticks[seat] && s->ball.owner == i) {   /* inherited stick: don't dribble with it */
+                pin[i].move_x = pin[i].move_y = 0;
+                mv[i] = pin[i];
+            }
             seats_assist_receive(s, seat, &mv[i]);
             header_assist_move(s, i, &mv[i]);
         }
