@@ -6,6 +6,9 @@
 #include "test_util.h"
 #include "sim_test_helpers.h"
 #include "sim/sim_internal.h"
+#include "shape_metrics.h"
+
+static ShapeAcc shape[2];
 
 static int run_format(int seven, int matches);
 static void run_levels(void);
@@ -49,6 +52,7 @@ static void run_levels(void) {
 
 static int run_format(int seven, int matches) {
     static SimState s;
+    memset(shape, 0, sizeof shape);
     long goals[2] = {0}, shots[2] = {0}, passes[2] = {0}, done[2] = {0}, tackles[2] = {0}, poss[2] = {0};
     long stuck = 0, ticks = 0, headers = 0, crosses = 0;
     for (int m = 0; m < matches; m++) {
@@ -72,6 +76,7 @@ static int run_format(int seven, int matches) {
                     s.players[i].pos = fv2_add(s.players[i].pos, fv2_make(dx, dy));
                 }
             if (s.ball.owner >= 0) poss[s.players[s.ball.owner].team]++;
+            if (t % 6 == 0) { shape_sample(&shape[0], &s, 0); shape_sample(&shape[1], &s, 1); }
             if (s.events & WP_EV_GOAL) goals[s.players[s.ball.last_touch >= 0 ? s.ball.last_touch : 0].team]++;
             if (s.events & WP_EV_TACKLE) tackles[s.players[s.ball.last_touch].team]++;
             if (s.events & WP_EV_HEADER) headers++;
@@ -110,6 +115,8 @@ static int run_format(int seven, int matches) {
     CHECKF(D * 100 > P * 50, "only %ld/%ld passes arrive", D, P);
     CHECKF(stuck == 0, "%ld stuck players", stuck);
     printf("  aerial: %ld crosses/lofted, %ld headers\n", crosses, headers);
+    shape_print(&shape[0], "team 0");
+    shape_print(&shape[1], "team 1");
     CHECKF(headers >= 3, "AI aerial duels: only %ld headers", headers);
     long ps = poss[0] + poss[1];
     CHECKF(poss[0] * 100 > ps * 40 && poss[1] * 100 > ps * 40, "possession imbalance");
