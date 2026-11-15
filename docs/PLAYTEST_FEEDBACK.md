@@ -23,3 +23,11 @@ Format:
   per-format pitch sizes and (2) future training of flair moves (bicycle kicks, rabonas, "Messi + Neymar" style).
 - **Action:** defaults set (D-011). (1) answered: pitch is config; formations/markings/camera to be made format-aware
   (D-002 note). (2) answered with walkthrough; committed to parametric moves (D-012) starting CP0.1.
+
+## CP0.1 — 2026-11-14
+- **Feedback (verbatim):** "dribbling feels a bit off, which becomes worse while sprinting"
+- **Diagnosis (traced tick by tick):** (1) sprint speed flickered 7.4<->8.0 m/s every tick (dribble slowdown toggled at
+  the 1.0 m reach edge); (2) touches only fired when the ball lagged, so in a steady dribble the ball rolled ~1 m ahead
+  with a touch every 1-2 s — detached, no rhythm; (3) at a steady sprint the ball parked at exactly reach (1.0 m), so
+  cuts could abandon it. Tests missed it: they only sampled the first second of a dribble.
+- **Action:** see CP0.1b in ROADMAP / D-014.

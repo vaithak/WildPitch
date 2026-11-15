@@ -143,6 +143,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
         float spd = sqrtf(tof(b->vel.x) * tof(b->vel.x) + tof(b->vel.y) * tof(b->vel.y));
         float face = (float)b->facing * (6.2831853f / 65536.0f);
         wp_avatar_anim_update(&ctx->anim[i], px[i], py[i], face, spd, dt);
+        if ((ctx->frame_events & WP_EV_TOUCH) && cur->ball.last_touch == i) ctx->anim[i].since_touch = 0;
         items[n++] = (DrawItem){py[i], 0, i};
     }
     float bx = lerpf(tof(prev->ball.pos.x), tof(cur->ball.pos.x), alpha);
@@ -180,6 +181,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 .action_t = ((float)p->action_timer + alpha) / (float)WP_TICK_HZ,
                 .time = ctx->time + (float)i * 0.37f,
                 .keeper = p->role == WP_ROLE_KEEPER,
+                .touch01 = 1.0f - ctx->anim[i].since_touch / 0.16f,
                 .kick_foot = p->kick.foot,
                 .kick_kind = p->kick.kind,
                 .kick_windup = (float)p->kick.windup / (float)WP_TICK_HZ,

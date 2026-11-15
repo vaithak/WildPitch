@@ -18,6 +18,7 @@ typedef struct {
     bool          looks_ready;
     int           style;                 /* index into wp_avatar_styles */
     bool          hide_markers;          /* --demo: no 'controlled player' arrows */
+    uint16_t      frame_events;          /* OR of sim events over the ticks stepped this frame (set by main) */
     float         time;
 } WpRenderCtx;
 

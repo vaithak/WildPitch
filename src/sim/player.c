@@ -138,15 +138,19 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     fv2 dir = stick_dir(in, &has);
     if (p->z > 0) return;                                 /* airborne: momentum only */
     fx top = (in->buttons & WP_BTN_SPRINT) ? T_SPRINT_SPEED : T_WALK_SPEED;
-    /* dribbling slows you only while the ball is at your feet; running onto a knock-on is full speed */
-    if (s->ball.owner == i && fv2_len(fv2_sub(s->ball.pos, p->pos)) <= T_TOUCH_REACH) top = fx_mul(top, T_DRIBBLE_SPEED_MUL);
+    /* dribbling slows you while the ball is at your feet; ramps off smoothly (no flicker at the reach edge)
+     * when you're running onto a ball that got away */
+    if (s->ball.owner == i) {
+        fx gapd = fv2_len(fv2_sub(s->ball.pos, p->pos));
+        fx k = fx_clamp(fx_div(gapd - T_TOUCH_REACH, FX(0.6)), 0, FX_ONE);   /* 0 at reach .. 1 at reach+0.6 */
+        top = fx_mul(top, fx_lerp(T_DRIBBLE_SPEED_MUL, FX_ONE, k));
+    }
     int winding = p->action == WP_ACT_KICK && !p->kick.done;
     if (winding) top = fx_mul(top, T_KICK_SPEED_MUL);
     if (has && s->ball.owner == i) {
-        /* Reversing on a ball that's out of reach: go and get it first, then turn with it.
-         * (Otherwise sprint knock-ons + a 180 would simply abandon the ball.) */
+        /* the ball got out of foot reach: go and get it first, then carry on the way the stick says */
         fv2 to_ball = fv2_sub(s->ball.pos, p->pos);
-        if (fv2_len(to_ball) > T_TOUCH_REACH && fv2_dot(to_ball, dir) < 0) dir = fv2_norm(to_ball);
+        if (fv2_len(to_ball) > T_TOUCH_REACH) dir = fv2_norm(to_ball);
     }
     if (has) {                                            /* analogue magnitude scales speed */
         fx mag = fx_min(fv2_len(fv2_make((fx)in->move_x * (FX_ONE / 127), (fx)in->move_y * (FX_ONE / 127))), FX_ONE);
@@ -198,26 +202,29 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
         }
         if (dist > T_TOUCH_REACH) return;                  /* must actually reach the ball with a foot */
         fv2 mdir = sdir;
-        fx ahead = fv2_dot(d, mdir);
-        fv2 bdir = fv2_norm(b->vel);
-        int lagging = ahead < T_TOUCH_AHEAD;
-        int wrong_way = fv2_dot(bdir, mdir) < FX(0.8);
-        /* a deliberate change of direction may cut the touch rhythm short */
-        if (p->touch_cooldown && !(wrong_way && p->touch_cooldown <= T_TOUCH_GAP_WALK - T_TOUCH_MIN_GAP)) return;
-        if (lagging || wrong_way) {
-            int sprint = (in->buttons & WP_BTN_SPRINT) != 0;
-            /* push relative to how fast the player is going the NEW way: a cut or reversal is a soft touch,
-             * a straight run knocks it further (more so when sprinting) */
-            fx along = fx_max(fv2_dot(p->vel, mdir), 0);
-            fx push = fx_max(fx_mul(along, sprint ? T_TOUCH_PUSH_SPRINT : T_TOUCH_PUSH), T_TOUCH_MIN_SPEED);
-            fv2 lat = fv2_sub(d, fv2_scale(mdir, ahead));  /* sideways offset from the running line */
-            b->vel = fv2_sub(fv2_scale(mdir, push), fv2_scale(lat, FX(4.0)));
-            b->spin = 0;
-            if (b->vz > 0) b->vz = 0;
-            p->touch_cooldown = (uint16_t)(sprint ? T_TOUCH_GAP_SPRINT : T_TOUCH_GAP_WALK);
-            b->last_touch = (int8_t)i;
-            s->events |= WP_EV_TOUCH;
-        }
+        int wrong_way = fv2_dot(fv2_norm(b->vel), mdir) < FX(0.8);
+        int sprint = (in->buttons & WP_BTN_SPRINT) != 0;
+        int gap = sprint ? T_TOUCH_GAP_SPRINT : T_TOUCH_GAP_WALK;
+        /* rhythm: touch whenever the cooldown expires; a change of direction may cut it short */
+        if (p->touch_cooldown && !(wrong_way && p->touch_cooldown <= gap - T_TOUCH_MIN_GAP)) return;
+        /* Size the touch so that, when the next touch is due (T = gap ticks), the ball sits LEAD ahead of where
+         * the player WILL be: predict the player (current velocity accelerating toward stick*top, capped by
+         * T_ACCEL), aim the ball at prediction + mdir*lead, and add back what rolling friction takes. One rule
+         * covers straight runs, cuts and reversals (a reversal becomes a drag-back). */
+        fx T = FX_INT(gap) / WP_TICK_HZ;
+        fx lead = sprint ? T_TOUCH_LEAD_SPRINT : T_TOUCH_LEAD_JOG;
+        fx top = fx_mul(sprint ? T_SPRINT_SPEED : T_WALK_SPEED, T_DRIBBLE_SPEED_MUL);
+        fv2 v_end = fv2_add(p->vel, fv2_clamp_len(fv2_sub(fv2_scale(mdir, top), p->vel), fx_mul(T_ACCEL, T)));
+        fv2 p_pred = fv2_add(p->pos, fv2_scale(fv2_add(p->vel, v_end), T / 2));
+        fv2 target = fv2_add(p_pred, fv2_scale(mdir, lead));
+        fv2 need = fv2_scale(fv2_sub(target, b->pos), fx_div(FX_ONE, T));
+        fv2 ndir = fv2_norm(need);
+        b->vel = fv2_add(need, fv2_scale(ndir, fx_mul(T_ROLL_DECEL, T) / 2));
+        b->spin = 0;
+        if (b->vz > 0) b->vz = 0;
+        p->touch_cooldown = (uint16_t)gap;
+        b->last_touch = (int8_t)i;
+        s->events |= WP_EV_TOUCH;
         return;
     }
     /* gain control of a loose ball */

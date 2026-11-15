@@ -8,6 +8,7 @@
  *   --style N              avatar preset (0 Modern, 1 Arcade, 2 Retro pixel); P cycles in game
  *   --zoom N               camera zoom preset (0 wide, 1 medium, 2 close); Z cycles in game
  *   --autoplay             seat 0 is scripted: chase ball, dribble at goal, charged shot (visual checks)
+ *   --autoplay-chip / --autoplay-dribble   variants: chip instead of shot / sprint zigzag dribble (no shot)
  *   --check-kick-pose      numeric check: kicking instep at the ball on the contact tick (no window)
  *   --screenshot F.bmp     save frame number --frames N (default 60) to F.bmp and exit
  */
@@ -84,7 +85,7 @@ static void demo_input(SimState *s, WpInput *in) {
 }
 
 /* ---- autoplay harness (visual checks): seat 0 chases the ball, dribbles at the goal, charges and shoots ---- */
-static bool autoplay_chip = false;
+static bool autoplay_chip = false, autoplay_dribble = false;
 static void autoplay_input(const SimState *s, WpInput *in) {
     static int charging = 0;
     int me = s->seat_player[0];
@@ -94,6 +95,13 @@ static void autoplay_input(const SimState *s, WpInput *in) {
     float bx = (float)s->ball.pos.x / 65536.0f, by = (float)s->ball.pos.y / 65536.0f;
     float tx = bx, ty = by;
     if (s->ball.owner == me) { tx = 22.0f; ty = 1.6f; }   /* far side of the goal, past the keeper */
+    if (autoplay_dribble && s->ball.owner == me) {        /* sprint zigzag: 90-degree cuts every 0.75 s */
+        int leg = (int)(s->tick / 45) % 4;
+        float dirs[4][2] = {{1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
+        in->seat[0].move_x = (int8_t)(dirs[leg][0] * 127); in->seat[0].move_y = (int8_t)(dirs[leg][1] * 127);
+        in->seat[0].buttons = WP_BTN_SPRINT;
+        return;
+    }
     float dx = tx - px, dy = ty - py, l = sqrtf(dx * dx + dy * dy) + 1e-4f;
     in->seat[0].move_x = (int8_t)(dx / l * 127.0f);
     in->seat[0].move_y = (int8_t)(dy / l * 127.0f);
@@ -232,6 +240,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--demo")) demo = true;
         else if (!strcmp(argv[i], "--autoplay")) autoplay = true;
         else if (!strcmp(argv[i], "--autoplay-chip")) { autoplay = true; autoplay_chip = true; }
+        else if (!strcmp(argv[i], "--autoplay-dribble")) { autoplay = true; autoplay_dribble = true; }
         else if (!strcmp(argv[i], "--check-kick-pose")) return check_kick_pose();
     }
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -342,6 +351,7 @@ int main(int argc, char **argv) {
             }
             SDL_SetRenderDrawColor(g.ren, 18, 40, 22, 255);
             SDL_RenderClear(g.ren);
+            g.rctx.frame_events = frame_ev;
             wp_render_match(g.ren, &g.rctx, &cam, &g.prev, &g.cur, alpha, dts);
             if (f > 1) {
                 SDL_SetRenderTarget(g.ren, NULL);

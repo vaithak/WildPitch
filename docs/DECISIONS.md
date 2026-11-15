@@ -84,6 +84,16 @@ when a move needs it. Applies from CP0.1: kicks are implemented as parameterised
 - **Temporary out-of-play rule** (until CP0.4): ball goes dead, then is placed just inside the line after 0.75 s.
 - Other players have no AI yet (CP0.3): they stand still and block the ball with their bodies.
 
+**D-014 · 2026-11-14 · Dribbling = rhythmic, predictive touches** (Claude, after owner feedback "dribbling feels a
+bit off, worse while sprinting"; supersedes the dribble bullet of D-013). While the ball is within foot reach the owner
+touches it every `T_TOUCH_GAP_*` ticks (jog 16 = 0.27 s, sprint 20 = 0.33 s; a direction change may re-touch after 4).
+Each touch predicts where the player will be at the next touch (velocity accelerating toward stick × top speed) and
+sends the ball to that point + `T_TOUCH_LEAD_*` (jog 0.45 m, sprint 0.75 m — well inside the 1.0 m reach), plus what
+rolling friction will take. One rule handles straight runs, cuts and reversals (a reversal becomes a drag-back).
+The dribble speed penalty ramps off smoothly beyond reach (no flicker); an out-of-reach owned ball is always fetched.
+The avatar's forward-swinging leg flicks on each touch (presentation only). Steady-state tests (cadence band, speed
+smoothness, gap < 0.9 m, cuts/reversals after 40–180-tick run-ups) guard it.
+
 ## Open (owner to decide later)
 - Name: keep WILDPITCH? (working title in use)
 - Business model: one-time purchase vs open-source core.

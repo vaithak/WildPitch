@@ -113,7 +113,8 @@ static float wrap_pi(float a) {
 }
 
 void wp_avatar_anim_update(WpAvatarAnim *a, float x, float y, float sim_facing, float speed, float dt) {
-    if (!a->init) { a->init = true; a->last_x = x; a->last_y = y; a->facing = sim_facing; a->phase = 0; }
+    if (!a->init) { a->init = true; a->last_x = x; a->last_y = y; a->facing = sim_facing; a->phase = 0; a->since_touch = 9; }
+    a->since_touch += dt;
     float dx = x - a->last_x, dy = y - a->last_y, dist = sqrtf(dx * dx + dy * dy);
     if (dist > 3.0f) dist = 0;                         /* teleport (kickoff reset) */
     float cycle = 1.1f + 0.22f * speed;                /* metres per full stride cycle (2 steps) */
@@ -166,6 +167,12 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
             o->sh[s] = 0.75f; o->elb[s] = 0.7f; o->ab[s] = 0.45f;
         }
         o->lean = 0.38f;
+    }
+    /* dribble touch: the leg that is swinging forward reaches out and flicks the ball */
+    if (P->touch01 > 0 && P->action == WP_ACT_NONE) {
+        float k = smooth01(P->touch01);
+        for (int sl = 0; sl < 2; sl++)
+            if (cosf(P->phase + (float)sl * PI_F) > 0) { o->hip[sl] += 0.35f * k; o->knee[sl] *= 1.0f - 0.6f * k; }
     }
     /* charging a shot/chip with the ball close: the hold IS the backswing (right leg by default) */
     if (P->action == WP_ACT_NONE && P->charge01 > 0) {

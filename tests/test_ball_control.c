@@ -83,6 +83,54 @@ int main(void) {
         }
     }
 
+    /* steady-state dribble quality (owner feedback "dribbling feels off, worse sprinting"):
+     * touch cadence, speed smoothness, gap inside reach, and cuts/reversals after LONG run-ups */
+    for (int sprint = 0; sprint <= 1; sprint++) {
+        uint16_t b = sprint ? WP_BTN_SPRINT : 0;
+        const char *tag = sprint ? "sprint" : "jog";
+        with_ball(&s);
+        run_seat(&s, (WpSeatInput){127, 0, b}, 60);
+        int last_touch = -1, max_gap_ticks = 0, min_gap_ticks = 999; fx max_dv = 0, max_lead = 0, prev_v = fv2_len(s.players[ME].vel);
+        for (int t = 0; t < 180; t++) {
+            uint16_t ev = run_seat(&s, (WpSeatInput){127, 0, b}, 1);
+            fx v = fv2_len(s.players[ME].vel);
+            if (fx_abs(v - prev_v) > max_dv) max_dv = fx_abs(v - prev_v);
+            prev_v = v;
+            if (ball_dist(&s) > max_lead) max_lead = ball_dist(&s);
+            if (ev & WP_EV_TOUCH) {
+                if (last_touch >= 0) { int g = t - last_touch; if (g > max_gap_ticks) max_gap_ticks = g; if (g < min_gap_ticks) min_gap_ticks = g; }
+                last_touch = t;
+            }
+        }
+        printf("%-6s steady: touches every %d..%d ticks, max speed change %.3f m/s/tick, max ball gap %.2f m\n",
+               tag, min_gap_ticks, max_gap_ticks, tod(max_dv), tod(max_lead));
+        CHECKF(max_gap_ticks <= 26 && min_gap_ticks >= 10, "%s cadence %d..%d ticks", tag, min_gap_ticks, max_gap_ticks);
+        CHECKF(max_dv < FX(0.05), "%s speed not smooth: %.3f m/s per tick", tag, tod(max_dv));
+        CHECKF(max_lead < FX(0.9), "%s ball gap %.2f too close to reach", tag, tod(max_lead));
+        int worst_cut = 0, worst_rev = 0, lost = 0;
+        for (int run = 40; run <= 180; run += 7) {
+            for (int kind = 0; kind < 3; kind++) {   /* 90 cut, 45 cut, reversal */
+                with_ball(&s);
+                run_seat(&s, (WpSeatInput){127, 0, b}, run);
+                WpSeatInput turn = kind == 0 ? (WpSeatInput){0, 127, b} : kind == 1 ? (WpSeatInput){127, 127, b} : (WpSeatInput){-127, 0, b};
+                int turned = -1;
+                for (int t = 0; t < 60; t++) {
+                    run_seat(&s, turn, 1);
+                    fv2 want = fv2_norm(fv2_make((fx)turn.move_x * 516, (fx)turn.move_y * 516));
+                    if (turned < 0 && fv2_dot(fv2_norm(s.ball.vel), want) > FX(0.7)) turned = t;
+                }
+                if (s.ball.owner != ME) lost++;
+                if (kind < 2 && turned > worst_cut) worst_cut = turned;
+                if (kind == 2 && turned > worst_rev) worst_rev = turned;
+                if (turned < 0) { if (kind < 2) worst_cut = 99; else worst_rev = 99; }
+            }
+        }
+        printf("%-6s after 40..180-tick run-ups: lost %d, worst cut %d ticks, worst reversal %d ticks\n", tag, lost, worst_cut, worst_rev);
+        CHECKF(lost == 0, "%s lost the ball %d times after long run-ups", tag, lost);
+        CHECKF(worst_cut <= (sprint ? 20 : 12), "%s worst cut %d ticks", tag, worst_cut);
+        CHECKF(worst_rev <= (sprint ? 40 : 24), "%s worst reversal %d ticks", tag, worst_rev);
+    }
+
     /* overhead ball (head height) can't be controlled; chest-height slow ball can (dropped to feet) */
     setup_empty(&s, ME); s.seat_player[0] = ME;
     s.players[ME].pos = fv2_make(0, 0);

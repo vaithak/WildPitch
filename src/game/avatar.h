@@ -28,6 +28,7 @@ typedef struct {
     float kick_windup;   /* seconds from action start to ball contact (0 -> default) */
     float kick_power01;  /* 0..1 strength of the strike */
     float charge01;      /* 0..1 while charging a shot/chip near the ball (leg drawn back), else 0 */
+    float touch01;       /* 1 right after a dribble touch, decays to 0 (forward leg flicks the ball) */
 } WpAvatarPose;
 
 
@@ -52,6 +53,7 @@ extern const WpAvatarStyle wp_avatar_styles[WP_AVATAR_STYLE_COUNT];
 typedef struct {
     float phase, facing;
     float last_x, last_y;
+    float since_touch;   /* seconds since this player last touched the ball (presentation only) */
     bool  init;
 } WpAvatarAnim;
 

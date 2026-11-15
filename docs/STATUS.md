@@ -3,8 +3,9 @@
 _Last updated: 2026-11-14 by Claude session #1_
 
 ## Current checkpoint
-**CP0.1 — "Ball on grass": ✅ done, waiting for the owner's playtest.** Next: **CP0.2 "Pass and move"** (re-plan
-after feedback).
+**CP0.1b — Dribble feel fix: ✅ done, waiting for the owner's playtest** (owner said CP0.1 dribbling "feels a bit off,
+worse while sprinting"; diagnosis + fix in PLAYTEST_FEEDBACK / D-014). Next: **CP0.2 "Pass and move"** once dribbling
+feels right.
 
 ## What works now
 - Build: CMake + Ninja, SDL 3.4.8 vendored and statically linked.
@@ -16,20 +17,23 @@ after feedback).
 - **Game:** Modern look, wide zoom (defaults), power bar while charging, leg draws back as you charge, kick pose
   driven by kick params (foot/kind/wind-up), GOAL banner, OUT label, no interpolation across resets, net drawn as
   the physics box, F3 shows ball speed/height/spin/owner/phase/events, control hints on screen.
-- Flags: `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
+- Flags: `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (7 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_scoring, test_determinism
-  (golden `d304ef46f21376c6`; scripted seat chases the ball: ~110 kicks, 270 touches, 6 goals per 10 min, asserted),
+  (golden `eda2fc8bf4a1ac7e`; scripted seat chases the ball: ~110 kicks, 270 touches, 6 goals per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~22,700× real time.
 
 ### Feel numbers (from test_ball_control; update when tuning changes)
-Dribble numbers are the WORST case over 16 start offsets across a touch cycle (no offset may lose the ball):
+Dribble numbers (D-014). Direction-change rows are the WORST case over 16 start offsets and over 40–180-tick run-ups:
 | | jog | sprint |
 |---|---|---|
-| max ball gap, straight dribble | 0.83 m | 1.02 m |
-| 90° cut: ball going new way after | 4 ticks (67 ms) | 6 ticks (100 ms) |
-| 180° turn: ball heading back after / max gap (lose at 2.2 m) | 0 ticks / 0.84 m | 3 ticks / 1.51 m |
-| stop: ball settles from the player | 0.41 m | 0.43 m |
+| touch rhythm (steady) | every 16 ticks (0.27 s) | every 20 ticks (0.33 s) |
+| ball gap, steady / max | ~0.45 / 0.62 m | ~0.75 / 0.91 m (reach 1.0) |
+| player speed change per tick at top speed | 0.00 m/s | 0.00 m/s (was 0.30 flicker) |
+| 90° cut: ball going the new way after | 3 ticks (50 ms) | 3 ticks |
+| 180° turn: ball heading back after / max gap | 3 ticks / 0.63 m | 3 ticks / 1.00 m (lose at 2.2) |
+| stop: ball settles from the player | 0.45 m | 0.45 m |
+| balls lost after long run-ups + cuts | 0 | 0 (was 2) |
 | shot release → ball leaves foot | ≤ 6 ticks (100 ms) | ≤ 6 ticks |
 
 Scoring sweep (`test_scoring`, keyboard 8-way, statue keeper): natural positions (x ≥ 10 m, |y| ≤ 4 m, stick toward
@@ -59,6 +63,12 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Playtest guide (CP0.1b — focus: dribbling)
+Same build/controls as below. Dribble at jog and with Shift held: straight runs, sharp cuts, reversals, stops.
+Judge: does the ball now feel carried (regular touches, flick visible), at a comfortable distance? Sprinting: ball a
+bit further ahead but always yours? If still off, say which: ball too close / too far / touches too frequent / too
+rare / turns too sharp / too sluggish — each is one number in `src/sim/tuning.h`.
 
 ## Playtest guide (CP0.1)
 Run `./build/wildpitch`. You control the red #11 striker (yellow marker), attacking the goal on the RIGHT.

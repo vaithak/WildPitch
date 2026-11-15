@@ -44,14 +44,14 @@
 #define T_CONTROL_REACH    FX(0.75)   /* horizontal distance from player centre to gain control */
 #define T_CONTROL_MAX_REL  FX(16.0)   /* relative speed above which first touch fails (deflects) */
 #define T_LOSE_DIST        FX(2.2)    /* owner loses possession beyond this distance */
-#define T_TOUCH_AHEAD      FX(0.55)   /* desired ball lead in front of the feet when dribbling */
-#define T_TOUCH_GAP_WALK   12         /* ticks between dribble touches */
-#define T_TOUCH_GAP_SPRINT 14
-#define T_TOUCH_PUSH       FX(1.18)   /* touch sends the ball at (player speed along the stick) * this */
-#define T_TOUCH_PUSH_SPRINT FX(1.22)   /* ball gap peaks at dv^2/(2*roll decel): keep dv ~1.4 m/s */
+/* Dribbling = rhythmic touches (D-014): while the ball is in reach, touch every GAP ticks; each touch is sized so
+ * the ball sits at LEAD ahead of the feet when the next touch is due. */
+#define T_TOUCH_LEAD_JOG   FX(0.45)
+#define T_TOUCH_LEAD_SPRINT FX(0.75)  /* must stay well inside T_TOUCH_REACH */
+#define T_TOUCH_GAP_WALK   16         /* ticks between dribble touches (0.27 s) */
+#define T_TOUCH_GAP_SPRINT 20         /* 0.33 s */
 #define T_TOUCH_REACH      FX(1.0)    /* a dribble touch needs the ball within foot reach */
 #define T_TOUCH_MIN_GAP    4          /* fastest re-touch when changing direction (ticks) */
-#define T_TOUCH_MIN_SPEED  FX(2.2)    /* slowest touch (starting / changing direction) */
 #define T_BODY_HIT_COOLDOWN 12        /* after a ball smacks into you, you can't control it for this long */
 
 /* ---- kicks ---- */
