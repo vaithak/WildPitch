@@ -79,20 +79,45 @@ void seats_update(SimState *s, const WpInput *in) {
     }
 }
 
+/* Where should player p meet the ball? Steps a cheap prediction (gravity + air drag in flight, rolling decel on
+ * the grass, bounces ignored) every 50 ms for up to 4 s; among the points at head height or below that he can run
+ * to in time (~6.5 m/s + 0.15 s to react) it takes the one CLOSEST to him: step across to a pass and let it come
+ * (soft first touch), wait where a through ball slows, get under a lofted ball. Fallback: where it ends up. */
+static fv2 meet_point(const SimState *s, const WpPlayer *p, int through) {
+    const WpBall *b = &s->ball;
+    fv2 pos = b->pos, v = b->vel;
+    fx z = b->z, vz = b->vz, dt = FX(0.05), best_d = -1;
+    fv2 best = b->pos;
+    for (int k = 1; k <= 80; k++) {
+        fx hs = fv2_len(v);
+        if (z > 0 || vz > 0) {
+            fx kd = fx_min(fx_mul(fx_mul(T_AIR_DRAG, fv2_len(fv2_make(hs, vz))), dt), FX_ONE);
+            v = fv2_sub(v, fv2_scale(v, kd));
+            vz -= fx_mul(vz, kd) + fx_mul(T_GRAVITY, dt);
+            z += fx_mul(vz, dt);
+            if (z <= 0) { z = 0; vz = 0; }
+        } else if (hs > 0) {
+            fx dec = fx_mul(ball_roll_decel(hs), dt);
+            v = hs <= dec ? fv2_make(0, 0) : fv2_scale(v, fx_div(hs - dec, hs));
+        }
+        pos = fv2_add(pos, fv2_scale(v, dt));
+        if (z > FX(1.9)) continue;
+        if (through && fv2_len(v) <= T_THROUGH_ARRIVE + FX(0.5)) return pos;   /* run onto it where it slows */
+        fx d = fv2_len(fv2_sub(pos, p->pos)), t = dt * k, reach = fx_div(d, FX(6.5)) + FX(0.15);
+        if (reach <= t && (best_d < 0 || d < best_d)) { best_d = d; best = pos; }
+    }
+    return best_d >= 0 ? best : pos;
+}
+
 /* Assisted receive: the seat's player is the pass target and the human hasn't moved the stick since the pass ->
- * run to meet the ball on its path (buttons kept). */
+ * run to where he can first meet the ball (onto a through ball, under a lofted one). Buttons kept. */
 void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io) {
     int me = s->seat_player[seat];
     if (me < 0 || s->pass_target != me || s->pass_stick[0] == -128) return;
     const WpBall *b = &s->ball;
     const WpPlayer *p = &s->players[me];
-    fv2 meet = b->pos;
-    fx spd = fv2_len(b->vel);
-    if (spd > FX(0.5)) {
-        fv2 dir = fv2_scale(b->vel, fx_div(FX_ONE, spd));
-        fx t = fv2_dot(fv2_sub(p->pos, b->pos), dir);
-        if (t > 0) meet = fv2_add(b->pos, fv2_scale(dir, t));
-    }
+    (void)b;
+    fv2 meet = meet_point(s, p, s->pass_from >= 0 && s->players[s->pass_from].kick.kind == WP_KICK_THROUGH);
     uint16_t buttons = io->buttons;
     team_steer(p, meet, FX(0.3), FX(1.5), io);
     io->buttons = buttons;

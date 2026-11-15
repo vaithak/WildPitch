@@ -180,12 +180,17 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 .keeper = p->role == WP_ROLE_KEEPER,
                 .touch01 = 1.0f - ctx->anim[i].since_touch / 0.16f,
                 .kick_foot = p->kick.foot,
-                .kick_kind = p->kick.kind,
+                .kick_kind = p->kick.kind == WP_KICK_THROUGH ? WP_KICK_PASS     /* same strike, different weight */
+                           : p->kick.kind == WP_KICK_LOB ? WP_KICK_CHIP : p->kick.kind,
                 .kick_windup = (float)p->kick.windup / (float)WP_TICK_HZ,
-                .kick_power01 = p->kick.kind == WP_KICK_PASS ? 0.3f
+                .kick_power01 = (p->kick.kind == WP_KICK_PASS || p->kick.kind == WP_KICK_THROUGH) ? 0.3f
+                              : p->kick.kind == WP_KICK_LOB ? 0.5f
                               : (tof(p->kick.power) - 14.0f) / 16.0f,
             };
-            if (p->charge_kind != 0xFF && p->kick_charge > 0) {
+            /* a pass tap shows nothing; past the tap window it's a through ball and gets the bar (+ backswing) */
+            int charging = p->charge_kind != 0xFF &&
+                           p->kick_charge > (p->charge_kind == WP_KICK_PASS ? T_PASS_TAP_TICKS : 0);
+            if (charging) {
                 float dxb = bx - px[i], dyb = by - py[i];
                 if (dxb * dxb + dyb * dyb < 4.0f) pose.charge01 = (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
             }
@@ -200,14 +205,17 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                         {{m.x, m.y}, {1, 0.95f, 0.3f, 1}, {0, 0}},
                     };
                     SDL_RenderGeometry(r, NULL, tri, 3, NULL, 0);
-                    if (p->charge_kind != 0xFF && p->kick_charge > 0) {   /* power bar while charging */
-                        float c = (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
+                    if (charging) {   /* power bar while charging (through ball: lead distance) */
+                        float c = p->charge_kind == WP_KICK_PASS
+                                ? (float)(p->kick_charge - T_PASS_TAP_TICKS) / (float)(T_CHARGE_MAX_TICKS - T_PASS_TAP_TICKS)
+                                : (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
                         float bw = 1.1f * cam->ppm * m.s, bh = 0.16f * cam->ppm * m.s + 2.0f;
                         float x0 = m.x - bw * 0.5f, y0 = m.y - rad * 0.8f - bh - 4.0f;
                         SDL_FRect bg = {x0 - 1, y0 - 1, bw + 2, bh + 2}, fg = {x0, y0, bw * c, bh};
                         SDL_SetRenderDrawColor(r, 15, 15, 20, 220);
                         SDL_RenderFillRect(r, &bg);
                         if (p->charge_kind == WP_KICK_CHIP) SDL_SetRenderDrawColor(r, 90, 200, 255, 255);
+                        else if (p->charge_kind == WP_KICK_PASS) SDL_SetRenderDrawColor(r, 240, 240, 245, 255);
                         else SDL_SetRenderDrawColor(r, (Uint8)(120 + 135 * c), (Uint8)(230 - 150 * c), 60, 255);
                         SDL_RenderFillRect(r, &fg);
                     }

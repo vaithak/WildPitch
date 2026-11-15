@@ -139,3 +139,17 @@ edited or "tidied". Shown as a quiet card on every normal launch (`src/game/dedi
 centred, a drawn red heart; ~4 s with fades, any key skips; never in harness/capture modes; `--dedication
 --screenshot F.bmp` captures it). Also at the top of README.md. When menus exist (CP0.4/0.5) it also gets a
 permanent line on the title screen footer and in the credits. Never on the in-match HUD.
+
+## D-019 — Through balls, lofted passes, headers (2026-11-15, CP0.2b)
+- **J is tap/hold:** released within 9 ticks (150 ms) = targeted pass (fires on RELEASE: costs the tap's length in
+  latency, ~50-100 ms); held longer = through ball, lead 2.5→10 m ahead of the receiver (mostly toward the goal
+  he attacks), weighted to arrive there at 3 m/s; white power bar appears only past the tap window.
+- **L = lofted pass:** to the best team-mate toward the stick, dropped where he'll be in 0.8 s; vz = 4 + 0.22·d
+  (5–9.5 m/s); horizontal speed from `ball_lob_speed_for()` (air-model inverse, agreement-tested ±0.4 m).
+- **Headers (D-010 made playable):** J/K pressed while the ball comes in above body height (within 1.2 s, 2 m)
+  starts a header attempt: stand header if it'll arrive ≤ 1.9 m, else a jump timed so the apex meets it. While it
+  waits, the stick only AIMS and the legs step under the ball. Contact only in the head band (±0.32 m, 0.45 m
+  reach); the attacker's body cylinder ignores the ball meanwhile. K: aim-assisted at goal, 11 m/s + 25% of the
+  incoming pace (max 17), nodded down; J: cushioned to the best team-mate (hands control over).
+- **Assisted receive meet point:** cheap 50 ms ball prediction; ground/lofted passes → the reachable point CLOSEST to
+  the receiver (step across, let it come: arrives ~6 m/s); through balls → where it slows to ~3.5 m/s (run onto it).

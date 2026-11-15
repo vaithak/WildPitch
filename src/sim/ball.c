@@ -92,6 +92,8 @@ static void collide_bodies(SimState *s) {
     for (int i = 0; i < 2 * s->n_per_side; i++) {
         WpPlayer *p = &s->players[i];
         if (i == b->owner || p->immune) continue;
+        if ((p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) && p->kick.kind == WP_KICK_HEADER &&
+            !p->kick.done && b->z > WP_BAND_FEET_MAX) continue;    /* going for a header: the head decides (D-010) */
         if (b->z > p->z + T_BODY_H || b->z + T_BALL_R < p->z) continue;
         fx r = (p->role == WP_ROLE_KEEPER ? T_KEEPER_BODY_R : T_BODY_R) + T_BALL_R;
         fv2 d = fv2_sub(b->pos, p->pos);
@@ -191,6 +193,36 @@ fx ball_roll_speed_for(fx d) {
     for (int it = 0; it < 18; it++) {
         fx mid = (lo + hi) / 2;
         if (ball_roll_distance(mid) < d) lo = mid; else hi = mid;
+    }
+    return hi;
+}
+
+/* where a ball launched at (vh, vz) from the grass first lands (mirrors integrate()'s air branch + substeps) */
+fx ball_carry_distance(fx vh, fx vz) {
+    fx x = 0, z = 0;
+    for (int t = 0; t < 600; t++) {
+        fx sp = fv2_len(fv2_make(vh, vz));
+        int n = 1 + (int)(fx_mul(sp, WP_DT) / T_SUBSTEP_MAX_MOVE);
+        if (n > 12) n = 12;
+        fx dt = WP_DT / n;
+        for (int k = 0; k < n; k++) {
+            fx s3 = fv2_len(fv2_make(vh, vz));
+            fx kd = fx_min(fx_mul(fx_mul(T_AIR_DRAG, s3), dt), FX_ONE);
+            vh -= fx_mul(vh, kd);
+            vz -= fx_mul(vz, kd) + fx_mul(T_GRAVITY, dt);
+            x += fx_mul(vh, dt);
+            z += fx_mul(vz, dt);
+            if (z <= 0) return x;
+        }
+    }
+    return x;
+}
+
+fx ball_lob_speed_for(fx d, fx vz) {
+    fx lo = 0, hi = FX(35.0);
+    for (int it = 0; it < 16; it++) {
+        fx mid = (lo + hi) / 2;
+        if (ball_carry_distance(mid, vz) < d) lo = mid; else hi = mid;
     }
     return hi;
 }

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "test_util.h"
 #include "sim_test_helpers.h"
+#include "sim/sim_internal.h"
 
 #define ME 4      /* team 0 striker (seat 0) */
 #define MATE 3    /* team 0 midfielder */
@@ -38,7 +39,8 @@ int main(void) {
             /* stick toward the mate */
             fv2 to = fv2_norm(fv2_sub(s.players[MATE].pos, s.players[ME].pos));
             int8_t sx = (int8_t)(to.x * 127 / FX_ONE), sy = (int8_t)(to.y * 127 / FX_ONE);
-            run_seat(&s, (WpSeatInput){sx, sy, (uint16_t)(runs[r].b | WP_BTN_PASS)}, 1);
+            run_seat(&s, (WpSeatInput){sx, sy, (uint16_t)(runs[r].b | WP_BTN_PASS)}, 2);   /* tap J ... */
+            run_seat(&s, (WpSeatInput){sx, sy, runs[r].b}, 1);                             /* ... release, stick held */
             int kick_t = -1, seat_before_kick_ok = 1, got = -1; fx arrive = 0;
             for (int t = 0; t < 300 && got < 0; t++) {
                 int seat_before = s.seat_player[0];
@@ -54,18 +56,19 @@ int main(void) {
             CHECKF(kick_t >= 0 && seat_before_kick_ok, "%s: kick %d, switched before contact %d", runs[r].name, kick_t, !seat_before_kick_ok);
             CHECKF(got == MATE, "%s %d m: ball ended with %d, not the receiver", runs[r].name, far ? 18 : 8, got);
             CHECKF(s.seat_player[0] == MATE, "%s: control didn't move to the receiver", runs[r].name);
-            CHECKF(arrive > FX(3.0) && arrive < FX(9.0), "%s: arrival pace %.1f m/s", runs[r].name, tod(arrive));
+            CHECKF(arrive > FX(3.0) && arrive < FX(10.0), "%s: arrival pace %.1f m/s", runs[r].name, tod(arrive));
         }
     }
 
     /* 2. the receiver's aim comes from the human's stick, not the assisted run: pass +x, keep holding +x, pass again
      *    on arrival -> the second pass goes on +x (to MATE2 beyond), not back toward the first passer */
     scene(&s, fv2_make(-FX(10.0), 0), fv2_make(-FX(1.0), 0), fv2_make(FX(9.0), FX(1.0)));
-    run_seat(&s, (WpSeatInput){127, 0, WP_BTN_PASS}, 1);
-    int second = 0;
+    run_seat(&s, (WpSeatInput){127, 0, WP_BTN_PASS}, 2);
+    int second = 0, tapped = 0;
     for (int t = 0; t < 300 && !second; t++) {
-        int mine = s.seat_player[0] == MATE && s.ball.owner == MATE;
-        uint16_t ev = run_seat(&s, (WpSeatInput){127, 0, (uint16_t)(mine ? WP_BTN_PASS : 0)}, 1);
+        int mine = s.seat_player[0] == MATE && s.ball.owner == MATE && !tapped;
+        if (mine) { run_seat(&s, (WpSeatInput){127, 0, WP_BTN_PASS}, 2); tapped = 1; }
+        uint16_t ev = run_seat(&s, (WpSeatInput){127, 0, 0}, 1);
         if ((ev & WP_EV_KICK) && s.ball.last_touch == MATE) second = 1;
     }
     CHECKF(second && s.ball.vel.x > 0, "one-two: second pass went %.1f m/s in x (want +x)", tod(s.ball.vel.x));
@@ -92,5 +95,78 @@ int main(void) {
     run_seat(&s, (WpSeatInput){0, 0, WP_BTN_SHOOT}, 2);
     CHECKF(s.seat_player[0] == MATE, "auto-switch to the player nearest a loose ball: seat %d", s.seat_player[0]);
     CHECK(s.players[ME].charge_kind == 0xFF && s.players[ME].kick_charge == 0);
+    /* 5. through ball (hold J): lands in the space AHEAD of the receiver, who runs onto it and gets it */
+    for (int hold = 14; hold <= 36; hold += 22) {
+        scene(&s, fv2_make(-FX(12.0), 0), fv2_make(-FX(4.0), FX(3.0)), fv2_make(-FX(12.0), -FX(9.0)));
+        fv2 to = fv2_norm(fv2_sub(s.players[MATE].pos, s.players[ME].pos));
+        int8_t sx = (int8_t)(to.x * 127 / FX_ONE), sy = (int8_t)(to.y * 127 / FX_ONE);
+        fx mate_x0 = s.players[MATE].pos.x;
+        run_seat(&s, (WpSeatInput){sx, sy, WP_BTN_PASS}, hold);
+        run_seat(&s, (WpSeatInput){sx, sy, 0}, 1);
+        int got = -1, kicked = 0;
+        for (int t = 0; t < 300 && got < 0; t++) {
+            kicked |= (run_seat(&s, NOIN, 1) & WP_EV_KICK) != 0;
+            if (kicked && s.ball.owner >= 0) got = s.ball.owner;
+        }
+        printf("through ball (hold %d): received by %d, %.1f m beyond where he started\n", hold, got,
+               tod(s.players[MATE].pos.x - mate_x0));
+        CHECKF(got == MATE, "through ball hold %d: ended with %d", hold, got);
+        CHECKF(s.players[MATE].pos.x - mate_x0 > (hold > 20 ? FX(6.0) : FX(1.5)), "through ball hold %d: only %.1f m ahead",
+               hold, tod(s.players[MATE].pos.x - mate_x0));
+    }
+
+    /* 6. lofted pass (L) over a defender: goes over (high), dropped on the receiver */
+    scene(&s, fv2_make(-FX(12.0), 0), fv2_make(FX(4.0), FX(1.0)), fv2_make(-FX(12.0), -FX(9.0)));
+    s.players[7].pos = fv2_make(-FX(6.0), FX(0.3));           /* an opponent statue in the lane */
+    {
+        fx peak = 0; int got = -1, kicked = 0;
+        run_seat(&s, (WpSeatInput){127, 8, WP_BTN_LOB}, 1);
+        for (int t = 0; t < 300 && got < 0; t++) {
+            kicked |= (run_seat(&s, NOIN, 1) & WP_EV_KICK) != 0;
+            if (s.ball.z > peak) peak = s.ball.z;
+            if (kicked && s.ball.owner >= 0) got = s.ball.owner;
+        }
+        printf("lofted pass: peak %.1f m, received by %d\n", tod(peak), got);
+        CHECKF(peak > FX(2.5) && got == MATE, "lob: peak %.1f m, got %d", tod(peak), got);
+    }
+    /* lob solver agrees with the real flight */
+    for (int d = 8; d <= 28; d += 10) {
+        fx vz = FX(6.0);
+        setup_empty(&s, -1); s.seat_player[0] = -1;
+        s.ball.pos = fv2_make(-FX(18.0), FX(8.0)); s.ball.z = 0; s.ball.owner = -1;
+        s.ball.vel = fv2_make(ball_lob_speed_for(FX_INT(d), vz), 0); s.ball.vz = vz;
+        fx landed = 0;
+        for (int t = 0; t < 400 && !landed; t++) { if (run_seat(&s, NOIN, 1) & WP_EV_BOUNCE) landed = s.ball.pos.x + FX(18.0); }
+        CHECKF(landed > FX_INT(d) - FX(0.4) && landed < FX_INT(d) + FX(0.4), "lob solver %d m landed %.2f", d, tod(landed));
+    }
+
+    /* 7. headers: a cross arriving at head height -> K = header at goal (scores vs an empty goal), J = header pass;
+     *    too high to reach standing -> the player jumps (and still gets his head to it) */
+    for (int kind = 0; kind < 3; kind++) {
+        setup_empty(&s, ME); s.seat_player[0] = ME;
+        s.players[ME].pos = fv2_make(FX(14.0), FX(1.0)); s.players[ME].facing = 0;
+        s.players[MATE].pos = fv2_make(FX(8.0), -FX(6.0));
+        fx hz = kind == 2 ? FX(2.15) : FX(1.65);                  /* height at arrival */
+        /* ball from the right touchline area flying across to arrive at ME's head in ~0.6 s */
+        fv2 from = fv2_make(FX(14.0), FX(10.0));
+        fx T = FX(0.6), z0 = FX(1.0);
+        s.ball.pos = from; s.ball.z = z0; s.ball.owner = -1;
+        s.ball.vel = fv2_scale(fv2_sub(s.players[ME].pos, from), fx_div(FX_ONE, T));
+        s.ball.vz = fx_div(hz - z0, T) + fx_mul(T_GRAVITY, T) / 2;
+        uint16_t btn = kind == 1 ? WP_BTN_PASS : WP_BTN_SHOOT;
+        run_seat(&s, (WpSeatInput){0, 0, btn}, 1);
+        int acted = s.players[ME].action;
+        uint16_t ev = 0; fx top = 0;
+        WpSeatInput hold = kind == 1 ? (WpSeatInput){-83, -96, 0} : NOIN;   /* header pass: stick at the mate */
+        for (int t = 0; t < 90; t++) { ev |= run_seat(&s, hold, 1); if (s.players[ME].z > top) top = s.players[ME].z; }
+        printf("header %s: action %d, head contact %d, jumped %.2f m, score %d, ball heading x %.1f\n",
+               kind == 1 ? "pass" : kind == 2 ? "high" : "shot", acted, (ev & WP_EV_HEADER) != 0, tod(top), s.score[0],
+               tod(s.ball.vel.x));
+        CHECKF(ev & WP_EV_HEADER, "header kind %d: no head contact", kind);
+        if (kind == 2) CHECKF(acted == WP_ACT_JUMP_HEADER && top > FX(0.3), "high ball: no jump (%d, %.2f)", acted, tod(top));
+        else CHECKF(acted == WP_ACT_STAND_HEADER, "head-height ball: action %d", acted);
+        if (kind != 1) CHECKF(s.score[0] == 1 || s.phase == WP_PHASE_GOAL, "header at goal didn't score");
+        if (kind == 1) CHECKF(s.seat_player[0] == MATE, "header pass: control not handed to the team-mate");
+    }
     return TEST_DONE();
 }

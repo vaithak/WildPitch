@@ -76,6 +76,18 @@
 #define T_PASS_CONE_DEG    55         /* receivers within this angle of the stick are candidates */
 #define T_PASS_LEAD_S      FX(0.25)   /* aim at the receiver's position this far ahead */
 #define T_SPRINT_SPILL     FX(0.12)   /* extra first-touch spill when receiving at a sprint */
+#define T_PASS_TAP_TICKS   9          /* J released within this = tap (targeted pass); held longer = through ball */
+#define T_THROUGH_LEAD_MIN FX(2.5)    /* through ball lands this far ahead of the receiver at minimum hold ... */
+#define T_THROUGH_LEAD_MAX FX(10.0)   /* ... and this far at full hold */
+#define T_THROUGH_ARRIVE   FX(3.0)    /* through ball's speed when it reaches that spot */
+#define T_LOB_VZ_BASE      FX(4.0)    /* lofted pass: vz = BASE + PER_M * distance, clamped */
+#define T_LOB_VZ_PER_M     FX(0.22)
+#define T_LOB_VZ_MIN       FX(5.0)
+#define T_LOB_VZ_MAX       FX(9.5)
+#define T_HEADER_SHOT      FX(11.0)   /* header at goal: base speed (+25% of the incoming ball's speed) */
+#define T_HEADER_SHOT_MAX  FX(17.0)
+#define T_HEADER_SHOT_VZ   -FX(0.8)   /* nodded down */
+#define T_HEADER_PASS_MAX  FX(12.0)
 
 /* ---- kicks ---- */
 #define T_CHARGE_MAX_TICKS 36         /* full power after 0.6 s */

@@ -61,7 +61,7 @@ void sim_player_kick(SimState *s, int i, const WpKick *k) {
 
 /* Best team-mate for a pass toward `dir`: within T_PASS_CONE_DEG, scored by angle off the stick and distance
  * (nearer and straighter wins). Keeper only if nearly straight at him. -1 if nobody fits (pass into space). */
-static int pass_pick(const SimState *s, int i, wp_angle dir) {
+int pass_pick(const SimState *s, int i, wp_angle dir) {
     const WpPlayer *p = &s->players[i];
     int best = -1; int32_t best_score = 0;
     for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
@@ -80,6 +80,25 @@ static int pass_pick(const SimState *s, int i, wp_angle dir) {
     return best;
 }
 
+/* Aim assist (D-013): roughly toward goal, the stick picks a TARGET rather than an exact angle — up/down = that
+ * side of the goal, straight/none = the far post from where you stand. A share of the stick's angular error
+ * remains so aiming still matters. Shared by shots, chips and headers. */
+wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim) {
+    const WpPlayer *p = &s->players[i];
+    int sg = p->team == 0 ? 1 : -1;
+    fx side = fx_mul(s->pitch.goal_width, T_AIM_SIDE);
+    fx gy;
+    if (has_aim && aim.y > FX(0.25)) gy = side;
+    else if (has_aim && aim.y < -FX(0.25)) gy = -side;
+    else gy = p->pos.y > FX(0.5) ? -side : side;
+    fv2 to_goal = fv2_sub(fv2_make(sg * (s->pitch.length / 2), gy), p->pos);
+    wp_angle ga = fx_atan2(to_goal.y, to_goal.x);
+    int32_t diff = ang_diff(dir, ga);
+    if (diff > -DEG_TO_ANG(T_AIM_WINDOW_DEG) && diff < DEG_TO_ANG(T_AIM_WINDOW_DEG))
+        dir = (wp_angle)(ga + (int32_t)(((int64_t)diff * T_AIM_RESIDUAL) >> FX_SHIFT));
+    return dir;
+}
+
 /* Build kick parameters from a human's input. charge01 in [0,1]. */
 static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 aim, int has_aim, WpKick *k) {
     const WpPlayer *p = &s->players[i];
@@ -95,6 +114,17 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
             dir = fx_atan2(d.y, d.x);
             k->to = (uint8_t)(r + 1);
         }
+    } else if (kind == WP_KICK_THROUGH || kind == WP_KICK_LOB) {
+        /* power field = through-ball lead (m) / lob: unused; vz decided at contact */
+        k->power = fx_lerp(T_THROUGH_LEAD_MIN, T_THROUGH_LEAD_MAX, charge01);
+        k->vz = 0;
+        k->windup = kind == WP_KICK_LOB ? T_KICK_WINDUP_CHIP : T_KICK_WINDUP_PASS;
+        int r = pass_pick(s, i, dir);
+        if (r >= 0) {
+            fv2 d = fv2_sub(s->players[r].pos, p->pos);
+            dir = fx_atan2(d.y, d.x);
+            k->to = (uint8_t)(r + 1);
+        }
     } else if (kind == WP_KICK_SHOT) {
         k->power = fx_lerp(T_SHOT_MIN, T_SHOT_MAX, charge01);
         k->vz = fx_lerp(T_SHOT_VZ_MIN, T_SHOT_VZ_MAX, fx_mul(charge01, charge01));
@@ -104,21 +134,8 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
         k->vz = fx_lerp(T_CHIP_VZ_MIN, T_CHIP_VZ_MAX, charge01);
         k->windup = T_KICK_WINDUP_CHIP;
     }
-    if (kind != WP_KICK_PASS) {
-        /* Aim assist (D-013): roughly toward goal, the stick picks a TARGET rather than an exact angle —
-         * up/down = that side of the goal, straight/none = the far post from where you stand. A share of
-         * the stick's angular error remains so aiming still matters. */
-        int sg = p->team == 0 ? 1 : -1;
-        fx side = fx_mul(s->pitch.goal_width, T_AIM_SIDE);
-        fx gy;
-        if (has_aim && aim.y > FX(0.25)) gy = side;
-        else if (has_aim && aim.y < -FX(0.25)) gy = -side;
-        else gy = p->pos.y > FX(0.5) ? -side : side;
-        fv2 to_goal = fv2_sub(fv2_make(sg * (s->pitch.length / 2), gy), p->pos);
-        wp_angle ga = fx_atan2(to_goal.y, to_goal.x);
-        int32_t diff = ang_diff(dir, ga);
-        if (diff > -DEG_TO_ANG(T_AIM_WINDOW_DEG) && diff < DEG_TO_ANG(T_AIM_WINDOW_DEG))
-            dir = (wp_angle)(ga + (int32_t)(((int64_t)diff * T_AIM_RESIDUAL) >> FX_SHIFT));
+    if (kind == WP_KICK_SHOT || kind == WP_KICK_CHIP) {
+        dir = kick_aim_assist(s, i, dir, aim, has_aim);
         /* curl: striking across the direction of running bends the ball the way you turned */
         fx spd = fv2_len(p->vel);
         if (spd > FX(2.0)) {
@@ -143,6 +160,36 @@ static fv2 pass_velocity(const SimState *s, int r) {
     return fv2_scale(fv2_norm(d), v0);
 }
 
+/* Through ball: into the space ahead of the receiver (mostly toward the goal he attacks, partly his run), weighted
+ * to reach that spot at T_THROUGH_ARRIVE so he runs onto it. */
+static fv2 through_velocity(const SimState *s, int r, fx lead) {
+    const WpPlayer *q = &s->players[r];
+    fx hl = s->pitch.length / 2, hw = s->pitch.width / 2;
+    fv2 run = fv2_make(q->team == 0 ? FX(2.0) : -FX(2.0), 0);
+    if (fv2_len(q->vel) > FX(1.0)) run = fv2_add(run, fv2_norm(q->vel));
+    fv2 spot = fv2_add(q->pos, fv2_scale(fv2_norm(run), lead));
+    spot.x = fx_clamp(spot.x, -(hl - FX(1.5)), hl - FX(1.5));
+    spot.y = fx_clamp(spot.y, -(hw - FX(1.0)), hw - FX(1.0));
+    fv2 d = fv2_sub(spot, s->ball.pos);
+    fx v0 = fx_min(ball_roll_speed_for(fv2_len(d) + ball_roll_distance(T_THROUGH_ARRIVE)), T_PASS_MAX);
+    return fv2_scale(fv2_norm(d), v0);
+}
+
+/* Lofted pass: dropped on the receiver (where he'll be at landing), higher for longer balls. */
+static fv2 lob_velocity(const SimState *s, int r, wp_angle dir, fx *vz) {
+    fv2 target;
+    if (r >= 0) {
+        const WpPlayer *q = &s->players[r];
+        target = fv2_add(q->pos, fv2_scale(q->vel, FX(0.8)));
+    } else {
+        target = fv2_add(s->ball.pos, fv2_from_angle(dir, FX(18.0)));
+    }
+    fv2 d = fv2_sub(target, s->ball.pos);
+    fx dist = fv2_len(d);
+    *vz = fx_clamp(T_LOB_VZ_BASE + fx_mul(T_LOB_VZ_PER_M, dist), T_LOB_VZ_MIN, T_LOB_VZ_MAX);
+    return fv2_scale(fv2_norm(d), ball_lob_speed_for(dist, *vz));
+}
+
 static void contact(SimState *s, int i, const WpSeatInput *in) {
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
@@ -157,9 +204,13 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     fv2 spot = fv2_add(p->pos, fv2_from_angle(cd, FOOT_SPOT));
     fx off = fx_min(fx_div(fv2_len(fv2_sub(b->pos, spot)), KICK_REACH), FX_ONE);
     fx q = fx_max(FX_ONE - across / 4 - off / 4, FX(0.75));
-    if (p->kick.to) b->vel = pass_velocity(s, p->kick.to - 1);
-    else b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(p->kick.power, q)), fv2_scale(p->vel, INHERIT_VEL));
-    b->vz = p->kick.vz;
+    fx vz = p->kick.vz;
+    if (p->kick.kind == WP_KICK_LOB) b->vel = lob_velocity(s, (int)p->kick.to - 1, p->kick.dir, &vz);
+    else if (p->kick.kind == WP_KICK_THROUGH && p->kick.to) b->vel = through_velocity(s, p->kick.to - 1, p->kick.power);
+    else if (p->kick.to) b->vel = pass_velocity(s, p->kick.to - 1);
+    else b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(p->kick.kind == WP_KICK_THROUGH ? T_PASS_SPEED : p->kick.power, q)),
+                          fv2_scale(p->vel, INHERIT_VEL));
+    b->vz = vz;
     b->spin = p->kick.spin;
     b->owner = -1;
     b->last_touch = (int8_t)i;
@@ -176,19 +227,31 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     fv2 aim = stick_dir(in, &has);
     if (s->phase != WP_PHASE_PLAY) { p->kick_charge = 0; p->charge_kind = 0xFF; return; }
 
-    if ((pressed & WP_BTN_PASS) && p->action == WP_ACT_NONE && ball_reachable(s, i, KICK_START_REACH)) {
-        WpKick k; make_kick(s, i, WP_KICK_PASS, 0, aim, has, &k);
+    /* contextual header (D-010): pass/shoot pressed while a ball comes in above body height */
+    int jump;
+    if ((pressed & (WP_BTN_PASS | WP_BTN_SHOOT)) && p->action == WP_ACT_NONE && header_wanted(s, i, &jump)) {
+        header_start(s, i, (pressed & WP_BTN_SHOOT) != 0, jump);
+        return;
+    }
+    if ((pressed & WP_BTN_LOB) && p->action == WP_ACT_NONE && ball_reachable(s, i, KICK_START_REACH)) {
+        WpKick k; make_kick(s, i, WP_KICK_LOB, 0, aim, has, &k);
         sim_player_kick(s, i, &k);
     }
-    for (int c = 0; c < 2; c++) {                         /* shoot and chip share the charge mechanic */
-        uint16_t btn = c == 0 ? WP_BTN_SHOOT : WP_BTN_CHIP;
-        uint8_t kind = c == 0 ? WP_KICK_SHOT : WP_KICK_CHIP;
+    /* pass, shoot and chip share the hold/release mechanic. Pass: a tap (<= T_PASS_TAP_TICKS) = targeted pass,
+     * held longer = through ball whose lead grows with the hold. */
+    for (int c = 0; c < 3; c++) {
+        uint16_t btn = c == 0 ? WP_BTN_PASS : c == 1 ? WP_BTN_SHOOT : WP_BTN_CHIP;
+        uint8_t kind = c == 0 ? WP_KICK_PASS : c == 1 ? WP_KICK_SHOT : WP_KICK_CHIP;
         if ((pressed & btn) && p->charge_kind == 0xFF) { p->charge_kind = kind; p->kick_charge = 0; }
         if ((now & btn) && p->charge_kind == kind && p->kick_charge < T_CHARGE_MAX_TICKS) p->kick_charge++;
         if ((released & btn) && p->charge_kind == kind) {
             if (p->action == WP_ACT_NONE && ball_reachable(s, i, KICK_START_REACH)) {
                 WpKick k;
-                make_kick(s, i, kind, fx_div(FX_INT(p->kick_charge), FX_INT(T_CHARGE_MAX_TICKS)), aim, has, &k);
+                if (kind == WP_KICK_PASS && p->kick_charge > T_PASS_TAP_TICKS)
+                    make_kick(s, i, WP_KICK_THROUGH, fx_div(FX_INT(p->kick_charge - T_PASS_TAP_TICKS),
+                                                            FX_INT(T_CHARGE_MAX_TICKS - T_PASS_TAP_TICKS)), aim, has, &k);
+                else
+                    make_kick(s, i, kind, fx_div(FX_INT(p->kick_charge), FX_INT(T_CHARGE_MAX_TICKS)), aim, has, &k);
                 sim_player_kick(s, i, &k);
             }
             p->charge_kind = 0xFF;
@@ -339,8 +402,8 @@ static void air_and_timers(WpPlayer *p) {
     }
     if (p->action != WP_ACT_NONE) {
         p->action_timer++;
-        int ends = p->action == WP_ACT_JUMP_HEADER ? (p->z == 0 && p->vz == 0 && p->action_timer > 4)
-                 : p->action == WP_ACT_KICK ? p->action_timer >= T_KICK_TOTAL_TICKS
+        int ends = p->action == WP_ACT_KICK ? p->action_timer >= T_KICK_TOTAL_TICKS
+                 : (p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) ? header_action_ends(p)
                  : p->action_timer > 30;
         if (ends) { p->action = WP_ACT_NONE; p->action_timer = 0; }
     }
@@ -354,6 +417,8 @@ void sim_player_jump(SimState *s, int i, uint8_t action) {
     p->vz = WP_JUMP_VZ;
     p->action = action;
     p->action_timer = 0;
+    p->kick.done = 1;                                     /* a plain jump: no header contact attempt */
+    p->kick.windup = 1;
 }
 
 void players_step(SimState *s, const WpInput *in) {
@@ -364,7 +429,11 @@ void players_step(SimState *s, const WpInput *in) {
     seats_update(s, in);                                  /* switching first: this tick's inputs go to the new player */
     for (int i = 0; i < np; i++) {
         int seat = seat_of(s, i);
-        if (seat >= 0) { pin[i] = mv[i] = in->seat[seat]; seats_assist_receive(s, seat, &mv[i]); }
+        if (seat >= 0) {
+            pin[i] = mv[i] = in->seat[seat];
+            seats_assist_receive(s, seat, &mv[i]);
+            header_assist_move(s, i, &mv[i]);
+        }
         else if (s->flags & WP_SIMF_STATIC_OTHERS) pin[i] = mv[i] = (WpSeatInput){0, 0, 0};
         else { team_input(s, i, &pin[i]); mv[i] = pin[i]; }
     }
@@ -375,6 +444,7 @@ void players_step(SimState *s, const WpInput *in) {
         WpPlayer *p = &s->players[i];
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
+        if (seat >= 0) header_step(s, i, &pin[i]);
         air_and_timers(p);
     }
     for (int i = 0; i < np; i++)

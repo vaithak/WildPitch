@@ -14,7 +14,8 @@ static void scripted_input(WpRng *r, uint32_t tick, const SimState *s, WpInput *
     static WpSeatInput held[WP_MAX_SEATS];
     memset(in, 0, sizeof *in);
     if (tick % 30 == 0) {
-        held[0].buttons = (uint16_t)(wp_rng_u32(r) & (WP_BTN_PASS | WP_BTN_SHOOT | WP_BTN_SPRINT | WP_BTN_CHIP | WP_BTN_SWITCH));
+        held[0].buttons = (uint16_t)(wp_rng_u32(r) & (WP_BTN_PASS | WP_BTN_SHOOT | WP_BTN_SPRINT | WP_BTN_CHIP | WP_BTN_SWITCH |
+                                                    WP_BTN_LOB));
         held[1].move_x = (int8_t)((int)wp_rng_range(r, 255) - 127);
         held[1].move_y = (int8_t)((int)wp_rng_range(r, 255) - 127);
         held[1].buttons = (uint16_t)(wp_rng_u32(r) & 0x3F);
@@ -27,6 +28,11 @@ static void scripted_input(WpRng *r, uint32_t tick, const SimState *s, WpInput *
         held[0].move_y = (int8_t)(dy > FX(0.3) ? 127 : (dy < -FX(0.3) ? -127 : 0));
     }
     for (int k = 0; k < 2; k++) in->seat[k] = held[k];
+    /* held buttons give through balls; also tap pass (2 ticks) now and then, and press it whenever the ball is
+     * up in the air nearby so headers get exercised */
+    if (tick % 45 == 10 || tick % 45 == 11) in->seat[0].buttons = (uint16_t)((in->seat[0].buttons & ~WP_BTN_PASS) | WP_BTN_PASS);
+    if (tick % 45 == 12) in->seat[0].buttons &= (uint16_t)~WP_BTN_PASS;
+    if (me >= 0 && s->ball.z > FX(1.3) && (tick & 7) < 2) in->seat[0].buttons |= (tick & 16) ? WP_BTN_SHOOT : WP_BTN_PASS;
 }
 
 static void scripted_poke(WpRng *r, uint32_t tick, SimState *s) {

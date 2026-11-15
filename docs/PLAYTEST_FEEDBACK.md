@@ -52,3 +52,7 @@ Format:
 - **Feedback (verbatim):** "looks really good, move ahead now"
 - **Action:** start CP0.2, split into CP0.2a (shape, switching, aimed ground passes, clock) and CP0.2b (through ball,
   lofted pass, headers) so passing/switching feel gets its own playtest.
+
+## CP0.2a — 2026-11-15
+- **Feedback (verbatim):** "go ahead" (after CP0.2a + the dedication card; no specific passing/switching notes yet).
+- **Action:** CP0.2b (through balls, lofted passes, headers). CP0.2a feel questions stay open for the next playtest.

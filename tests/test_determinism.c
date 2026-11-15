@@ -61,7 +61,8 @@ int main(void) {
     CHECK(counts[1] >= 50);   /* touches */
     CHECK(counts[5] + counts[6] >= 3);   /* goals + outs */
     CHECK(counts[7] >= 2);    /* resets */
-    printf("seat 0 switched player %d times; bad-owner ticks %d\n", switches, bad_owner);
+    printf("seat 0 switched player %d times; bad-owner ticks %d; headers %d\n", switches, bad_owner, counts[9]);
+    CHECK(counts[9] >= 3);    /* head contacts */
     CHECK(switches >= 20);    /* switching (manual + auto + pass hand-off) is exercised */
     CHECK(bad_owner == 0);
 

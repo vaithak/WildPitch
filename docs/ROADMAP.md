@@ -64,7 +64,7 @@ Not playable; invisible plumbing every later CP depends on.
 > **Dedication (D-018):** launch card done; when menus arrive (CP0.4/CP0.5) add it to the title-screen footer and
 > the credits, with the drawn heart.
 
-### CP0.2b — Through balls, lofted passes, headers ⏭ 🔵
+### CP0.2b — Through balls, lofted passes, headers ✅ 🔵
 - Hold pass = through ball into space (power by hold); lofted pass (L) with an airborne inverse model; playable
   contextual headers (D-010) incl. body-cylinder exemption during a header; pass power bar.
 
@@ -78,7 +78,7 @@ Not playable; invisible plumbing every later CP depends on.
 - HUD: score, clock, controlled-player marker, pass power bar.
 - **Playtest:** do passes go where you expect? Is switching intuitive?
 
-### CP0.3 — "Instinct AI" ⬜ 🟡
+### CP0.3 — "Instinct AI" ⏭ 🟡
 **Playable:** first real 5v5 match vs AI.
 - **Instinct layer** as *candidate actions × utility scores* over an observation vector
   (this is the exact interface the learned brain plugs into in Phase 1 — not a state machine).

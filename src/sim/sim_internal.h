@@ -3,6 +3,7 @@
  *   player.c  movement, turning, buttons -> parametric kicks, ball control & dribbling
  *   ball.c    ball physics (substepped), posts/crossbar/net, bodies, goal & out detection
  *   seats.c   which player each human seat controls (switching), pass in flight, assisted receive
+ *   header.c  contextual headers: trigger, take-off timing, head-band contact
  *   team.c    placeholder movement for non-human players (shape, runs, keepers) -> WpSeatInput (CP0.3: AI)
  */
 #ifndef WP_SIM_INTERNAL_H
@@ -28,6 +29,19 @@ static inline fx ball_roll_decel(fx v) { return T_ROLL_DECEL + fx_mul(T_ROLL_LIN
  * by bisection over the same per-tick integration ball.c uses). Used for stopping touches; passes later (CP0.2). */
 fx ball_roll_speed_for(fx d);
 fx ball_roll_distance(fx v);                 /* forward model: how far a ground ball at v rolls */
+
+fx ball_lob_speed_for(fx d, fx vz);          /* horizontal launch speed so a ball launched with vz lands at d */
+fx ball_carry_distance(fx vh, fx vz);        /* forward model: where (horizontally) it first lands */
+
+/* player.c helpers shared with header.c */
+int      pass_pick(const SimState *s, int i, wp_angle dir);
+wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim);
+/* header.c */
+int  header_wanted(const SimState *s, int i, int *jump);
+void header_start(SimState *s, int i, int shot, int jump);
+void header_step(SimState *s, int i, const WpSeatInput *in);
+int  header_action_ends(const WpPlayer *p);
+void header_assist_move(const SimState *s, int i, WpSeatInput *io);
 
 /* seats.c */
 void seats_update(SimState *s, const WpInput *in);

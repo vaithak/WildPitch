@@ -28,6 +28,7 @@ enum {
     WP_BTN_SWITCH = 1 << 3,
     WP_BTN_SHOUT  = 1 << 4,
     WP_BTN_CHIP   = 1 << 5,  /* chip: hold to charge, release (like shoot) */
+    WP_BTN_LOB    = 1 << 6,  /* lofted pass to the best team-mate toward the stick */
 };
 
 typedef struct {
@@ -76,7 +77,7 @@ enum {
 
 /* A kick is a parametric move (DECISIONS D-012): what it does to the ball + when contact happens.
  * The avatar reads the same fields (foot, windup) so the visible strike lands on the contact tick. */
-enum { WP_KICK_PASS = 0, WP_KICK_SHOT, WP_KICK_CHIP, WP_KICK_HEADER };
+enum { WP_KICK_PASS = 0, WP_KICK_SHOT, WP_KICK_CHIP, WP_KICK_HEADER, WP_KICK_THROUGH, WP_KICK_LOB };
 typedef struct {
     fx       power;              /* horizontal ball speed at contact, m/s */
     fx       vz;                 /* vertical ball speed at contact, m/s */
@@ -99,7 +100,7 @@ typedef struct {
     uint8_t team;                /* 0 or 1 */
     uint8_t role;                /* WP_ROLE_* */
     uint16_t kick_charge;        /* ticks the shoot/chip button has been held */
-    uint8_t  charge_kind;        /* WP_KICK_SHOT / WP_KICK_CHIP while charging, else 0xFF */
+    uint8_t  charge_kind;        /* WP_KICK_PASS (tap/through) / SHOT / CHIP while its button is held, else 0xFF */
     uint8_t  immune;             /* ticks this player's body ignores the ball (just kicked it) */
     uint16_t touch_cooldown;     /* ticks before this player may touch the ball again */
     fx stamina;                  /* 0..1 */
@@ -122,6 +123,7 @@ enum {
     WP_EV_OUT    = 1 << 6,
     WP_EV_RESET  = 1 << 7,   /* players/ball teleported: don't interpolate this tick */
     WP_EV_BODY   = 1 << 8,   /* ball hit a player's body */
+    WP_EV_HEADER = 1 << 9,   /* head contact (also sets WP_EV_KICK) */
 };
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };   /* players no seat controls stand still (statues / cones) */

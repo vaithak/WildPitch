@@ -50,6 +50,7 @@ static WpSeatInput read_keyboard(void) {
     if (k[SDL_SCANCODE_LSHIFT] || k[SDL_SCANCODE_RSHIFT]) in.buttons |= WP_BTN_SPRINT;
     if (k[SDL_SCANCODE_Q]) in.buttons |= WP_BTN_SWITCH;
     if (k[SDL_SCANCODE_I]) in.buttons |= WP_BTN_CHIP;
+    if (k[SDL_SCANCODE_L]) in.buttons |= WP_BTN_LOB;
     return in;
 }
 
@@ -375,7 +376,7 @@ int main(int argc, char **argv) {
             unsigned secs = g.cur.tick / WP_TICK_HZ;
             snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02u:%02u", g.cur.score[0], g.cur.score[1], secs / 60, secs % 60);
             SDL_RenderDebugText(g.ren, 12, 12, buf);
-            snprintf(buf, sizeof buf, "WASD move  Shift sprint  J pass  Q switch  K shoot (hold)  I chip (hold)   [P] look: %s  [Z] zoom: %s  F3 debug",
+            snprintf(buf, sizeof buf, "WASD move  Shift sprint  J pass (hold: through)  L lob  Q switch  K shoot  I chip  (J/K at a high ball: header)   [P] %s  [Z] %s  F3",
                      st->name, ZOOM_NAME[g.zoom]);
             SDL_RenderDebugText(g.ren, 12, (float)h - 20, buf);
             if (g.cur.phase == WP_PHASE_GOAL) {

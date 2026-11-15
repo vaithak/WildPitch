@@ -3,10 +3,13 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.2a — Pass and switch: ✅ done, waiting for the owner's playtest.** (CP0.1d ball visuals/physics: owner "looks
-really good, move ahead now".) Next: **CP0.2b** — through balls, lofted passes, headers (ROADMAP).
+**CP0.2b — Through balls, lofted passes, headers: ✅ done; CP0.2 (a+b) waiting for the owner's playtest.** Owner said
+"go ahead" after CP0.2a without passing notes, so both halves are up for feedback together. Next: **CP0.3 "Instinct
+AI"** after feedback.
 
 ## What works now
+- **CP0.2b:** hold J = through ball (white bar = how far ahead; receiver runs onto it), L = lofted pass over
+  defenders, J/K at a ball coming in high = header (stand or timed jump; K at goal, J to a team-mate).
 - **CP0.2a:** full 5-a-side team. J = pass to the best team-mate toward the stick (weighted to arrive ~6 m/s), control
   jumps to the receiver when the ball is struck and he runs to meet it; Q = switch; auto-switch to the team-mate
   nearest a loose ball; team-mates hold shape + make runs (placeholder, team.c); opposition = passive shuffling
@@ -24,9 +27,9 @@ really good, move ahead now".) Next: **CP0.2b** — through balls, lofted passes
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (8 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_scoring, test_determinism
-  (golden `07feb9343617ebcb`; scripted seat chases the ball + mashes pass/switch: ~100 kicks, 440 touches, 11 goals, 650 switches, owner invariant per 10 min, asserted),
+  (golden `df239f61a611a308`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
-- Perf: full game loop ~5% of one core; `bench_sim` ~8,300× real time (2 µs/tick; was 22,700× before team logic + pass solver — fine for play, revisit with a
+- Perf: full game loop ~5% of one core; `bench_sim` ~7,100× real time (2.4 µs/tick; was 22,700× before team logic + pass solver — fine for play, revisit with a
   lookup table before RL training).
 
 ### Feel numbers (from test_ball_control; update when tuning changes)
@@ -62,10 +65,10 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Log the owner's CP0.2a playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; tune `src/sim/tuning.h` (switch/pass block).
-2. CP0.2b: through ball (hold J, power by hold; decide tap-latency trade-off), lofted pass (L key, airborne inverse
-   model + agreement test), playable contextual headers (D-010; exempt header-action players from the body cylinder),
-   pass power bar. Scripted match must press the new buttons.
+1. Log the owner's CP0.2 playtest feedback (passing, switching, through balls, lobs, headers) in
+   `docs/PLAYTEST_FEEDBACK.md`; tune `src/sim/tuning.h` (switching & passing block) as needed.
+2. Re-plan and start CP0.3 "Instinct AI" per ROADMAP (candidate actions × utility, D-008): replaces team.c
+   placeholder; opposition becomes real; keepers dive; AI aerial duels; simple player stats.
 
 ## Known issues / environment notes
 - **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
@@ -76,6 +79,15 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Playtest guide (CP0.2b — focus: through balls, lofts, headers)
+New on top of CP0.2a: **hold J** = through ball — the white bar fills = how far ahead of your team-mate it goes;
+control jumps to him and he runs onto it (move the stick to take over). **L** = lofted pass to the team-mate toward
+your stick, over anyone in between. **Headers:** when a ball comes in high (try L to a team-mate near goal, then
+press K as it drops to him), press **K** to head at goal or **J** to head it to a team-mate — he steps under it
+and jumps if it's high; the stick aims. Note: a J *tap* now fires when you release it (~1/20 s later than before).
+Judge: is the tap/hold split natural, or would you rather have a separate through-ball key? Lob height/pace OK?
+Headers: easy enough to time? Too strong/weak?
 
 ## Playtest guide (CP0.2a — focus: passing & switching)
 `./build/wildpitch`. You're red, attacking right. New: **J** passes to the team-mate most in line with your stick
