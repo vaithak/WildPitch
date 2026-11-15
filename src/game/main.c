@@ -84,6 +84,7 @@ static void demo_input(SimState *s, WpInput *in) {
 }
 
 /* ---- autoplay harness (visual checks): seat 0 chases the ball, dribbles at the goal, charges and shoots ---- */
+static bool autoplay_chip = false;
 static void autoplay_input(const SimState *s, WpInput *in) {
     static int charging = 0;
     int me = s->seat_player[0];
@@ -97,7 +98,7 @@ static void autoplay_input(const SimState *s, WpInput *in) {
     in->seat[0].move_x = (int8_t)(dx / l * 127.0f);
     in->seat[0].move_y = (int8_t)(dy / l * 127.0f);
     in->seat[0].buttons = 0;
-    if (s->ball.owner == me && px > 7.0f && charging < 22) { charging++; in->seat[0].buttons = WP_BTN_SHOOT; }
+    if (s->ball.owner == me && px > 7.0f && charging < 22) { charging++; in->seat[0].buttons = autoplay_chip ? WP_BTN_CHIP : WP_BTN_SHOOT; }
     else charging = s->ball.owner == me ? charging : 0;
     if (s->phase != WP_PHASE_PLAY) charging = 0;
 }
@@ -111,8 +112,8 @@ static void draw_gallery(Game *g, int w, int h) {
         {"idle side", 0, 0, 0, 0, 0, 0, false},         {"idle back", PI / 2, 0, 0, 0, 0, 0, false},
         {"run 0", -PI / 5, 7, 0, 0, 0, 0, false},       {"run 1/4", -PI / 5, 7, PI / 2, 0, 0, 0, false},
         {"run 1/2", -PI / 5, 7, PI, 0, 0, 0, false},    {"run 3/4", -PI / 5, 7, 1.5f * PI, 0, 0, 0, false},
-        {"kick back", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.17f, false},
-        {"kick strike", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.29f, false},
+        {"kick back", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.04f, false},
+        {"kick contact", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.10f, false},
         {"header rise", -PI / 3, 0, 0, 0.35f, WP_ACT_JUMP_HEADER, 0.18f, false},
         {"header nod", -PI / 3, 0, 0, 0.58f, WP_ACT_JUMP_HEADER, 0.34f, false},
         {"keeper", -PI / 2, 0, 0, 0, 0, 0, true},       {"run side", 0, 5, PI / 3, 0, 0, 0, false},
@@ -137,7 +138,8 @@ static void draw_gallery(Game *g, int w, int h) {
             int look_id = pi < 4 ? 1 : pi * 3 + 1;           /* idle views share one look (front vs back) */
             wp_avatar_make_look(&look, 7, look_id, pi < 4 ? 0 : (pi & 1), p->keeper);
             WpAvatarPose pose = {.facing = p->facing, .speed = p->speed, .phase = p->phase, .z = p->z,
-                                 .action = p->action, .action_t = p->at, .keeper = p->keeper};
+                                 .action = p->action, .action_t = p->at, .keeper = p->keeper,
+                                 .kick_foot = 1, .kick_kind = WP_KICK_SHOT, .kick_windup = 0.1f, .kick_power01 = 0.7f};
             float yoff = -(float)cam.h * 0.36f / (cam.ppm * cam.tilt);   /* feet near the bottom: headroom for jumps */
             if (f > 1) {
                 if (!g->lowres || g->lowres_w != cam.w || g->lowres_h != cam.h) {
@@ -229,6 +231,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--gallery")) gallery = true;
         else if (!strcmp(argv[i], "--demo")) demo = true;
         else if (!strcmp(argv[i], "--autoplay")) autoplay = true;
+        else if (!strcmp(argv[i], "--autoplay-chip")) { autoplay = true; autoplay_chip = true; }
         else if (!strcmp(argv[i], "--check-kick-pose")) return check_kick_pose();
     }
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -263,6 +266,8 @@ int main(int argc, char **argv) {
     const Uint64 tick_ns = SDL_NS_PER_SECOND / WP_TICK_HZ;
     Uint64 last = SDL_GetTicksNS(), acc = 0;
     int frames = 0;
+    long total_frames = 0;
+    Uint64 start_ns = SDL_GetTicksNS();
     bool running = true;
     while (running) {
         SDL_Event e;
@@ -384,10 +389,18 @@ int main(int argc, char **argv) {
             running = false;
         }
         SDL_RenderPresent(g.ren);
+        total_frames++;
         if (!vsync) SDL_DelayNS(tick_ns / 2);   /* fallback: never spin */
         if (gallery && !shot_path) {            /* static sheet: wait for input instead of redrawing */
             SDL_WaitEvent(NULL);
         }
+    }
+    {   /* frame pacing report (thermal budget: ~60 fps even on high-refresh screens) */
+        double secs = (double)(SDL_GetTicksNS() - start_ns) / 1e9;
+        const SDL_DisplayMode *m = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(g.win));
+        if (!shot_path && secs > 1.0)
+            printf("avg %.1f fps over %.1f s (display %.0f Hz, vsync %s)\n", (double)total_frames / secs, secs,
+                   m ? (double)m->refresh_rate : 0.0, vsync ? "on" : "off");
     }
     SDL_Quit();
     return 0;

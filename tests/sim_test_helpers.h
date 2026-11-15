@@ -5,10 +5,10 @@
 #include "sim/sim.h"
 #include "sim/tuning.h"
 
-static double tod(fx v) { return (double)v / 65536.0; }
+static inline double tod(fx v) { return (double)v / 65536.0; }
 
 /* fresh 5v5 match with every player parked far off the pitch (so they don't block), except `keep` */
-static void setup_empty(SimState *s, int keep) {
+static inline void setup_empty(SimState *s, int keep) {
     WpMatchConfig cfg = sim_default_config();
     sim_init(s, &cfg);
     for (int i = 0; i < 2 * s->n_per_side; i++)
@@ -17,7 +17,7 @@ static void setup_empty(SimState *s, int keep) {
 }
 
 /* step n ticks with seat 0 input; returns OR of events */
-static uint16_t run_seat(SimState *s, WpSeatInput in, int n) {
+static inline uint16_t run_seat(SimState *s, WpSeatInput in, int n) {
     WpInput all; memset(&all, 0, sizeof all); all.seat[0] = in;
     uint16_t ev = 0;
     for (int i = 0; i < n; i++) { sim_step(s, &all); ev |= s->events; }

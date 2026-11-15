@@ -71,8 +71,11 @@ when a move needs it. Applies from CP0.1: kicks are implemented as parameterised
 
 **D-013 · 2026-11-14 · CP0.1 controls and feel rules** (Claude; owner to judge in playtest).
 - Keys: WASD/arrows move, Shift sprint, J (or Space) pass, K shoot (hold to charge, release), I chip (hold/release).
-- Shots/chips get a mild **aim assist** toward the opponent goal (≤18°; stick up/down picks the far side, straight
-  picks the middle), because 8-way keyboard aiming can't otherwise hit a 4 m goal. Tunable `T_AIM_ASSIST_DEG`.
+- Shots/chips use **target aim assist**: when you shoot within 65° of the goal, the stick picks a target —
+  up/down = that side of the goal (30% of goal width from centre), straight/no stick = the far post from where you
+  stand — and 12% of your angular error remains (skill). Why: 8-way keyboard aiming + an 18° "pull" scored only 21%
+  from natural positions (`test_scoring` sweep); target aim scores ~52% vs a statue keeper. Tunables
+  `T_AIM_WINDOW_DEG`, `T_AIM_RESIDUAL`, `T_AIM_SIDE`; analogue sticks may get finer control later.
 - **No dice:** inaccuracy comes only from visible causes — the ball inherits 50% of the kicker's velocity, harder
   strikes rise more, striking across your run adds curl.
 - Dribble touches follow the stick (not the slower-turning body), need foot reach (≤1 m), and push relative to the

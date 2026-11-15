@@ -40,13 +40,15 @@ Not playable; invisible plumbing every later CP depends on.
   **sprint**, **shoot** (hold to charge power; release), **chip** (modifier).
 - Goal detection (ball fully over line, under bar) → score + reset to kickoff.
 - Ball contact in **height bands** (D-010) from day one: feet/body/head; a ball overhead can't be trapped.
-- Turn rate in the sim (no instant facing snaps); avatar pose for dribble touches.
+- Turn rate in the sim (no instant facing snaps). *(Avatar dribble-touch flick moved to CP0.2.)*
 - Debug overlay (F3): fps, sim ms/tick, ball height/speed.
 - Cap presentation at 60 fps even on 120/144 Hz monitors (thermal budget); camera easing time-based.
+  *(Done via vsync interval; measured 61.9 fps on a 60 Hz display; 120/144 Hz untested — owner please report.)*
 - **Playtest:** does dribbling feel responsive? Do shots/chips feel weighty? Is the camera/tilt
   readable? Does the laptop stay quiet?
 
 ### CP0.2 — "Pass and move" ⏭ 🔵
+- Carried over from CP0.1: avatar dribble-touch flick.
 **Playable:** your full 5-a-side team (4 + keeper) vs. a passive opposition (cones that move a bit).
 - Pass: tap = short ground pass to the best teammate in the stick direction; hold = through ball
   into space (power by hold time). Lofted pass.

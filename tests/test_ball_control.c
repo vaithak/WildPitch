@@ -29,28 +29,37 @@ int main(void) {
                                        CHECKF(s.ball.owner == ME, "%s straight: lost ball at t=%d", tag, t); if (s.ball.owner != ME) break; }
         CHECKF(maxd < (sprint ? FX(1.8) : FX(1.3)), "%s straight: max dist %.2f", tag, tod(maxd));
         printf("%-6s straight: max ball gap %.2f m\n", tag, tod(maxd));
-        /* 180 reversal */
-        int turned = -1; maxd = 0;
-        for (int t = 0; t < 60; t++) { run_seat(&s, (WpSeatInput){-127, 0, b}, 1);
-            if (ball_dist(&s) > maxd) maxd = ball_dist(&s);
-            if (turned < 0 && s.ball.vel.x < 0) turned = t; }
-        CHECKF(s.ball.owner == ME, "%s reversal: lost ball", tag);
-        CHECKF(turned >= 0 && turned <= (sprint ? 45 : 20), "%s reversal: ball heading back after %d ticks", tag, turned);
-        CHECKF(maxd < T_LOSE_DIST, "%s reversal: max dist %.2f", tag, tod(maxd));
-        printf("%-6s 180 turn: ball heading back after %2d ticks, max gap %.2f m\n", tag, turned, tod(maxd));
-        /* 90 cut */
-        with_ball(&s);
-        run_seat(&s, (WpSeatInput){127, 0, b}, 60);
-        turned = -1;
-        for (int t = 0; t < 40; t++) { run_seat(&s, (WpSeatInput){0, 127, b}, 1);
-            if (turned < 0 && s.ball.vel.y > fx_abs(s.ball.vel.x)) turned = t; }
-        CHECKF(s.ball.owner == ME && turned >= 0 && turned <= (sprint ? 30 : 16), "%s 90 cut: %d ticks", tag, turned);
-        printf("%-6s  90 cut: ball going the new way after %2d ticks\n", tag, turned);
-        /* dead stop */
-        run_seat(&s, NOIN, 60);
-        CHECKF(fv2_len(s.ball.vel) < FX(0.3) && ball_dist(&s) < FX(1.0), "%s stop: ball speed %.2f dist %.2f", tag,
-               tod(fv2_len(s.ball.vel)), tod(ball_dist(&s)));
-        CHECK(s.ball.owner == ME);
+        /* 180 reversal, 90 cut, dead stop: swept across a full touch cycle (start offsets 0..15);
+         * no offset may lose the ball. Worst cases are printed for docs/STATUS.md. */
+        int worst_rev = 0, worst_cut = 0; fx worst_rev_gap = 0, worst_stop = 0;
+        for (int off = 0; off < 16; off++) {
+            with_ball(&s);
+            run_seat(&s, (WpSeatInput){127, 0, b}, 45 + off);
+            int turned = -1; maxd = 0;
+            for (int t = 0; t < 60; t++) { run_seat(&s, (WpSeatInput){-127, 0, b}, 1);
+                if (ball_dist(&s) > maxd) maxd = ball_dist(&s);
+                if (turned < 0 && s.ball.vel.x < 0) turned = t; }
+            CHECKF(s.ball.owner == ME, "%s reversal off %d: lost ball", tag, off);
+            CHECKF(turned >= 0 && turned <= (sprint ? 45 : 20), "%s reversal off %d: heading back after %d", tag, off, turned);
+            if (turned > worst_rev) worst_rev = turned;
+            if (maxd > worst_rev_gap) worst_rev_gap = maxd;
+
+            with_ball(&s);
+            run_seat(&s, (WpSeatInput){127, 0, b}, 45 + off);
+            turned = -1;
+            for (int t = 0; t < 40; t++) { run_seat(&s, (WpSeatInput){0, 127, b}, 1);
+                if (turned < 0 && s.ball.vel.y > fx_abs(s.ball.vel.x)) turned = t; }
+            CHECKF(s.ball.owner == ME && turned >= 0 && turned <= (sprint ? 30 : 16), "%s 90 cut off %d: %d ticks", tag, off, turned);
+            if (turned > worst_cut) worst_cut = turned;
+            run_seat(&s, NOIN, 60);
+            CHECKF(fv2_len(s.ball.vel) < FX(0.3) && ball_dist(&s) < FX(1.0) && s.ball.owner == ME,
+                   "%s stop off %d: ball speed %.2f dist %.2f", tag, off, tod(fv2_len(s.ball.vel)), tod(ball_dist(&s)));
+            if (ball_dist(&s) > worst_stop) worst_stop = ball_dist(&s);
+        }
+        printf("%-6s 180 turn (worst of 16 offsets): ball heading back after %2d ticks, max gap %.2f m (lose at %.1f)\n",
+               tag, worst_rev, tod(worst_rev_gap), tod(T_LOSE_DIST));
+        printf("%-6s  90 cut  (worst of 16 offsets): ball going the new way after %2d ticks\n", tag, worst_cut);
+        printf("%-6s stop     (worst of 16 offsets): ball settles %.2f m from the player\n", tag, tod(worst_stop));
 
         /* never whiff: shoot at every tick offset across a touch cycle; measure release->contact latency */
         int max_lat = 0;

@@ -60,16 +60,20 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
         k->windup = T_KICK_WINDUP_CHIP;
     }
     if (kind != WP_KICK_PASS) {
-        /* Aim assist toward the opponent goal (8-way keyboard can't otherwise hit a 4 m goal).
-         * Stick up/down picks the far side of the goal; straight picks the middle. */
+        /* Aim assist (D-013): roughly toward goal, the stick picks a TARGET rather than an exact angle —
+         * up/down = that side of the goal, straight/none = the far post from where you stand. A share of
+         * the stick's angular error remains so aiming still matters. */
         int sg = p->team == 0 ? 1 : -1;
-        fx gy = 0;
-        if (has_aim && aim.y > FX(0.25)) gy = fx_mul(s->pitch.goal_width, FX(0.32));
-        if (has_aim && aim.y < -FX(0.25)) gy = -fx_mul(s->pitch.goal_width, FX(0.32));
+        fx side = fx_mul(s->pitch.goal_width, T_AIM_SIDE);
+        fx gy;
+        if (has_aim && aim.y > FX(0.25)) gy = side;
+        else if (has_aim && aim.y < -FX(0.25)) gy = -side;
+        else gy = p->pos.y > FX(0.5) ? -side : side;
         fv2 to_goal = fv2_sub(fv2_make(sg * (s->pitch.length / 2), gy), p->pos);
         wp_angle ga = fx_atan2(to_goal.y, to_goal.x);
-        int32_t diff = ang_diff(ga, dir), lim = DEG_TO_ANG(T_AIM_ASSIST_DEG);
-        if (diff > -2 * lim && diff < 2 * lim) dir = (wp_angle)(dir + (diff > lim ? lim : (diff < -lim ? -lim : diff)));
+        int32_t diff = ang_diff(dir, ga);
+        if (diff > -DEG_TO_ANG(T_AIM_WINDOW_DEG) && diff < DEG_TO_ANG(T_AIM_WINDOW_DEG))
+            dir = (wp_angle)(ga + (int32_t)(((int64_t)diff * T_AIM_RESIDUAL) >> FX_SHIFT));
         /* curl: striking across the direction of running bends the ball the way you turned */
         fx spd = fv2_len(p->vel);
         if (spd > FX(2.0)) {
@@ -88,7 +92,8 @@ static void contact(SimState *s, int i) {
     WpBall *b = &s->ball;
     p->kick.done = 1;
     if (s->phase != WP_PHASE_PLAY || !ball_reachable(s, i, KICK_REACH)) return;   /* whiff */
-    if (b->owner == i) b->pos = fv2_add(p->pos, fv2_from_angle(p->kick.dir, FOOT_SPOT));
+    /* no teleport to the foot: the wind-up gather already brought the ball there, and moving it here could
+     * skip it across a line without ball.c seeing the crossing */
     b->vel = fv2_add(fv2_from_angle(p->kick.dir, p->kick.power), fv2_scale(p->vel, INHERIT_VEL));
     b->vz = p->kick.vz;
     b->spin = p->kick.spin;
@@ -175,7 +180,10 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
         if (dist > T_LOSE_DIST || b->z > WP_BAND_BODY_MAX) { b->owner = -1; return; }
         if (p->action == WP_ACT_KICK && !p->kick.done) {   /* gather: settle ball at the foot for contact */
             fv2 spot = fv2_add(p->pos, fv2_from_angle(p->kick.dir, FOOT_SPOT));
-            b->vel = fv2_add(p->vel, fv2_scale(fv2_sub(spot, b->pos), FX(8.0)));
+            /* arrive exactly on the contact tick (moved by ball physics, so line crossings are still seen) */
+            int remaining = (int)p->kick.windup - (int)p->action_timer;
+            if (remaining < 1) remaining = 1;
+            b->vel = fv2_add(p->vel, fv2_scale(fv2_sub(spot, b->pos), FX_INT(WP_TICK_HZ) / remaining));
             b->vz = 0; b->z = 0;
             return;
         }

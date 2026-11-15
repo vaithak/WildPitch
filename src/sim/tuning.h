@@ -70,7 +70,9 @@
 #define T_CHIP_MAX         FX(15.0)
 #define T_CHIP_VZ_MIN      FX(5.0)
 #define T_CHIP_VZ_MAX      FX(8.5)
-#define T_AIM_ASSIST_DEG   18         /* max pull of a shot toward the goal (keyboard 8-way aiming) */
+#define T_AIM_WINDOW_DEG   65         /* shots within this of the goal are aimed at a target (D-013) */
+#define T_AIM_RESIDUAL     FX(0.12)   /* share of the stick's angular error that remains (skill) */
+#define T_AIM_SIDE         FX(0.30)   /* target = this * goal width from the centre (inside the posts) */
 #define T_ERR_DEG_PER_MS   FX(0.55)   /* visible-cause inaccuracy: degrees per m/s of player speed */
 #define T_ERR_DEG_CHARGE   FX(3.0)    /* extra degrees at full power */
 
