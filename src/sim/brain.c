@@ -63,6 +63,13 @@ typedef struct {
 } Ctx;
 
 static fx clampf(fx v, fx lo, fx hi) { return fx_clamp(v, lo, hi); }
+
+/* difficulty knobs for a team (D-028) */
+static const uint8_t LV_DECIDE[WP_AI_LEVELS] = T_AI_DECIDE_BY_LEVEL;
+static const uint8_t LV_PASS_REACT[WP_AI_LEVELS] = T_AI_PASS_REACT_BY_LEVEL;
+static const uint8_t LV_KEEPER_REACT[WP_AI_LEVELS] = T_KEEPER_REACT_BY_LEVEL;
+static const fx LV_EXPOSED[WP_AI_LEVELS] = T_AI_TACKLE_EXPOSED_BY_LEVEL;
+static int lvl(const SimState *s, int team) { return s->ai_level[team] < WP_AI_LEVELS ? s->ai_level[team] : WP_AI_NORMAL; }
 static fx dist(fv2 a, fv2 b) { return fv2_len(fv2_sub(a, b)); }
 
 static fx nearest_opp(const Ctx *x, fv2 at) {
@@ -350,7 +357,7 @@ static void keeper(Ctx *x, WpSeatInput *out) {
         fx cy = b->pos.y + fx_mul(b->vel.y, t);
         if (t < FX(1.5) && fx_abs(cy) < gw + FX(1.0)) {
             shot = 1;
-            if (p->ai_wait < T_KEEPER_REACT) { p->ai_wait++; at = p->ai_goal; }        /* still reading it */
+            if (p->ai_wait < LV_KEEPER_REACT[lvl(s, x->team)]) { p->ai_wait++; at = p->ai_goal; }   /* reading it */
             else {
                 at = fv2_make(p->pos.x, clampf(cy, -gw - FX(0.5), gw + FX(0.5)));
                 fx gap = cy - p->pos.y;
@@ -407,7 +414,8 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         return;
     }
 
-    int decide = ((s->tick + (uint32_t)(i % s->n_per_side)) % T_AI_DECIDE) == 0   /* staggered by role: mirror-fair */ || p->ai_act == AI_NONE ||
+    int lv = lvl(s, p->team);
+    int decide = ((s->tick + (uint32_t)(i % s->n_per_side)) % LV_DECIDE[lv]) == 0   /* staggered by role: mirror-fair */ || p->ai_act == AI_NONE ||
                  (owner && p->ai_act < AI_DRIBBLE) || (!owner && p->ai_act >= AI_DRIBBLE && p->ai_act != AI_KEEP);
     if (s->pass_target == i && p->ai_act != AI_RECEIVE) decide = 1;
     /* aerial duel: a ball coming in high - the team's first man (on his decision beat) goes for a header. At goal near
@@ -427,7 +435,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     }
     if (p->ai_act == AI_HEAD && (p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER)) return;
     /* a pass by the other team has just been struck: defenders need a moment to react (keep doing what they were) */
-    if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < T_AI_PASS_REACT) decide = 0;
+    if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < LV_PASS_REACT[lv]) decide = 0;
     if (decide) {
         if (owner) gen_on_ball(&x); else gen_off_ball(&x);
         int best = -1; fx bs = 0;
@@ -460,7 +468,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         return;
     }
     case AI_CHASE: {                                      /* the ball moves: keep re-aiming (after reacting) */
-        if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < T_AI_PASS_REACT) break;
+        if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < LV_PASS_REACT[lv]) break;
         Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
         p->ai_goal = m.pos;
         team_steer_speed(p, m.pos, fx_min(fx_mul(dist(m.pos, p->pos), FX(4.0)) + FX(2.0), T_SPRINT_SPEED), out);
@@ -473,7 +481,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         /* tackle when the carrier's ball is exposed (away from his feet) right in front of me */
         fx db = dist(b->pos, p->pos), exposed = dist(b->pos, s->players[b->owner].pos);
         fv2 face = fv2_from_angle(p->facing, FX_ONE);
-        fx need = fv2_len(s->players[b->owner].vel) < FX(2.0) ? T_AI_TACKLE_SHIELD : T_AI_TACKLE_EXPOSED;
+        fx need = fv2_len(s->players[b->owner].vel) < FX(2.0) ? T_AI_TACKLE_SHIELD : LV_EXPOSED[lv];
         if (decide && p->action == WP_ACT_NONE && db < T_AI_TACKLE_DIST && exposed > need &&   /* at his decision beat */
             fv2_dot(face, fv2_sub(b->pos, p->pos)) > 0) {
             tackle_start(s, i);

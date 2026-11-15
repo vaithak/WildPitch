@@ -4,9 +4,51 @@
 #include <string.h>
 #include "game/menu.h"
 
-static const char *MAIN_ITEMS[3] = {"Resume", "Controls", "Quit game"};
+enum { ITEM_RESUME, ITEM_DIFFICULTY, ITEM_RESTART, ITEM_CONTROLS, ITEM_QUIT, ITEM_COUNT };
+static const char *DIFF_NAME[3] = {"Easy", "Normal", "Hard"};
+static const char *DIFF_ID[3] = {"easy", "normal", "hard"};
 
-void wp_menu_open(WpMenu *m) { memset(m, 0, sizeof *m); m->screen = WP_MENU_MAIN; }
+void wp_menu_open(WpMenu *m) {
+    int d = m->difficulty;
+    memset(m, 0, sizeof *m);
+    m->screen = WP_MENU_MAIN;
+    m->difficulty = d;
+}
+
+static char *settings_file(void) {
+    char *dir = SDL_GetPrefPath("WildPitch", "WildPitch");
+    if (!dir) return NULL;
+    size_t n = strlen(dir) + 16;
+    char *f = (char *)SDL_malloc(n);
+    if (f) snprintf(f, n, "%ssettings.cfg", dir);
+    SDL_free(dir);
+    return f;
+}
+int wp_settings_load_difficulty(void) {
+    char *f = settings_file();
+    int lv = 1;
+    if (!f) return lv;
+    size_t len = 0;
+    char *text = (char *)SDL_LoadFile(f, &len);
+    SDL_free(f);
+    if (!text) return lv;
+    for (int k = 0; k < 3; k++) {
+        char want[32];
+        snprintf(want, sizeof want, "difficulty = %s", DIFF_ID[k]);
+        if (strstr(text, want)) lv = k;
+    }
+    SDL_free(text);
+    return lv;
+}
+bool wp_settings_save_difficulty(int level) {
+    char *f = settings_file();
+    if (!f) return false;
+    char buf[96];
+    int n = snprintf(buf, sizeof buf, "# WildPitch settings\ndifficulty = %s\n", DIFF_ID[level < 0 || level > 2 ? 1 : level]);
+    bool ok = SDL_SaveFile(f, buf, (size_t)n);
+    SDL_free(f);
+    return ok;
+}
 
 WpMenuResult wp_menu_event(WpMenu *m, const SDL_Event *e, WpKeymap *km) {
     if (e->type != SDL_EVENT_KEY_DOWN || e->key.repeat) return WP_MENU_NONE;
@@ -18,11 +60,18 @@ WpMenuResult wp_menu_event(WpMenu *m, const SDL_Event *e, WpKeymap *km) {
         snprintf(m->note, sizeof m->note, wp_keymap_save(km) ? "Saved" : "Couldn't save (kept for this session)");
         return WP_MENU_NONE;
     }
-    int rows = m->screen == WP_MENU_MAIN ? 3 : WP_KEY_COUNT;
+    int rows = m->screen == WP_MENU_MAIN ? ITEM_COUNT : WP_KEY_COUNT;
     if (sc == SDL_SCANCODE_UP)   { m->sel = (m->sel + rows - 1) % rows; m->note[0] = 0; return WP_MENU_NONE; }
     if (sc == SDL_SCANCODE_DOWN) { m->sel = (m->sel + 1) % rows; m->note[0] = 0; return WP_MENU_NONE; }
+    if (m->screen == WP_MENU_MAIN && m->sel == ITEM_DIFFICULTY &&
+        (sc == SDL_SCANCODE_LEFT || sc == SDL_SCANCODE_RIGHT || sc == SDL_SCANCODE_RETURN)) {
+        m->difficulty = (m->difficulty + (sc == SDL_SCANCODE_LEFT ? 2 : 1)) % 3;
+        wp_settings_save_difficulty(m->difficulty);
+        snprintf(m->note, sizeof m->note, "Opposition: %s - applies when you restart the match", DIFF_NAME[m->difficulty]);
+        return WP_MENU_NONE;
+    }
     if (sc == SDL_SCANCODE_ESCAPE) {
-        if (m->screen == WP_MENU_CONTROLS) { m->screen = WP_MENU_MAIN; m->sel = 1; m->note[0] = 0; return WP_MENU_NONE; }
+        if (m->screen == WP_MENU_CONTROLS) { m->screen = WP_MENU_MAIN; m->sel = ITEM_CONTROLS; m->note[0] = 0; return WP_MENU_NONE; }
         m->screen = WP_MENU_CLOSED;
         return WP_MENU_RESUME;
     }
@@ -33,8 +82,9 @@ WpMenuResult wp_menu_event(WpMenu *m, const SDL_Event *e, WpKeymap *km) {
     }
     if (sc == SDL_SCANCODE_RETURN || sc == SDL_SCANCODE_KP_ENTER) {
         if (m->screen == WP_MENU_CONTROLS) { m->waiting = true; m->note[0] = 0; return WP_MENU_NONE; }
-        if (m->sel == 0) { m->screen = WP_MENU_CLOSED; return WP_MENU_RESUME; }
-        if (m->sel == 1) { m->screen = WP_MENU_CONTROLS; m->sel = 0; return WP_MENU_NONE; }
+        if (m->sel == ITEM_RESUME) { m->screen = WP_MENU_CLOSED; return WP_MENU_RESUME; }
+        if (m->sel == ITEM_RESTART) { m->screen = WP_MENU_CLOSED; return WP_MENU_RESTART; }
+        if (m->sel == ITEM_CONTROLS) { m->screen = WP_MENU_CONTROLS; m->sel = 0; return WP_MENU_NONE; }
         return WP_MENU_QUIT;
     }
     return WP_MENU_NONE;
@@ -57,13 +107,16 @@ void wp_menu_draw(const WpMenu *m, const WpKeymap *km, SDL_Renderer *r, int w, i
     if (m->screen == WP_MENU_MAIN) {
         text(r, x0, y, sc * 1.5f, "PAUSED", 240, 235, 220);
         y += lh * 3;
-        for (int i = 0; i < 3; i++, y += lh * 1.6f) {
+        for (int i = 0; i < ITEM_COUNT; i++, y += lh * 1.6f) {
             bool on = m->sel == i;
-            char buf[64];
-            snprintf(buf, sizeof buf, "%s %s", on ? ">" : " ", MAIN_ITEMS[i]);
+            char buf[96];
+            static const char *items[ITEM_COUNT] = {"Resume", NULL, "Restart match", "Controls", "Quit game"};
+            if (i == ITEM_DIFFICULTY) snprintf(buf, sizeof buf, "%s Difficulty: < %s >", on ? ">" : " ", DIFF_NAME[m->difficulty]);
+            else snprintf(buf, sizeof buf, "%s %s", on ? ">" : " ", items[i]);
             text(r, x0, y, sc, buf, on ? 255 : 170, on ? 225 : 170, on ? 90 : 170);
         }
-        text(r, x0, y + lh, sc * 0.75f, "Up/Down choose, Enter select, Esc resume", 120, 130, 120);
+        text(r, x0, y + lh, sc * 0.75f, "Up/Down choose, Enter select, Left/Right difficulty, Esc resume", 120, 130, 120);
+        if (m->note[0]) text(r, x0, y + lh * 2, sc * 0.75f, m->note, 120, 220, 140);
         return;
     }
     text(r, x0, y, sc * 1.5f, "CONTROLS", 240, 235, 220);

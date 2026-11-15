@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 1928  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 1936  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (CP0.3a, owner request): bigger pitch and goals, keeper + 2-3-1 */
 WpMatchConfig sim_config_7v7(void) {
@@ -37,6 +37,7 @@ WpMatchConfig sim_default_config(void) {
     WpMatchConfig c;
     memset(&c, 0, sizeof c);
     c.seed = 1;
+    c.ai_level[0] = c.ai_level[1] = WP_AI_NORMAL;
     c.n_per_side = 5;
     c.pitch.length = FX(40.0);
     c.pitch.width = FX(25.0);
@@ -81,6 +82,7 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
     memset(s, 0, sizeof *s);
     wp_rng_seed(&s->rng, cfg->seed, 0x5157u);
     s->pitch = cfg->pitch;
+    for (int t = 0; t < 2; t++) s->ai_level[t] = cfg->ai_level[t] < WP_AI_LEVELS ? cfg->ai_level[t] : WP_AI_NORMAL;
     s->n_per_side = cfg->n_per_side < 1 ? 1 : (cfg->n_per_side > WP_MAX_PER_SIDE ? WP_MAX_PER_SIDE : cfg->n_per_side);
     for (int i = 0; i < WP_MAX_PLAYERS; i++) s->players[i].stamina = FX_ONE;
     for (int i = 0; i < WP_MAX_SEATS; i++) {
@@ -143,7 +145,7 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, b->vel.x); fnv_i(&f, b->vel.y); fnv_i(&f, b->vz); fnv_i(&f, b->spin);
     fnv_i(&f, b->owner); fnv_i(&f, b->last_touch);
     fnv_i(&f, s->n_per_side); fnv_i(&f, s->phase); fnv_i(&f, s->phase_timer);
-    fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->events);
+    fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->ai_level[0]); fnv_i(&f, s->ai_level[1]); fnv_i(&f, s->events);
     for (int k = 0; k < WP_MAX_SEATS; k++) {
         fnv_i(&f, s->seat_player[k]); fnv_i(&f, s->prev_buttons[k]); fnv_i(&f, s->switch_cool[k]);
     }

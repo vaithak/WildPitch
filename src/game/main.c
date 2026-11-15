@@ -312,6 +312,8 @@ int main(int argc, char **argv) {
 
     /* the match format: 7-a-side by default (owner, CP0.3a); harness modes keep the 5v5 their scripts were made for */
     WpMatchConfig cfg = (five || autoplay || demo || gallery) ? sim_default_config() : sim_config_7v7();
+    g.menu.difficulty = (shot_path || autoplay || demo || gallery) ? WP_AI_NORMAL : wp_settings_load_difficulty();
+    cfg.ai_level[1] = (uint8_t)g.menu.difficulty;          /* the opposition; our AI team-mates stay NORMAL */
     sim_init(&g.cur, &cfg);
     g.demo = demo;
     if (demo) demo_setup(&g.cur);
@@ -331,7 +333,7 @@ int main(int argc, char **argv) {
     long total_frames = 0;
     Uint64 start_ns = SDL_GetTicksNS();
     bool running = true;
-    if (menu_shot) { wp_menu_open(&g.menu); g.menu.screen = WP_MENU_CONTROLS; g.menu.sel = WP_KEY_PASS; }
+    if (menu_shot) { wp_menu_open(&g.menu); if (!getenv("WP_MENU_MAIN")) { g.menu.screen = WP_MENU_CONTROLS; g.menu.sel = WP_KEY_PASS; } else g.menu.sel = 1; }
     while (running) {
         SDL_Event e;
         if (g.menu.screen != WP_MENU_CLOSED) {
@@ -350,6 +352,12 @@ int main(int argc, char **argv) {
                 if (e.type == SDL_EVENT_QUIT) running = false;
                 WpMenuResult res = wp_menu_event(&g.menu, &e, &g.km);
                 if (res == WP_MENU_QUIT) running = false;
+                if (res == WP_MENU_RESTART) {                 /* new match, same format, chosen difficulty */
+                    cfg.ai_level[1] = (uint8_t)g.menu.difficulty;
+                    sim_init(&g.cur, &cfg);
+                    g.prev = g.cur;
+                    wp_render_reset_anim(&g.rctx);
+                }
             } while (SDL_PollEvent(&e));
             last = SDL_GetTicksNS();                      /* don't fast-forward the time spent paused */
             acc = 0;

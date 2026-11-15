@@ -133,7 +133,8 @@ enum {
     WP_EV_TACKLE = 1 << 10,  /* a tackle won the ball off its owner */
 };
 
-enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };   /* players no seat controls stand still (statues / cones) */
+enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };
+enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };   /* players no seat controls stand still (statues / cones) */
 /* how an assisted receiver plays a pass: step to the closest reachable point (standing/checking receivers, lofts),
  * run through a planned meet at just-in-time speed (runners; in-stride through balls keep >= 4.5 m/s) */
 enum { WP_PLAN_CLOSEST = 0, WP_PLAN_RUN = 1, WP_PLAN_STRIDE = 2 };
@@ -149,6 +150,7 @@ typedef struct {
     uint8_t  score[2];
     uint8_t  kickoff_team;           /* team taking the next kickoff */
     uint8_t  flags;                  /* WP_SIMF_* (drills / isolation tests) */
+    uint8_t  ai_level[2];            /* per team: WP_AI_EASY / NORMAL / HARD (reaction + decision speed) */
     uint16_t events;                 /* WP_EV_* raised during the last sim_step */
     int8_t   seat_player[WP_MAX_SEATS]; /* player index each seat controls, -1 = none */
     uint16_t prev_buttons[WP_MAX_SEATS];/* for edge detection inside the sim */
@@ -181,6 +183,7 @@ typedef struct {
     uint64_t seed;
     uint8_t  n_per_side;             /* 1..WP_MAX_PER_SIDE */
     WpPitch  pitch;
+    uint8_t  ai_level[2];             /* per team; sim_default_config(): both NORMAL */
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */

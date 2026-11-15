@@ -7,16 +7,21 @@
 #include "game/keymap.h"
 
 typedef enum { WP_MENU_CLOSED, WP_MENU_MAIN, WP_MENU_CONTROLS } WpMenuScreen;
-typedef enum { WP_MENU_NONE, WP_MENU_RESUME, WP_MENU_QUIT } WpMenuResult;
+typedef enum { WP_MENU_NONE, WP_MENU_RESUME, WP_MENU_QUIT, WP_MENU_RESTART } WpMenuResult;
 
 typedef struct {
     WpMenuScreen screen;
     int          sel;          /* highlighted row */
     bool         waiting;      /* Controls: waiting for the new key of row `sel` */
     char         note[96];     /* status line ("Saved", ...) */
+    int          difficulty;   /* WP_AI_EASY / NORMAL / HARD for the opposition (applies on Restart) */
 } WpMenu;
 
-void         wp_menu_open(WpMenu *m);
+/* settings.cfg in the pref dir (separate from controls.cfg): "difficulty = easy|normal|hard" */
+int  wp_settings_load_difficulty(void);              /* default NORMAL */
+bool wp_settings_save_difficulty(int level);
+
+void         wp_menu_open(WpMenu *m);                 /* keeps m->difficulty */
 /* handle one event; edits the keymap (and saves it) when rebinding */
 WpMenuResult wp_menu_event(WpMenu *m, const SDL_Event *e, WpKeymap *km);
 void         wp_menu_draw(const WpMenu *m, const WpKeymap *km, SDL_Renderer *r, int w, int h);

@@ -290,3 +290,11 @@ pick finds a mate). The AI's aim is its `ai_goal` (not its movement stick). Head
 moves: of all heads that can reach the ball this tick, the NEAREST wins (no index-order bias); the legs-only step
 under the ball (`header_assist_move`) applies to AI and humans. AI carriers wide in the attacking third get a CROSS
 candidate (lofted pass to a team-mate within 13 m of goal). AI vs AI: ~3.5 crosses/min, ~2 headers/min (7v7).
+
+## D-028 — Difficulty: per-team AI level (2026-11-15, CP0.3b)
+`SimState.ai_level[2]` (hashed; `WpMatchConfig.ai_level`), EASY / NORMAL / HARD changes only reaction and decision
+speed (no dice, no stat boosts): decision beat 9/6/4 ticks, reaction to a struck pass 18/12/8, keeper reaction to a
+shot 26/20/15, tackle needs the carrier's ball 0.75/0.6/0.5 m exposed. NORMAL reproduces the previous behaviour bit
+for bit (verified against the old goldens with the field unhashed). The game applies the chosen level to the
+OPPOSITION; our AI team-mates stay NORMAL. Esc menu: Difficulty < Easy | Normal | Hard > (saved to `settings.cfg`,
+separate from `controls.cfg`), applied by "Restart match". EASY vs HARD AI (7v7): goals 15–21, possession 44–56%.

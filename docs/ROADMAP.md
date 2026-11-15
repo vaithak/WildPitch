@@ -92,7 +92,9 @@ Not playable; invisible plumbing every later CP depends on.
 
 ### CP0.3a+ — 7v7 on a 55 × 35 m pitch (owner request) ✅ 🟡  (D-025)
 
-### CP0.3b — Stats, aerial duels, keeper dives, difficulty ⏭ 🟡
+### CP0.3b — Keeper dives, AI aerial duels, difficulty ✅ 🟡  (D-026..D-028)
+
+### CP0.3c — Player stats (pace, control, passing, shooting, tackling, stamina) ⏭ 🟡
 
 ### CP0.3 — "Instinct AI" (original plan, now CP0.3a + CP0.3b) 🟡
 **Playable:** first real 5v5 match vs AI.

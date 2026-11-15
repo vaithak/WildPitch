@@ -3,14 +3,14 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3a — "They play back": ✅ done, waiting for the owner's playtest.** First real 5v5 vs AI. Owner decisions: control
-jumps to our AI team-mate/keeper who wins the ball; the human controls the keeper with the ball. Next: **CP0.3b**
-(player stats, AI aerial duels, keeper dives/poses, difficulty) after feedback.
+**CP0.3b — Keeper dives, AI aerial duels, difficulty: ✅ done, waiting for the owner's playtest.** (Owner on 7v7:
+"it is a good game, keep going ahead".) Next: **CP0.3c player stats** (own hand-over: it shifts calibrated numbers).
 
 ## What works now
-- **CP0.3b so far:** keepers dive (catch or parry; pose), shots keep their aim (corner shots beat him), tackles
-  have a lunge pose, 7v7 has its own golden hash + harnesses (`tools/playtest/*`, format flag). 7v7 shots 7–16 m:
-  goal 36% (weak 13%, medium 43%, hard 52%).
+- **CP0.3b:** keepers dive (catch or parry; pose), shots keep their aim (corner shots beat him), tackles have a
+  lunge pose; AI players win headers (shots near goal, clearances, nod-ons) and cross from wide; difficulty
+  Easy/Normal/Hard for the opposition (Esc menu, Restart match). 7v7 has its own golden + harnesses. 7v7 shots
+  7–16 m: goal 36% (weak 13%, medium 43%, hard 52%). AI vs AI 7v7: ~2 headers/min.
 - **7v7 (D-025):** the game now starts 7-a-side (keeper + 2-3-1) on a 55 × 35 m pitch with 5 m goals
   (`--5v5` for the old format). AI vs AI 7v7 balanced (goals 58–60 over 30 × 5 min).
 - **CP0.3a (D-022/D-023):** the blue team plays: presses, marks, covers, tackles, passes, runs in behind, shoots;
@@ -92,10 +92,11 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Log the owner's CP0.3a playtest feedback; tune `tuning.h` (AI block) and brain weights `W[][]` in `brain.c`.
-2. CP0.3b: simple player stats (pace, control, passing, shooting, tackling, stamina → speed, touch, pass/shot error
-   as visible-cause offsets, tackle reach) feeding utility; AI aerial duels (header_start for AI); keeper dive
-   action + dive/catch poses; difficulty knob (decision cadence / reaction); AI kick-offs and restarts.
+1. Log the owner's CP0.3b playtest feedback; tune (keeper: T_DIVE_*, T_KEEPER_*; difficulty tables).
+2. CP0.3c player stats (advisor list): stats survive kickoff memsets; one top-speed helper used everywhere speed is
+   assumed (move, dribble predictor, team_steer_speed, meet_choose 6.5 m/s, pass/through solvers, receive clamp);
+   AI-match tests use mirrored/neutral stats; stamina shown on the HUD, mild drain; regression config neutral.
+3. Then CP0.4 "A real match" (rules, restarts, halves) per ROADMAP.
 
 ## Known issues / environment notes
 - **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
@@ -111,6 +112,11 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 Arrows move · **E** sprint · **S** pass (hold = through ball; near their ball = tackle) · **D** shoot (hold) ·
 **A** lofted pass · **W** chip (hold) · **Q** switch · **C** zoom · **P** look · F3 debug · **Esc** pause menu.
 Older playtest guides below still say J/K/L/I/WASD — read them as Pass/Shoot/Lob/Chip/Move.
+
+## Playtest guide (CP0.3b — focus: keeper, headers, difficulty)
+Keepers now dive: power and placement beat them (corners), soft or central shots are caught/parried. Blue heads the
+ball (crosses come in from wide; they clear headers from their box). Esc → Difficulty (Left/Right) → Restart match.
+Judge: keeper fair? Do headers feel right (you can still win them with S/D as the ball drops)? Easy/Hard noticeable?
 
 ## Playtest guide (CP0.3a — focus: a real match vs AI)
 `./build/wildpitch`. The blue team now attacks and defends. Defend: get goal-side and press **J** when the blue

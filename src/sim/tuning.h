@@ -136,7 +136,13 @@
 #define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
 
 /* ---- instinct AI (brain.c, D-023) ---- */
-#define T_AI_DECIDE        6          /* each AI player re-decides every this many ticks (staggered) */
+#define T_AI_DECIDE        6          /* each AI player re-decides every this many ticks (staggered) [NORMAL] */
+/* difficulty (per team, WP_AI_EASY / NORMAL / HARD): decision beat, reaction to a struck pass, keeper reaction to a
+ * shot, how exposed a carrier's ball must be for a tackle. NORMAL = the values above/below. */
+#define T_AI_DECIDE_BY_LEVEL      {9, 6, 4}
+#define T_AI_PASS_REACT_BY_LEVEL  {18, 12, 8}
+#define T_KEEPER_REACT_BY_LEVEL   {26, 20, 15}
+#define T_AI_TACKLE_EXPOSED_BY_LEVEL {FX(0.75), FX(0.6), FX(0.5)}
 #define T_AI_COMMIT        FX(0.8)    /* utility bonus for sticking with the current action/target */
 #define T_AI_FIRST_TOUCH   10         /* an AI carrier controls the ball this long before passing/shooting */
 #define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
