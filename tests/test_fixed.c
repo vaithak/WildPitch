@@ -41,5 +41,20 @@ int main(void) {
     int buckets[10] = {0};
     for (int i = 0; i < 100000; i++) buckets[wp_rng_range(&r, 10)]++;
     for (int i = 0; i < 10; i++) CHECKF(buckets[i] > 9500 && buckets[i] < 10500, "bucket %d=%d", i, buckets[i]);
+    /* exact isqrt (clz start) == the reference digit-by-digit loop, bit for bit, over a wide sweep */
+    {
+        uint64_t x = 0x9E3779B97F4A7C15ULL; int bad = 0;
+        for (int k = 0; k < 200000; k++) {
+            x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+            int32_t a = (int32_t)(x >> (33 + (k % 31))) ;
+            fv2 v = fv2_make(a, (int32_t)(x & 0xFFFFFF));
+            uint64_t n = (uint64_t)((int64_t)v.x * v.x + (int64_t)v.y * v.y);
+            uint64_t res = 0, bit = (uint64_t)1 << 62;                 /* reference */
+            while (bit > n) bit >>= 2;
+            while (bit) { if (n >= res + bit) { n -= res + bit; res = (res >> 1) + bit; } else res >>= 1; bit >>= 2; }
+            bad += (uint64_t)fv2_len(v) != res;
+        }
+        CHECKF(bad == 0, "isqrt mismatches: %d", bad);
+    }
     return TEST_DONE();
 }

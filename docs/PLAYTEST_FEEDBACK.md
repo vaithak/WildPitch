@@ -74,3 +74,9 @@ Format:
   (answers: J hold = deeper/softer stays; no separate through-ball key; YES a standing receiver should be easier to
   take over to make a run while the ball is coming.)
 - **Action:** takeover rule for standing receivers; research `reports/Pass receiver selection.md`.
+
+## CP0.2d — 2026-11-15
+- **Feedback (verbatim):** "go ahead" (after CP0.2d receiver ring; no specific notes).
+- **Action:** start CP0.3 "Instinct AI".
+- **Owner decisions for CP0.3 (asked):** when an AI team-mate wins the ball, control jumps to him (held stick
+  latched); when our keeper has the ball, the human controls the keeper (control jumps to him too).

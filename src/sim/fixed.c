@@ -4,8 +4,10 @@
 
 /* Integer square root of a 64-bit value (floor). */
 static uint64_t isqrt64(uint64_t n) {
-    uint64_t res = 0, bit = (uint64_t)1 << 62;
-    while (bit > n) bit >>= 2;
+    /* exact floor(sqrt(n)), digit-by-digit. The start bit = highest power of 4 <= n, found with clz instead of a
+     * shifting loop (same result bit-for-bit; ~2x faster on typical pitch distances). */
+    if (n == 0) return 0;
+    uint64_t res = 0, bit = (uint64_t)1 << ((63 - __builtin_clzll(n)) & ~1);
     while (bit) {
         if (n >= res + bit) { n -= res + bit; res = (res >> 1) + bit; }
         else res >>= 1;
