@@ -120,7 +120,7 @@ From the ball-physics research (`reports/Football game ball physics.md`, steps R
   (R4 skid-to-roll/topspin is optional later).
 - `ball_roll_speed_for(d)` (inverse roll model) exists for CP0.2 weighted passes.
 
-## D-017 — Passing & switching model (2026-11-15, CP0.2a)
+## D-017 — Passing & switching model (2026-11-15, CP0.2a) — *receive/assist parts superseded by D-020*
 - **Tap pass = targeted ground pass:** receiver = best team-mate within 55° of the stick (angle + distance score;
   keeper only within 20°). Aimed and weighted at the CONTACT tick from where ball and receiver are (0.25 s lead), so
   the passer's run never spoils it: launch = inverse roll model so it arrives at 5.5 m/s (measured ~6.0). No receiver
@@ -140,7 +140,7 @@ centred, a drawn red heart; ~4 s with fades, any key skips; never in harness/cap
 --screenshot F.bmp` captures it). Also at the top of README.md. When menus exist (CP0.4/0.5) it also gets a
 permanent line on the title screen footer and in the credits. Never on the in-match HUD.
 
-## D-019 — Through balls, lofted passes, headers (2026-11-15, CP0.2b)
+## D-019 — Through balls, lofted passes, headers (2026-11-15, CP0.2b) — *through-ball model + tap window superseded by D-020*
 - **J is tap/hold:** released within 9 ticks (150 ms) = targeted pass (fires on RELEASE: costs the tap's length in
   latency, ~50-100 ms); held longer = through ball, lead 2.5→10 m ahead of the receiver (mostly toward the goal
   he attacks), weighted to arrive there at 3 m/s; white power bar appears only past the tap window.
@@ -180,4 +180,8 @@ received, and the moving key is pressed, player moves ahead without reception". 
   0.5 s he closes at ≤ 4 m/s.
 - **Deflection mid-pass:** switch at once to the team-mate with the best time to the ball; after any auto-switch the
   inherited stick is ignored (he chases the ball) until it changes/releases, ≤ 30 ticks.
-- Not done (CP0.3 AI): one-twos / passer follow-up runs, off-ball run timing, pass-lane scoring.
+- A planned runner lets a ball run only while it passes CLEAR of him (> 0.5 m); one coming through his body/feet is
+  taken in stride (never rolls through him, D-016).
+- Not built from the report's plan (yet): the 200 ms first-touch stick buffer (the touch already follows the stick
+  held at control), time-based (0.25 s) switch hysteresis (still 2 m distance). CP0.3 AI: one-twos / passer
+  follow-up runs, off-ball run timing, pass-lane scoring (passes still hit cones standing in lanes).

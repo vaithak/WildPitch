@@ -82,22 +82,25 @@ int main(void) {
 
     /* ---- B/C. assisted receivers keep running: through ball and tap to a runner (findings 2, 3) ---- */
     for (int kind = 0; kind < 2; kind++)
-        for (int sp = 0; sp < 3; sp++) {
-            fx v = sp ? FX(7.5) : FX(5.5);
-            scene(fv2_make(-FX(15.0), 0), fv2_make(sp == 2 ? -FX(3.0) : -FX(9.0), FX(3.0)));   /* sp 2: 12 m ahead */
+        for (int sp = 0; sp < 6; sp++) {          /* sp 3..5: same, passer directly BEHIND him (y = 0) */
+            fx v = sp % 3 ? FX(7.5) : FX(5.5);
+            scene(fv2_make(-FX(15.0), 0), fv2_make(sp % 3 == 2 ? -FX(3.0) : -FX(9.0), sp >= 3 ? 0 : FX(3.0)));
             pass_to_mate(kind ? 24 : 6, NOIN, 1, fv2_make(v, 0));
-            fx vrec = 0, cosv = 0, maxclose = 0; int got = -1, t = 0;
+            fx vrec = 0, cosv = 0, maxclose = 0, mind = FX(99.0); int got = -1, t = 0;
             for (; t < 300 && got < 0; t++) {
+                if (s.ball.owner < 0 && fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos)) < mind)
+                    mind = fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos));
                 fv2 rel = fv2_sub(s.ball.vel, s.players[MATE].vel);
                 if (s.ball.owner < 0 && fv2_len(rel) > maxclose && fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos)) < FX(2.0)) maxclose = fv2_len(rel);
                 step2(NOIN, NOIN);
                 if (s.ball.owner >= 0) { got = s.ball.owner; vrec = fv2_len(s.players[MATE].vel);
                     cosv = vrec > 0 ? fx_div(s.players[MATE].vel.x, vrec) : 0; }
             }
-            printf("%s to a runner at %.1f m/s: received by %d after %.2f s, his speed %.1f m/s, heading cos %.2f, closing %.1f\n",
-                   kind ? "through ball" : "tap pass    ", tod(v), got, t / 60.0, tod(vrec), tod(cosv), tod(maxclose));
+            printf("%s to a runner at %.1f m/s%s: received by %d after %.2f s, his speed %.1f m/s, heading cos %.2f, closing %.1f, closest %.2f\n",
+                   kind ? "through ball" : "tap pass    ", tod(v), sp >= 3 ? " (in line)" : "", got, t / 60.0, tod(vrec), tod(cosv), tod(maxclose), tod(mind));
+            CHECKF(mind > FX(0.35), "kind %d sp %d: ball passed %.2f m from his centre (through the body)", kind, sp, tod(mind));
             CHECKF(got == MATE, "kind %d speed %d: not received (%d)", kind, sp, got);
-            CHECKF(vrec >= fx_mul(v, sp == 2 ? FX(0.5) : FX(0.6)) && cosv > FX(0.7), "kind %d sp %d: runner slowed to %.1f / turned (cos %.2f)", kind, sp, tod(vrec), tod(cosv));
+            CHECKF(vrec >= fx_mul(v, sp % 3 == 2 ? FX(0.5) : FX(0.6)) && cosv > FX(0.7), "kind %d sp %d: runner slowed to %.1f / turned (cos %.2f)", kind, sp, tod(vrec), tod(cosv));
             if (kind) CHECKF(vrec >= FX(4.5), "through: received at %.1f m/s (want >= 4.5)", tod(vrec));
             CHECKF(maxclose < T_CONTROL_MAX_REL, "closing speed %.1f", tod(maxclose));
         }
@@ -108,8 +111,8 @@ int main(void) {
         static const char *dn[4] = {"release", "sideways", "forward", "toward"};
         for (int kind = 0; kind < 2; kind++)
             for (int d = 0; d < 4; d++)
-                for (int when = 0; when < 3; when++) {        /* nudge after hand-off / nudge mid-flight / hold late */
-                    int miss = 0, n = 0;
+                for (int when = 0; when < 4; when++) {   /* nudge after hand-off / mid-flight / hold late / hold from hand-off */
+                    int miss = 0, n = 0; fx maxc = 0;
                     for (int pl = 0; pl < 6; pl++) {
                         fv2 mate = fv2_make(-FX(10.0) + FX_INT(7 + pl * 2), FX_INT((pl % 3) * 3 - 3));
                         scene(fv2_make(-FX(10.0), 0), mate);
@@ -117,7 +120,9 @@ int main(void) {
                         int got = -1;
                         for (int t = 0; t < 300 && got < 0; t++) {
                             WpSeatInput in = NOIN;
-                            int nudge = when == 0 ? t < 12 : when == 1 ? (t >= 20 && t < 32) : t >= 25;
+                            int nudge = when == 0 ? t < 12 : when == 1 ? (t >= 20 && t < 32) : when == 2 ? t >= 25 : 1;
+                            fv2 rel = fv2_sub(s.ball.vel, s.players[MATE].vel);
+                            if (s.ball.owner < 0 && fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos)) < FX(1.5) && fv2_len(rel) > maxc) maxc = fv2_len(rel);
                             if (nudge) { in.move_x = dirs[d][0]; in.move_y = dirs[d][1]; }
                             if (when == 0 && d == 0 && t < 12) { in.move_x = 127; }   /* "release": held then let go */
                             step2(in, NOIN);
@@ -125,10 +130,11 @@ int main(void) {
                         }
                         n++; miss += got != MATE;
                     }
-                    printf("receive %-7s %-8s %-12s: %d/%d missed\n", kind ? "through" : "tap", dn[d],
-                           when == 0 ? "nudge early" : when == 1 ? "nudge mid" : "hold late", miss, n);
+                    printf("receive %-7s %-8s %-18s: %d/%d missed\n", kind ? "through" : "tap", dn[d],
+                           when == 0 ? "nudge early" : when == 1 ? "nudge mid" : when == 2 ? "hold late" : "hold from hand-off", miss, n);
+                    CHECKF(maxc < T_CONTROL_MAX_REL, "closing speed %.1f m/s (bounce-off)", tod(maxc));
                     /* holding straight back toward the passer for the rest of the flight is a deliberate takeover */
-                    int deliberate = d == 3 && when == 2;
+                    int deliberate = d == 3 && when >= 2;
                     if (!deliberate) CHECKF(miss <= 1, "%s %s %d: %d/%d missed", kind ? "through" : "tap", dn[d], when, miss, n);
                 }
     }
@@ -146,6 +152,31 @@ int main(void) {
             if (defl_t >= 0 && switched_t < 0 && s.seat_player[0] != MATE) switched_t = t;
         }
         printf("deflection at t%d, control moved at t%d to %d\n", defl_t, switched_t, s.seat_player[0]);
+        /* follow-through: the new man goes for the ball (not away on the stale stick) and control doesn't ping-pong */
+        {
+            int me = s.seat_player[0], switches = 0, away = 0; int8_t seat = s.seat_player[0];
+            fx d0 = fv2_len(fv2_sub(s.ball.pos, s.players[me].pos));
+            scene(fv2_make(-FX(10.0), 0), fv2_make(FX(4.0), 0));
+            s.players[2].pos = fv2_make(-FX(2.0), FX(4.0));
+            s.players[9].pos = fv2_make(-FX(4.0), FX(0.1));
+            pass_to_mate(6, NOIN, 0, fv2_make(0, 0));
+            int after = -1;
+            for (int t = 0; t < 120; t++) {
+                int8_t before = s.seat_player[0];
+                uint16_t ev = step2((WpSeatInput){127, -127, 0}, NOIN);
+                if (after < 0 && (ev & WP_EV_BODY)) after = t;
+                if (after >= 0 && t > after + 1) {
+                    if (s.seat_player[0] != before) switches++;
+                    int cur = s.seat_player[0];
+                    fv2 tb = fv2_sub(s.ball.pos, s.players[cur].pos);
+                    if (s.ball.owner < 0 && fv2_len(s.players[cur].vel) > FX(1.0) && fv2_dot(tb, s.players[cur].vel) < 0) away++;
+                    if (s.ball.owner >= 0 || t > after + 60) break;
+                }
+            }
+            (void)d0; (void)seat;
+            printf("after the deflection: %d more switches, %d ticks moving away from the loose ball\n", switches, away);
+            CHECKF(switches <= 1 && away <= 18, "deflection follow-through: %d switches, %d ticks away", switches, away);
+        }
         CHECKF(defl_t >= 0 && switched_t >= 0 && switched_t - defl_t <= 6, "deflection switch: defl %d switch %d", defl_t, switched_t);
     }
 

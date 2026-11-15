@@ -64,4 +64,6 @@ Format:
   non-natural gameplay and report its findings."
 - **Feedback (verbatim):** "like while a ball is being received, and the moving key is pressed, player moves ahead
   without reception, maybe this will be fixed later using AI on players, that is okay, I am just letting you know"
-- **Action:** research `reports/Through ball and pass reception.md` + headless playtest agent findings → fix plan.
+- **Action:** research `reports/Through ball and pass reception.md` + headless playtest agent findings (copied to
+  `research_notes/Through ball and pass reception/playtest_findings.md`) → CP0.2c / D-020, all nine findings as
+  acceptance tests in `tests/test_reception.c` (one-twos left to CP0.3). Owner: "go ahead and fix them".

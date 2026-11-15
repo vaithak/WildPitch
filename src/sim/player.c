@@ -467,12 +467,13 @@ static void control(SimState *s, int i, const WpSeatInput *in) {
     fx reach = s->pass_target == i ? T_CONTROL_STRETCH : T_CONTROL_REACH;
     if (dseg > reach) return;
     if (s->pass_target == i && s->pass_plan != WP_PLAN_CLOSEST && s->pass_stick[0] != -128) {
-        /* a runner on a planned meet lets the ball run until shortly before the meeting point (he'd otherwise trap
-         * a through ball that passes him early) - unless the human is steering him (stick opinion) */
+        /* a runner on a planned meet lets a ball passing clear of him run until shortly before the meeting point
+         * (he'd otherwise trap a through ball that passes him early) - unless the human is steering him */
         int dx = in->move_x - s->pass_stick[0], dy = in->move_y - s->pass_stick[1];
         int opinion = (in->move_x || in->move_y) && dx * dx + dy * dy > T_RECV_STICK_TOL * T_RECV_STICK_TOL;
         int32_t left = (int32_t)(int16_t)(uint16_t)(s->pass_meet_tick - (uint16_t)s->tick);
-        if (!opinion && left > 12) return;
+        /* ...but a ball coming through his body/feet is taken in stride (never rolls through him, D-016) */
+        if (!opinion && left > 12 && dseg > FX(0.5)) return;
     }
     fv2 rel = fv2_sub(b->vel, p->vel);
     fx rs = fv2_len(rel);
