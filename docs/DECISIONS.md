@@ -69,6 +69,18 @@ Player bodies are NOT physically simulated (no ragdoll/muscle RL): orders of mag
 primitives (design doc layer 5). New body state (e.g. body pitch for overhead kicks/dives) is added as sim fields
 when a move needs it. Applies from CP0.1: kicks are implemented as parameterised actions, not hard-coded shot/pass types.
 
+**D-013 · 2026-11-14 · CP0.1 controls and feel rules** (Claude; owner to judge in playtest).
+- Keys: WASD/arrows move, Shift sprint, J (or Space) pass, K shoot (hold to charge, release), I chip (hold/release).
+- Shots/chips get a mild **aim assist** toward the opponent goal (≤18°; stick up/down picks the far side, straight
+  picks the middle), because 8-way keyboard aiming can't otherwise hit a 4 m goal. Tunable `T_AIM_ASSIST_DEG`.
+- **No dice:** inaccuracy comes only from visible causes — the ball inherits 50% of the kicker's velocity, harder
+  strikes rise more, striking across your run adds curl.
+- Dribble touches follow the stick (not the slower-turning body), need foot reach (≤1 m), and push relative to the
+  player's speed in the new direction. Reversing on an out-of-reach knock-on makes the player fetch it first.
+- An owned ball is gathered to the foot during the wind-up, so the owner's kicks never whiff.
+- **Temporary out-of-play rule** (until CP0.4): ball goes dead, then is placed just inside the line after 0.75 s.
+- Other players have no AI yet (CP0.3): they stand still and block the ball with their bodies.
+
 ## Open (owner to decide later)
 - Name: keep WILDPITCH? (working title in use)
 - Business model: one-time purchase vs open-source core.

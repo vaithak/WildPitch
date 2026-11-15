@@ -22,7 +22,14 @@ typedef struct {
     float action_t;      /* seconds since action start */
     float time;          /* global seconds, for idle breathing */
     bool  keeper;
+    /* kick parameters (from the sim's WpKick, D-012) so the strike lands on the contact tick */
+    uint8_t kick_foot;   /* 0 left, 1 right */
+    uint8_t kick_kind;   /* WP_KICK_* */
+    float kick_windup;   /* seconds from action start to ball contact (0 -> default) */
+    float kick_power01;  /* 0..1 strength of the strike */
+    float charge01;      /* 0..1 while charging a shot/chip near the ball (leg drawn back), else 0 */
 } WpAvatarPose;
+
 
 typedef struct {
     SDL_FColor skin, hair, shirt, sleeve, shorts, socks, boots, gloves;
@@ -63,5 +70,9 @@ void wp_avatar_draw(SDL_Renderer *r, SDL_Texture *soft, const WpCamera *cam, flo
 void wp_soft_disc(SDL_Renderer *r, SDL_Texture *soft, float cx, float cy, float rx, float ry, SDL_FColor c);
 void wp_soft_capsule(SDL_Renderer *r, SDL_Texture *soft, float ax, float ay, float ar,
                      float bx, float by, float br, SDL_FColor c);
+
+/* Joint query for checks: world position of the instep (mid-foot; foot 0 = left, 1 = right) for a pose at (x, y). */
+void wp_avatar_toe_pos(const WpAvatarPose *pose, const WpAvatarLook *look, const WpAvatarStyle *style,
+                       float x, float y, int foot, float out[3]);
 
 #endif

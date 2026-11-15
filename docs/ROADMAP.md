@@ -28,7 +28,7 @@ Not playable; invisible plumbing every later CP depends on.
 - Sim: player jump state (`z`, `vz`, `action`, `action_timer`) for headers (D-010).
 - `--demo` (8 scripted runners), `--gallery` (pose sheet), `--style`, `--zoom`, `--frames` flags.
 
-### CP0.1 — "Ball on grass" ⏭ 🔵
+### CP0.1 — "Ball on grass" ✅ 🔵
 **Playable:** one player you control on a tilted 2.5D pitch with goals, and a ball that feels right.
 - Window, 60 Hz fixed-step loop with interpolated rendering, vsync + sleep (no spinning).
 - Tilted tabletop camera that follows play; pitch markings, goals with nets, shadows.
@@ -46,7 +46,7 @@ Not playable; invisible plumbing every later CP depends on.
 - **Playtest:** does dribbling feel responsive? Do shots/chips feel weighty? Is the camera/tilt
   readable? Does the laptop stay quiet?
 
-### CP0.2 — "Pass and move" ⬜ 🔵
+### CP0.2 — "Pass and move" ⏭ 🔵
 **Playable:** your full 5-a-side team (4 + keeper) vs. a passive opposition (cones that move a bit).
 - Pass: tap = short ground pass to the best teammate in the stick direction; hold = through ball
   into space (power by hold time). Lofted pass.

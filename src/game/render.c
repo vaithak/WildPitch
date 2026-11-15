@@ -1,5 +1,6 @@
 /* render.c - tilted 2.5D "tabletop" match renderer on SDL_Renderer. */
 #include "game/render.h"
+#include "sim/tuning.h"
 #include <math.h>
 
 static float tof(fx v) { return (float)v / 65536.0f; }
@@ -78,12 +79,22 @@ static void draw_pitch(SDL_Renderer *r, const WpCamera *c, const WpPitch *p) {
 static void draw_goal(SDL_Renderer *r, const WpCamera *c, const WpPitch *p, int sgn) {
     float gx = (float)sgn * tof(p->length) / 2, gw = tof(p->goal_width) / 2, gh = tof(p->goal_height);
     float back = gx + (float)sgn * tof(p->goal_depth);
-    SDL_SetRenderDrawColor(r, 200, 200, 210, 140);
-    for (int i = 0; i <= 8; i++) {  /* net */
+    /* net = the physics box (ball.c): roof at crossbar height, back wall, side walls */
+    SDL_SetRenderDrawColor(r, 210, 210, 220, 120);
+    for (int i = 0; i <= 8; i++) {
         float y = -gw + (float)i * (2 * gw / 8);
-        line3(r, c, gx, y, gh, back, y, gh * 0.6f); line3(r, c, back, y, gh * 0.6f, back, y, 0);
+        line3(r, c, gx, y, gh, back, y, gh); line3(r, c, back, y, gh, back, y, 0);
     }
-    line3(r, c, back, -gw, gh * 0.6f, back, gw, gh * 0.6f);
+    for (int i = 1; i <= 4; i++) {
+        float z = gh * (float)i / 5.0f;
+        line3(r, c, back, -gw, z, back, gw, z);
+        line3(r, c, gx, -gw, z, back, -gw, z); line3(r, c, gx, gw, z, back, gw, z);
+    }
+    for (int i = 1; i <= 3; i++) {
+        float x = gx + (back - gx) * (float)i / 4.0f;
+        line3(r, c, x, -gw, 0, x, -gw, gh); line3(r, c, x, gw, 0, x, gw, gh); line3(r, c, x, -gw, gh, x, gw, gh);
+    }
+    line3(r, c, back, -gw, 0, back, -gw, gh); line3(r, c, back, gw, 0, back, gw, gh);
     SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
     for (int k = -1; k <= 1; k++) {   /* thick posts */
         float o = (float)k * 0.04f;
@@ -169,7 +180,16 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 .action_t = ((float)p->action_timer + alpha) / (float)WP_TICK_HZ,
                 .time = ctx->time + (float)i * 0.37f,
                 .keeper = p->role == WP_ROLE_KEEPER,
+                .kick_foot = p->kick.foot,
+                .kick_kind = p->kick.kind,
+                .kick_windup = (float)p->kick.windup / (float)WP_TICK_HZ,
+                .kick_power01 = p->kick.kind == WP_KICK_PASS ? 0.3f
+                              : (tof(p->kick.power) - 14.0f) / 16.0f,
             };
+            if (p->charge_kind != 0xFF && p->kick_charge > 0) {
+                float dxb = bx - px[i], dyb = by - py[i];
+                if (dxb * dxb + dyb * dyb < 4.0f) pose.charge01 = (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
+            }
             wp_avatar_draw(r, ctx->soft, cam, px[i], py[i], &pose, &ctx->look[i], style);
             for (int s = 0; s < WP_MAX_SEATS && !ctx->hide_markers; s++)
                 if (cur->seat_player[s] == i) {
@@ -181,6 +201,17 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                         {{m.x, m.y}, {1, 0.95f, 0.3f, 1}, {0, 0}},
                     };
                     SDL_RenderGeometry(r, NULL, tri, 3, NULL, 0);
+                    if (p->charge_kind != 0xFF && p->kick_charge > 0) {   /* power bar while charging */
+                        float c = (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
+                        float bw = 1.1f * cam->ppm * m.s, bh = 0.16f * cam->ppm * m.s + 2.0f;
+                        float x0 = m.x - bw * 0.5f, y0 = m.y - rad * 0.8f - bh - 4.0f;
+                        SDL_FRect bg = {x0 - 1, y0 - 1, bw + 2, bh + 2}, fg = {x0, y0, bw * c, bh};
+                        SDL_SetRenderDrawColor(r, 15, 15, 20, 220);
+                        SDL_RenderFillRect(r, &bg);
+                        if (p->charge_kind == WP_KICK_CHIP) SDL_SetRenderDrawColor(r, 90, 200, 255, 255);
+                        else SDL_SetRenderDrawColor(r, (Uint8)(120 + 135 * c), (Uint8)(230 - 150 * c), 60, 255);
+                        SDL_RenderFillRect(r, &fg);
+                    }
                 }
         } else {
             WpScreenPt b = wp_project(cam, bx, by, bz + 0.11f);

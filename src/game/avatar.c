@@ -167,21 +167,44 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         }
         o->lean = 0.38f;
     }
+    /* charging a shot/chip with the ball close: the hold IS the backswing (right leg by default) */
+    if (P->action == WP_ACT_NONE && P->charge01 > 0) {
+        float c = smooth01(P->charge01 * 1.6f);
+        o->hip[1] += (-0.75f - o->hip[1]) * c;
+        o->knee[1] += (1.25f - o->knee[1]) * c;
+        o->ab[0] += (0.7f - o->ab[0]) * c;
+        o->lean += (0.12f - o->lean) * c;
+    }
     if (P->action == WP_ACT_NONE) return;
     /* Action poses are computed separately and blended over the locomotion pose with a weight that ramps in
-     * (~0.06 s) and out before the sim clears the action, so nothing pops. */
+     * (~0.04 s) and out before the sim clears the action, so nothing pops. */
     Pose a = *o;
     float t = P->action_t, w = 0;
     switch (P->action) {
-    case WP_ACT_KICK: {          /* right-footed strike; sim clears the action after 0.5 s */
-        float back = smooth01(t / 0.16f), strike = smooth01((t - 0.16f) / 0.11f), rec = smooth01((t - 0.32f) / 0.12f);
-        a.hip[1] = (-0.8f * back + 2.1f * strike) * (1 - rec) + 0.1f * rec;
-        a.knee[1] = (0.15f + 1.35f * back * (1 - strike) + 0.1f * strike) * (1 - rec) + 0.2f * rec;
-        a.hip[0] = 0.25f; a.knee[0] = 0.35f;
-        a.sh[0] = 0.5f; a.ab[0] = 0.9f; a.elb[0] = 0.5f;
-        a.sh[1] = -0.6f * strike; a.ab[1] = 0.6f;
-        a.lean = 0.10f - 0.12f * strike * (1 - rec);
-        w = smooth01(t / 0.06f) * (1 - smooth01((t - 0.36f) / 0.12f));
+    case WP_ACT_KICK: {
+        /* keyframes relative to contact time tc: backswing -> contact (foot at the ball) -> follow-through.
+         * Kicking leg = kick_foot (leg index 1 is the right leg). */
+        float tc = P->kick_windup > 0.01f ? P->kick_windup : 0.1f;
+        int kl = P->kick_foot ? 1 : 0, sl = 1 - kl;
+        float pw = clampf(P->kick_power01, 0, 1);
+        bool pass = P->kick_kind == WP_KICK_PASS, chip = P->kick_kind == WP_KICK_CHIP;
+        float back_hip = pass ? -0.45f : -0.6f - 0.35f * pw, follow = pass ? 0.75f : (chip ? 0.85f : 1.0f + 0.7f * pw);
+        float s1 = smooth01((t - (tc - 0.07f)) / 0.07f);           /* swing to contact */
+        float s2 = smooth01((t - tc) / 0.10f);                       /* follow-through */
+        float back = smooth01(t / fmaxf(tc - 0.07f, 0.03f));
+        float hip = back_hip * back;
+        hip += ((chip ? 0.48f : 0.42f) - hip) * s1;                   /* contact: foot reaches the ball */
+        hip += (follow - hip) * s2;
+        float knee = 0.2f + (pass ? 0.6f : 1.2f) * back;
+        knee += ((chip ? 0.32f : 0.18f) - knee) * s1;
+        knee += ((chip ? 0.35f : 0.12f) - knee) * s2;
+        a.hip[kl] = hip; a.knee[kl] = knee;
+        a.leg_out[kl] = -0.13f * s1 + 0.06f * (1 - s1);              /* swing across onto the ball line */
+        a.hip[sl] = 0.22f; a.knee[sl] = 0.35f; a.leg_out[sl] = 0.06f;
+        a.sh[sl] = 0.45f; a.ab[sl] = 0.95f; a.elb[sl] = 0.5f;        /* opposite arm out for balance */
+        a.sh[kl] = -0.5f * s1; a.ab[kl] = 0.45f; a.elb[kl] = 0.5f;
+        a.lean = chip ? 0.10f - 0.28f * s1 : 0.14f - 0.12f * s2;     /* chip: lean back under the ball */
+        w = smooth01(t / 0.04f) * (1 - smooth01((t - (tc + 0.18f)) / 0.12f));
         break;
     }
     case WP_ACT_JUMP_HEADER:
@@ -249,6 +272,15 @@ static void solve(const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarSt
     for (int i = 0; i < 4; i++) lowest = fminf(lowest, J[feet[i]].z);
     float shift = (0.05f * k + P->z) - lowest;
     for (int i = 0; i < J_COUNT; i++) J[i].z += shift;
+}
+
+void wp_avatar_toe_pos(const WpAvatarPose *pose, const WpAvatarLook *look, const WpAvatarStyle *style,
+                       float x, float y, int foot, float out[3]) {
+    V3 J[J_COUNT + 4];
+    float hr;
+    solve(pose, look, style, x, y, J, &hr);
+    V3 t = J[foot ? J_TOE_R : J_TOE_L], a = J[foot ? J_ANK_R : J_ANK_L];
+    out[0] = (t.x + a.x) * 0.5f; out[1] = (t.y + a.y) * 0.5f; out[2] = (t.z + a.z) * 0.5f;   /* instep */
 }
 
 /* ------------------------------------------------------------------ drawing */
