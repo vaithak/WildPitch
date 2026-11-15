@@ -21,7 +21,9 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
                         danger, stick memory, per-tick preview (pick_recv) that passes read
   header.c              contextual headers (D-010/D-019): trigger on J/K at a high ball, legs step under it while
                         the stick aims, jump timed so the apex meets it, head-band contact, header pass/shot
-  team.c                PLACEHOLDER movement for non-human players (shape, runs, keepers, passive cones) ->
+  brain.c               INSTINCT AI (D-023): candidates x feature utility -> input/kick/tackle for every non-seat player
+  tackle.c              standing tackles (J near an opponent's ball; AI when the ball is exposed)
+  team.c                steering helpers (team_steer*, used by seats/brain) + the old CP0.2 placeholder positioning movement for non-human players (shape, runs, keepers, passive cones) ->
                         WpSeatInput; replaced by the CP0.3 instinct AI. SimState.flags WP_SIMF_STATIC_OTHERS = statues
 src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   main.c                window, input -> WpInput, fixed-step loop, camera, HUD, flags (--demo --gallery
@@ -37,6 +39,8 @@ tests/                  headless tests (test_*.c auto-registered with ctest), be
   test_ball_control.c   dribble feel targets, never-whiff kicks, height bands, no-magnet checks, shot table (prints)
   test_reception.c      D-020 acceptance: through-ball geometry at the planned meet, runners keep their speed, keys
                         pressed/released mid-flight (0 misses), deflection switch, untargeted hold, live short room
+  test_ai_rules.c       possession rules: tackle, closest wins, control follows our ball, no ball through bodies
+  test_ai_match.c       AI vs AI: balanced teams, football-like goal/shot/pass/tackle rates, nobody stuck
   test_passing.c        targeted passes reach the receiver (standing/jog/sprint), hand-off timing, one-two aim,
                         switching rules, through balls (lead by hold), lob over a defender + solver agreement,
                         headers (stand/jump, at goal scores, pass hands off)

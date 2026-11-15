@@ -228,3 +228,18 @@ reachable 100%. CP0.3: the striker's forward key still finds nobody (team.c puts
 - **Bodies block:** players never overlap closer than 0.6 m (pushed apart equally, closing speed removed).
 - **Owner decisions:** when an AI team-mate (or the keeper) of a seat wins the ball, control jumps to him with the
   held stick latched; the human controls the keeper with the ball.
+
+## D-023 — Instinct AI: candidates × linear feature utility (2026-11-15, CP0.3a)
+Realises D-008 in `src/sim/brain.c` for every player no seat controls (team-mates and opposition alike):
+observation → candidate actions → a fixed FEATURE vector per candidate (forward gain, openness, lane clearance,
+cost, threat, first-to-ball, crowding, bias) → utility = W[action]·features (+ commitment bonus) → argmax → a
+WpSeatInput (same physics as humans) or an action (kick via `sim_player_kick`, tackle). The learned per-player brain
+(Phase 1) adds its own score over the same candidates/features — training changes which candidate wins, never
+physics. Actions: off the ball SHAPE / SUPPORT / RUN / CHASE / PRESS / COVER / MARK / RECEIVE (+ TACKLE when the
+carrier's ball is exposed in front); on the ball DRIBBLE (8 dirs) / PASS / THROUGH / SHOOT; keepers KEEP (line
+between ball and goal centre, meet a shot's line, come for loose balls they reach first; catch ≤ 22 m/s within
+1.3 m up to 2.3 m high). Attack-direction geometry (one code path for both teams). No dice: decisions every 6 ticks,
+staggered BY ROLE (staggering by index made mirrored players decide on different ticks → measured bias), first touch
+before an AI pass. Verification: `tests/test_ai_match.c` (AI vs AI, nudged starts: balance + football-like rates),
+`tools/playtest/aimatch.c`, mirror-symmetry harness. Not yet (CP0.3b): player stats, AI aerial duels, keeper
+dives/poses, difficulty, AI set pieces.

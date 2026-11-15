@@ -3,11 +3,15 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.2d — Passes always go somewhere sensible, and you can see who: ✅ done, waiting for the owner's playtest.**
-(CP0.2c decisions: hold = deeper kept, no separate key, standing receivers can be taken over to make a run.) Owner
-asked for research on receiver selection → `reports/Pass receiver selection.md` → D-021. Next: **CP0.3 "Instinct AI"**.
+**CP0.3a — "They play back": ✅ done, waiting for the owner's playtest.** First real 5v5 vs AI. Owner decisions: control
+jumps to our AI team-mate/keeper who wins the ball; the human controls the keeper with the ball. Next: **CP0.3b**
+(player stats, AI aerial duels, keeper dives/poses, difficulty) after feedback.
 
 ## What works now
+- **CP0.3a (D-022/D-023):** the blue team plays: presses, marks, covers, tackles, passes, runs in behind, shoots;
+  your red team-mates support, run, cover and mark; keepers position and catch. **J near their ball = tackle**
+  (lunge; well-timed wins it, mistimed commits you). Bodies block. If a team-mate wins it, you get control.
+  AI vs AI (12 × 3 min): ~0.9 goals/min, 65% passes arrive, possession 51/49, nobody stuck.
 - **CP0.2d (D-021):** a white ring under the team-mate a pass would go to right now (amber = an opponent near that
   lane) — the pass always goes to the ringed man; diagonals and wide team-mates are easier to hit on a keyboard;
   the keeper is reachable but only as a last resort; a pass with nobody there rolls into space and stops inside
@@ -36,10 +40,11 @@ asked for research on receiver selection → `reports/Pass receiver selection.md
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (9 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_scoring, test_determinism
-  (golden `a1bebf61d7ddd972`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (11 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism
+  (golden `f09c7cc2902a3f89`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
-- Perf: full game loop ~5% of one core; `bench_sim` ~4,500× real time (3.7 µs/tick; per-tick receiver preview added). Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
+- Perf: full game loop ~5% of one core; `bench_sim` ~1,080× real time (15 µs/tick with 10 AI players; ~0.1% of a core in play). RL training will want a
+  faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
   receiver prediction ~4% → perf pass = a faster EXACT isqrt (bit-identical, golden unchanged); was 22,700× before team logic + pass solver — fine for play, revisit with a
   lookup table before RL training).
 
@@ -63,7 +68,7 @@ Bounce (D-016): 2 m drop → 0.69 m; full chip stops after ~30.6 m (was 39.7). P
 never closer than 0.40 m to the player's centre on stops/receptions/gathers; no braking from beyond reach.
 
 Scoring sweep (`test_scoring`, keyboard 8-way, statue keeper): natural positions (x ≥ 10 m, |y| ≤ 4 m, stick toward
-goal) score **51%** vs statues; in the **live** setup (keeper shades on his line, opposition shuffles) **39%**
+goal) score **51%** vs statues; in the **live** setup (CP0.3 keeper + defending AI) **22%**
 (asserted ≥ 25%). Live passes to moving team-mates: 23/24 complete; misses are mostly the keeper/kickoff statues. Floor asserted at 45%.
 Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here.
 
@@ -77,21 +82,28 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Log the owner's CP0.2c playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; tune the D-020 block in `tuning.h`.
-   Open owner questions: hold = deeper (current) or firmer? Separate through-ball key instead of tap/hold?
-2. Re-plan and start CP0.3 "Instinct AI" per ROADMAP (candidate actions × utility, D-008): replaces team.c
-   placeholder (incl. one-twos / follow-up runs / run timing / pass lanes from D-020's deferred list); real
-   opposition; keepers dive; AI aerial duels; simple player stats. Consider a perf pass (bench 4,900×) first.
+1. Log the owner's CP0.3a playtest feedback; tune `tuning.h` (AI block) and brain weights `W[][]` in `brain.c`.
+2. CP0.3b: simple player stats (pace, control, passing, shooting, tackling, stamina → speed, touch, pass/shot error
+   as visible-cause offsets, tackle reach) feeding utility; AI aerial duels (header_start for AI); keeper dive
+   action + dive/catch poses; difficulty knob (decision cadence / reaction); AI kick-offs and restarts.
 
 ## Known issues / environment notes
 - **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
   `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build` (needed by CP0.4/CP0.5).
-- Opposition = passive shuffling cones (no tackling/stealing, keepers don't dive) until CP0.3. Team-mates use
-  placeholder positioning (team.c), not real AI.
+- Keepers don't dive yet (they shuffle and catch; hard shots beat them or bounce off). No player stats yet (all equal).
+  No fouls/offside/set pieces (CP0.4).
 - Headers: height bands exist; the trigger is CP0.2.
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
 - Avatar nits: eyes only on large heads; back number is a generic "11".
 - Agents: never `pkill -f` a pattern that also appears in your own shell command (it kills the shell).
+
+## Playtest guide (CP0.3a — focus: a real match vs AI)
+`./build/wildpitch`. The blue team now attacks and defends. Defend: get goal-side and press **J** when the blue
+carrier's ball is close in front of you to tackle (too early/far = you lunge past and lose a moment). Your red
+team-mates cover, mark, support and make runs; if one wins the ball, control jumps to him. Their keeper positions
+and catches — scoring from 10–16 m is now ~22% in tests (was 39% vs a shuffling keeper).
+Judge: are your team-mates helpful (in good spots, making runs)? Is blue beatable but not dumb? Tackling feel?
+Too many/few tackles or turnovers? Keeper too good/bad?
 
 ## Playtest guide (CP0.2d — focus: who gets the pass)
 Watch the white ring: it sits under whoever J would pass to right now (amber when a blue player is near the lane).

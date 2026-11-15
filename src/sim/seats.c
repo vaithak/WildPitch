@@ -49,14 +49,13 @@ static int nearest_to_ball(const SimState *s, int team, int skip, fx *out_d) {
     return best;
 }
 
-typedef struct { fv2 pos; fx t; int found; } Meet;
 
 /* Where can player p meet the ball? Cheap prediction every 50 ms for up to 4 s (gravity + air drag in flight,
  * rolling decel on the grass, bounces ignored). Candidates: points at head height or below that he can run to in
  * time (~6.5 m/s + 0.15 s to react). No preference -> the candidate CLOSEST to him (step across, let it come).
  * With a stick preference (unit vector) -> min cost t/2 + 0.3*(1 - cos(stick, direction to candidate)) (GRF's
  * 0.6*angle/pi weighting). Not found -> the last predicted point. */
-static Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
+Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
     const WpBall *b = &s->ball;
     fv2 pos = b->pos, v = b->vel;
     fx z = b->z, vz = b->vz, dt = FX(0.05), best_cost = 0;

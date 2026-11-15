@@ -86,7 +86,13 @@ Not playable; invisible plumbing every later CP depends on.
 - Two-bearing pick, wider keyboard stage, keeper band, safe ball into space, stick memory, preview ring with lane
   tint (D-021). Sweep harness `tools/playtest/sel.c`.
 
-### CP0.3 — "Instinct AI" ⏭ 🟡
+### CP0.3a — "They play back" ✅ 🟡
+- Possession rules (D-022: anyone can win it, closest wins, tackles, bodies block, control follows our ball),
+  instinct brain for all non-human players (D-023), keeper positioning/catching, faster exact isqrt.
+
+### CP0.3b — Stats, aerial duels, keeper dives, difficulty ⏭ 🟡
+
+### CP0.3 — "Instinct AI" (original plan, now CP0.3a + CP0.3b) 🟡
 **Playable:** first real 5v5 match vs AI.
 - **Instinct layer** as *candidate actions × utility scores* over an observation vector
   (this is the exact interface the learned brain plugs into in Phase 1 — not a state machine).

@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 1664  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 1928  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 WpMatchConfig sim_default_config(void) {
     WpMatchConfig c;
@@ -144,6 +144,8 @@ uint64_t sim_hash(const SimState *s) {
         fnv_i(&f, p->facing); fnv_i(&f, p->team); fnv_i(&f, p->role);
         fnv_i(&f, p->kick_charge); fnv_i(&f, p->charge_kind); fnv_i(&f, p->immune);
         fnv_i(&f, p->touch_cooldown); fnv_i(&f, p->stamina);
+        fnv_i(&f, p->ai_act); fnv_i(&f, p->ai_mate); fnv_i(&f, p->ai_wait); fnv_i(&f, p->ai_hold);
+        fnv_i(&f, p->ai_goal.x); fnv_i(&f, p->ai_goal.y);
         const WpKick *k = &p->kick;
         fnv_i(&f, k->power); fnv_i(&f, k->vz); fnv_i(&f, k->spin); fnv_i(&f, k->dir);
         fnv_i(&f, k->foot); fnv_i(&f, k->kind); fnv_i(&f, k->windup); fnv_i(&f, k->done); fnv_i(&f, k->to);

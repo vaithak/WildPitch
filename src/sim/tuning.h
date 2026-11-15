@@ -134,6 +134,17 @@
 #define T_TACKLE_TICKS     30         /* whole tackle action (recovery included) */
 #define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
 
+/* ---- instinct AI (brain.c, D-023) ---- */
+#define T_AI_DECIDE        6          /* each AI player re-decides every this many ticks (staggered) */
+#define T_AI_COMMIT        FX(0.8)    /* utility bonus for sticking with the current action/target */
+#define T_AI_FIRST_TOUCH   10         /* an AI carrier controls the ball this long before passing/shooting */
+#define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
+#define T_AI_TACKLE_DIST   FX(0.95)    /* AI tackles when the ball is this close ... */
+#define T_AI_TACKLE_EXPOSED FX(0.6)  /* ... and this far from the carrier's feet (between touches) */
+#define T_KEEPER_REACH     FX(1.3)    /* keepers take a loose ball within this (hands) ... */
+#define T_KEEPER_HANDS_Z   FX(2.3)    /* ... up to this high ... */
+#define T_KEEPER_CATCH_REL FX(22.0)   /* ... arriving at up to this speed (faster: it beats/bounces off him) */
+
 /* ---- kicks ---- */
 #define T_CHARGE_MAX_TICKS 36         /* full power after 0.6 s */
 #define T_KICK_WINDUP_PASS 4

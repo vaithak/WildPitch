@@ -105,6 +105,12 @@ typedef struct {
     uint16_t touch_cooldown;     /* ticks before this player may touch the ball again */
     fx stamina;                  /* 0..1 */
     WpKick kick;                 /* current/last kick parameters */
+    /* instinct AI decision state (brain.c): what he's doing and where; re-decided every T_AI_DECIDE ticks */
+    uint8_t  ai_act;             /* AI_* */
+    int8_t   ai_mate;            /* player the action is about (mark / pass target), -1 none */
+    uint8_t  ai_wait;            /* ticks until the next decision */
+    uint8_t  ai_hold;            /* ticks he has had the ball (AI carriers don't act on the first touch) */
+    fv2      ai_goal;            /* where he is going */
 } WpPlayer;
 
 enum { WP_ROLE_KEEPER = 0, WP_ROLE_OUTFIELD = 1 };

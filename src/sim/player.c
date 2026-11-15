@@ -471,14 +471,15 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
     const WpBall *b = &s->ball;
     if (s->phase != WP_PHASE_PLAY || !player_can_control(s, i)) return -1;
     if (b->owner >= 0 || p->touch_cooldown || p->action != WP_ACT_NONE || p->z > 0) return -1;
-    if (b->z > WP_BAND_BODY_MAX) return -1;
+    int gk = p->role == WP_ROLE_KEEPER;
+    if (b->z > (gk ? T_KEEPER_HANDS_Z : WP_BAND_BODY_MAX)) return -1;
     /* reach is SWEPT over the coming tick (ball.pos .. ball.pos + vel*dt): a ball passing between ticks counts.
      * The pass's receiver may also stretch beyond clean reach, with a heavier touch. */
     fv2 seg = fv2_scale(b->vel, WP_DT);
     fx sl2 = fv2_dot(seg, seg), u = 0;
     if (sl2 > 0) u = fx_clamp(fx_div(fv2_dot(fv2_sub(p->pos, b->pos), seg), sl2), 0, FX_ONE);
     fx dseg = fv2_len(fv2_sub(p->pos, fv2_add(b->pos, fv2_scale(seg, u))));
-    fx reach = T_CONTROL_REACH;
+    fx reach = gk ? T_KEEPER_REACH : T_CONTROL_REACH;
     if (s->pass_target == i && dseg > T_CONTROL_REACH) {
         /* stretch (heavier touch) only for a ball that would otherwise pass him out of clean reach;
          * one coming to him rolls in to his foot */
@@ -497,7 +498,7 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
         /* ...but a ball coming through his body/feet is taken in stride (never rolls through him, D-016) */
         if (!opinion && left > 12 && dseg > FX(0.5)) return -1;
     }
-    if (fv2_len(fv2_sub(b->vel, p->vel)) > T_CONTROL_MAX_REL) return -1;   /* too hot: body collision deflects it */
+    if (fv2_len(fv2_sub(b->vel, p->vel)) > (gk ? T_KEEPER_CATCH_REL : T_CONTROL_MAX_REL)) return -1;   /* too hot */
     return dseg;
 }
 
@@ -595,7 +596,7 @@ void players_step(SimState *s, const WpInput *in) {
             header_assist_move(s, i, &mv[i]);
         }
         else if (s->flags & WP_SIMF_STATIC_OTHERS) pin[i] = mv[i] = (WpSeatInput){0, 0, 0};
-        else { team_input(s, i, &pin[i]); mv[i] = pin[i]; }
+        else { brain_input(s, i, &pin[i]); mv[i] = pin[i]; }
     }
     for (int i = 0; i < np; i++) {
         int seat = seat_of(s, i);

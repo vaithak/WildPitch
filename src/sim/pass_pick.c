@@ -19,7 +19,7 @@ static int is_digital(int8_t x, int8_t y) {
 }
 
 /* nearest opponent clearance from the lane ball -> target (opponents advanced a little along their run) */
-static fx lane_clear(const SimState *s, int team, fv2 a, fv2 t) {
+fx pass_lane_clear(const SimState *s, int team, fv2 a, fv2 t) {
     fv2 seg = fv2_sub(t, a);
     fx len2 = fv2_dot(seg, seg), len = fv2_len(seg), best = FX(99.0);
     if (len2 <= 0) return best;
@@ -68,7 +68,7 @@ int pass_pick_ex(const SimState *s, int i, wp_angle dir, int flags, int prev, ui
         }
         int32_t pts = (int32_t)(((int64_t)off * 360 * T_PASS_W_ANGLE) / 65536) + (int32_t)(dist / (FX_ONE / T_PASS_W_DIST));
         if (dist > T_PASS_PENALTY_M) pts += (int32_t)((dist - T_PASS_PENALTY_M) / (FX_ONE / T_PASS_W_FAR));
-        fx clear = lane_clear(s, p->team, s->ball.pos, qp);
+        fx clear = pass_lane_clear(s, p->team, s->ball.pos, qp);
         if (clear < T_LANE_CLEAR) pts += (int32_t)(((int64_t)(T_LANE_CLEAR - clear) * T_PASS_W_LANE_M) >> FX_SHIFT);
         if (j == prev) pts -= T_PASS_STICKY;
         if (best < 0 || pts < best_pts || (pts == best_pts && off < best_off)) {

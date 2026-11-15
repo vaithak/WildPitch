@@ -6,7 +6,8 @@
  *   pass_pick.c  who receives a pass (stick cone + score, preview, stick memory)
  *   header.c  contextual headers: trigger, take-off timing, head-band contact
  *   tackle.c  standing tackles (human J when they have the ball nearby; AI later)
- *   team.c    placeholder movement for non-human players (shape, runs, keepers) -> WpSeatInput (CP0.3: AI)
+ *   brain.c   instinct AI (D-008): observation -> candidate actions x utility -> input / kicks / tackles
+ *   team.c    steering helpers (+ the old CP0.2 placeholder positioning) movement for non-human players (shape, runs, keepers) -> WpSeatInput (CP0.3: AI)
  */
 #ifndef WP_SIM_INTERNAL_H
 #define WP_SIM_INTERNAL_H
@@ -45,6 +46,12 @@ int      pass_pick_ex(const SimState *s, int i, wp_angle dir, int flags, int pre
 void     pass_pick_update(SimState *s, int seat, int i, const WpSeatInput *in);   /* per tick: preview */
 void     pass_pick_reset(SimState *s, int seat);
 fx       ray_exit_dist(fv2 from, fv2 dir, fx X, fx Y);
+fx       pass_lane_clear(const SimState *s, int team, fv2 from, fv2 to);   /* nearest opponent to the lane (m) */
+/* seats.c: where can p meet the ball (closest reachable point, or the stick-preferred one) */
+typedef struct { fv2 pos; fx t; int found; } Meet;
+Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref);
+/* brain.c (CP0.3 instinct AI, D-008): input + actions for a player no seat controls */
+void brain_input(SimState *s, int i, WpSeatInput *out);
 wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim);
 /* header.c */
 int  header_wanted(const SimState *s, int i, int *jump);

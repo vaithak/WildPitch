@@ -7,6 +7,7 @@
 
 static SimState s;
 static uint16_t step1(WpSeatInput a) { WpInput in; memset(&in, 0, sizeof in); in.seat[0] = a; sim_step(&s, &in); return s.events; }
+static uint16_t step2(WpSeatInput a, WpSeatInput b) { WpInput in; memset(&in, 0, sizeof in); in.seat[0] = a; in.seat[1] = b; sim_step(&s, &in); return s.events; }
 
 int main(void) {
     WpMatchConfig cfg = sim_default_config();
@@ -18,13 +19,14 @@ int main(void) {
         s.players[2].pos = fv2_make(-FX(8.0), 0);
         s.players[9].pos = fv2_make(FX(0.0), 0);               /* their striker on the ball, carrying it at us (-x) */
         s.ball.pos = fv2_make(-FX(0.5), 0); s.ball.owner = 9;
+        s.seat_player[1] = 9;                                   /* a second human carries it straight at us */
         int tackled = 0, started = 0;
         for (int t = 0; t < 120 && !tackled; t++) {
             for (int j = 0; j < 10; j++) if (j != 2 && j != 9) s.players[j].pos = fv2_make(FX_INT(j * 3), FX(40.0));
             fx d = fv2_len(fv2_sub(s.ball.pos, s.players[2].pos));
             int press = !started && d < (far ? FX(1.6) : FX(1.0));
             if (press) started = 1;
-            uint16_t ev = step1((WpSeatInput){0, 0, (uint16_t)(press ? WP_BTN_PASS : 0)});
+            uint16_t ev = step2((WpSeatInput){0, 0, (uint16_t)(press ? WP_BTN_PASS : 0)}, (WpSeatInput){-127, 0, 0});
             if (ev & WP_EV_TACKLE) tackled = 1;
         }
         printf("tackle pressed at %s: %s\n", far ? "1.6 m (early)" : "1.0 m", tackled ? "won the ball" : "missed");
@@ -74,7 +76,10 @@ int main(void) {
             step1(in);
             if (s.phase != WP_PHASE_PLAY) continue;
             for (int i = 0; i < 10; i++) {
-                if (i != s.ball.owner && s.ball.z < FX(1.5) && s.players[i].action == WP_ACT_NONE) {
+                /* skip: the owner, the kicker's own foot just after a kick (immune), and a player about to take a
+                 * loose ball he may control (the body steps aside for control - he takes it next tick) */
+                int taking = s.ball.owner < 0 && s.players[i].touch_cooldown == 0;
+                if (i != s.ball.owner && s.ball.z < FX(1.5) && s.players[i].action == WP_ACT_NONE && !s.players[i].immune && !taking) {
                     fx db = fv2_len(fv2_sub(s.ball.pos, s.players[i].pos));
                     if (db < min_ball) min_ball = db;
                 }
