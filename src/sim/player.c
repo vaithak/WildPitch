@@ -67,7 +67,7 @@ void sim_player_kick(SimState *s, int i, const WpKick *k) {
 wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim) {
     const WpPlayer *p = &s->players[i];
     int sg = p->team == 0 ? 1 : -1;
-    fx side = fx_mul(s->pitch.goal_width, T_AIM_SIDE);
+    fx side = fx_max(fx_mul(s->pitch.goal_width, T_AIM_SIDE), s->pitch.goal_width / 2 - T_AIM_POST_MARGIN);
     fx gy;
     if (has_aim && aim.y > FX(0.25)) gy = side;
     else if (has_aim && aim.y < -FX(0.25)) gy = -side;
@@ -285,6 +285,13 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
         }
         b->vel = fv2_scale(u, ball_roll_speed_for(d));
     }
+    else if (p->kick.kind == WP_KICK_SHOT || p->kick.kind == WP_KICK_CHIP) {
+        /* shots keep only the part of the run ALONG the strike (extra pace); the sideways part would drag an
+         * aimed shot toward the middle of the goal (CP0.3b: shots at the corners were ending at the keeper) */
+        fv2 u = fv2_from_angle(p->kick.dir, FX_ONE);
+        fx along = fx_max(fv2_dot(p->vel, u), 0);
+        b->vel = fv2_scale(u, fx_mul(p->kick.power, q) + fx_mul(along, INHERIT_VEL));
+    }
     else b->vel = fv2_add(fv2_from_angle(p->kick.dir, fx_mul(p->kick.power, q)), fv2_scale(p->vel, INHERIT_VEL));
     b->vz = vz;
     b->spin = p->kick.spin;
@@ -356,6 +363,10 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     }
     int winding = p->action == WP_ACT_KICK && !p->kick.done;
     if (winding) top = fx_mul(top, T_KICK_SPEED_MUL);
+    if (p->action == WP_ACT_KEEPER_DIVE) {                /* flying, then down: slides to a stop */
+        if (p->z == 0) p->vel = fv2_scale(p->vel, FX(0.85));
+        return;
+    }
     if (p->action == WP_ACT_TACKLE) {                     /* lunging, then committed: can't turn or accelerate */
         p->vel = fv2_clamp_len(p->vel, p->kick.done ? FX(2.5) : T_SPRINT_SPEED);
         return;
@@ -535,6 +546,7 @@ static void air_and_timers(WpPlayer *p) {
         p->action_timer++;
         int ends = p->action == WP_ACT_KICK ? p->action_timer >= T_KICK_TOTAL_TICKS
                  : p->action == WP_ACT_TACKLE ? p->action_timer >= T_TACKLE_TICKS
+                 : p->action == WP_ACT_KEEPER_DIVE ? p->action_timer >= T_DIVE_TICKS
                  : (p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) ? header_action_ends(p)
                  : p->action_timer > 30;
         if (ends) { p->action = WP_ACT_NONE; p->action_timer = 0; }
@@ -609,6 +621,7 @@ void players_step(SimState *s, const WpInput *in) {
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
         if (seat >= 0) header_step(s, i, &pin[i]);
         tackle_step(s, i);
+        keeper_step(s, i);
         air_and_timers(p);
     }
     bodies_separate(s);                                   /* players block each other */

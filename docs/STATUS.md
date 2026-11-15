@@ -8,6 +8,9 @@ jumps to our AI team-mate/keeper who wins the ball; the human controls the keepe
 (player stats, AI aerial duels, keeper dives/poses, difficulty) after feedback.
 
 ## What works now
+- **CP0.3b so far:** keepers dive (catch or parry; pose), shots keep their aim (corner shots beat him), tackles
+  have a lunge pose, 7v7 has its own golden hash + harnesses (`tools/playtest/*`, format flag). 7v7 shots 7–16 m:
+  goal 36% (weak 13%, medium 43%, hard 52%).
 - **7v7 (D-025):** the game now starts 7-a-side (keeper + 2-3-1) on a 55 × 35 m pitch with 5 m goals
   (`--5v5` for the old format). AI vs AI 7v7 balanced (goals 58–60 over 30 × 5 min).
 - **CP0.3a (D-022/D-023):** the blue team plays: presses, marks, covers, tackles, passes, runs in behind, shoots;

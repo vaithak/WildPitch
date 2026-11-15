@@ -271,3 +271,14 @@ format; harness modes `--autoplay*/--demo/--gallery` keep 5v5). `sim_default_con
 format (tests, golden hash). Formations are one table per format (`formation_frac`, shared by kick-offs and the AI
 shape); forward runs by formation depth (not index); the striker = last index. Pitch markings and camera zoom scale
 with the pitch. AI vs AI 7v7 (30 × 5 min): goals 58–60, shots 132–125, 76% passes arrive. 11v11 later (ROADMAP).
+
+## D-026 — Keeper dives; shots keep their aim (2026-11-15, CP0.3b)
+- **Dive** (`src/sim/keeper.c`, decided in brain.c): after his 0.33 s reaction, if a shot will cross his line more
+  than 0.7 m from him and arrive within 0.55 s, the AI keeper dives sideways (3 m/s, small hop). His body is a
+  segment from his centre toward the dive side that STRETCHES to 1.0 m over 15 ticks (+0.25 m hands); a ball crossing
+  it ≤ 2.2 m high is caught (≤ 18 m/s at body height) or parried out from goal. Down for 54 ticks. Pose: arms
+  overhead, rolled onto his side (avatar `roll`); tackles got a lunge pose.
+- **Shots keep their aim:** shots/chips inherit only the run velocity ALONG the strike (a run at goal no longer
+  drags a corner-aimed shot ~1 m to the middle); aim-assisted shots go 0.6 m inside the post (scales with the goal).
+- Control never stays on our keeper once he's played/lost the ball (the AI keeps goal).
+7v7 live shots 7–16 m out (wide angles incl.): goal 36% (weak 13% / medium 43% / hard 52%), was 19%.

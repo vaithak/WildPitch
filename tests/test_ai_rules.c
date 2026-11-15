@@ -95,5 +95,37 @@ int main(void) {
         CHECKF(min_ball > FX(0.15), "ball %.2f m from a body centre", tod(min_ball));
         CHECKF(min_gap > FX(0.5), "players overlapped (%.2f m)", tod(min_gap));
     }
+    /* 5. keeper dives (7v7 goal): a medium shot 1.6 m to his side from 11 m -> he dives and keeps it out; a hard shot
+     *    into the corner beats him; a soft one at him is caught */
+    {
+        static const struct { fx speed, aim_y; int want_goal; const char *name; } cases[3] = {
+            {FX(18.0), FX(1.6), 0, "medium, 1.6 m to his side"}, {FX(30.0), FX(2.1), 1, "hard, into the corner"},
+            {FX(12.0), FX(0.3), 0, "soft, at him"}};
+        for (int c = 0; c < 3; c++) {
+            WpMatchConfig c7 = sim_config_7v7();
+            sim_init(&s, &c7);
+            for (int k = 0; k < WP_MAX_SEATS; k++) s.seat_player[k] = -1;
+            int kp = s.n_per_side;                                       /* their keeper */
+            for (int j = 0; j < 14; j++) if (j != kp) s.players[j].pos = fv2_make(FX_INT(j * 2 - 14), FX(40.0));
+            for (int t = 0; t < 30; t++) {                               /* let him settle on his line */
+                for (int j = 0; j < 14; j++) if (j != kp) s.players[j].pos = fv2_make(FX_INT(j * 2 - 14), FX(40.0));
+                s.ball.pos = fv2_make(FX(16.5), 0); s.ball.vel = fv2_make(0, 0); s.ball.owner = -1;
+                step1(NOIN);
+            }
+            fv2 from = fv2_make(FX(16.5), 0), to = fv2_make(FX(27.6), cases[c].aim_y);
+            s.ball.pos = from; s.ball.z = FX(0.2); s.ball.vz = FX(1.0); s.ball.owner = -1; s.ball.last_touch = 3;
+            s.ball.vel = fv2_scale(fv2_norm(fv2_sub(to, from)), cases[c].speed);
+            int dived = 0; uint16_t ev = 0;
+            for (int t = 0; t < 90; t++) {
+                for (int j = 0; j < 14; j++) if (j != kp) s.players[j].pos = fv2_make(FX_INT(j * 2 - 14), FX(40.0));
+                ev |= step1(NOIN);
+                dived |= s.players[kp].action == WP_ACT_KEEPER_DIVE;
+                if (ev & WP_EV_GOAL) break;
+            }
+            printf("shot %s: %s%s\n", cases[c].name, (ev & WP_EV_GOAL) ? "GOAL" : "kept out", dived ? " (dived)" : "");
+            CHECKF(((ev & WP_EV_GOAL) != 0) == cases[c].want_goal, "keeper case %d", c);
+            if (c == 0) CHECK(dived);
+        }
+    }
     return TEST_DONE();
 }

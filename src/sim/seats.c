@@ -200,6 +200,11 @@ void seats_update(SimState *s, const WpInput *in) {
         }
         if (s->pass_target == me && s->pass_stick[0] != -128) recv_update(s, me, si);
         const WpPlayer *p = &s->players[me];
+        if (p->role == WP_ROLE_KEEPER && b->owner != me && s->phase == WP_PHASE_PLAY && s->pass_target != me) {
+            /* our keeper has played it / lost it: hand control back to an outfield man (the AI keeps goal) */
+            int to = nearest_to_ball(s, p->team, me, 0);
+            if (to >= 0) { do_switch(s, k, to, T_SWITCH_COOL, si, 1); continue; }
+        }
         int busy = (p->action == WP_ACT_KICK || p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) &&
                    !p->kick.done;                                     /* mid-kick or going for a header */
         if (s->phase != WP_PHASE_PLAY || b->owner == me || busy) continue;

@@ -335,7 +335,17 @@ static void keeper(Ctx *x, WpSeatInput *out) {
         if (t < FX(1.5) && fx_abs(cy) < gw + FX(1.0)) {
             shot = 1;
             if (p->ai_wait < T_KEEPER_REACT) { p->ai_wait++; at = p->ai_goal; }        /* still reading it */
-            else at = fv2_make(p->pos.x, clampf(cy, -gw - FX(0.5), gw + FX(0.5)));
+            else {
+                at = fv2_make(p->pos.x, clampf(cy, -gw - FX(0.5), gw + FX(0.5)));
+                fx gap = cy - p->pos.y;
+                /* too far to shuffle and it's nearly here: dive (only for balls heading for the goal) */
+                if (p->action == WP_ACT_NONE && p->z == 0 && fx_abs(gap) > T_DIVE_MIN_GAP && t < T_DIVE_WHEN &&
+                    fx_abs(cy) < gw + FX(0.3)) {
+                    keeper_dive_start(s, x->i, gap > 0 ? 1 : -1);
+                    p->ai_act = AI_KEEP;
+                    return;
+                }
+            }
             cap = T_KEEPER_SHUFFLE;
         }
     }

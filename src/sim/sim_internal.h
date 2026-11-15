@@ -5,6 +5,7 @@
  *   seats.c   which player each human seat controls (switching), pass in flight, assisted receive
  *   pass_pick.c  who receives a pass (stick cone + score, preview, stick memory)
  *   header.c  contextual headers: trigger, take-off timing, head-band contact
+ *   keeper.c  goalkeeper dives: catch / parry along the outstretched body
  *   tackle.c  standing tackles (human J when they have the ball nearby; AI later)
  *   brain.c   instinct AI (D-008): observation -> candidate actions x utility -> input / kicks / tackles
  *   team.c    steering helpers (+ the old CP0.2 placeholder positioning) movement for non-human players (shape, runs, keepers) -> WpSeatInput (CP0.3: AI)
@@ -71,6 +72,9 @@ void seats_on_gain(SimState *s, int i, const WpInput *in);   /* a team-mate of a
 int  tackle_wanted(const SimState *s, int i);             /* an opponent has the ball within reach of a tackle */
 void tackle_start(SimState *s, int i);
 void tackle_step(SimState *s, int i);
+/* keeper.c */
+void keeper_dive_start(SimState *s, int i, int side);
+void keeper_step(SimState *s, int i);
 /* player.c */
 void bodies_separate(SimState *s);
 /* team.c */

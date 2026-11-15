@@ -141,6 +141,7 @@ typedef struct {             /* floats only: blended field-by-field */
     float sh[2], elb[2], ab[2]; /* arm swing fwd, elbow bend, abduction */
     float nod;                  /* extra head pitch */
     float crouch;               /* extra pelvis drop (m) */
+    float roll;                 /* whole-body sideways tilt about the facing axis (rad, + = toward the left) */
 } Pose;
 
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -159,7 +160,7 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         o->ab[s] = 0.10f + 0.04f * (1 - run);
     }
     o->lean = 0.04f + 0.012f * sinf(P->time * 2.1f) * (1 - run) + run * (0.06f + 0.22f * amp);
-    o->nod = 0; o->crouch = 0;
+    o->nod = 0; o->crouch = 0; o->roll = 0;
 
     if (P->keeper && P->action == WP_ACT_NONE && P->speed < 1.5f) {      /* ready stance */
         for (int s = 0; s < 2; s++) {
@@ -212,6 +213,29 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         a.sh[kl] = -0.5f * s1; a.ab[kl] = 0.45f; a.elb[kl] = 0.5f;
         a.lean = chip ? 0.10f - 0.28f * s1 : 0.14f - 0.12f * s2;     /* chip: lean back under the ball */
         w = smooth01(t / 0.04f) * (1 - smooth01((t - (tc + 0.18f)) / 0.12f));
+        break;
+    }
+    case WP_ACT_KEEPER_DIVE: {   /* sideways dive: stretched, arms overhead, rolled down onto his side, then up */
+        float side = P->kick_foot ? -1.0f : 1.0f;      /* sim: foot 1 = dive toward +y; the pose rolls toward its left */
+        for (int s = 0; s < 2; s++) {
+            a.hip[s] = 0.05f; a.knee[s] = 0.15f; a.leg_out[s] = 0.18f;
+            a.sh[s] = 2.7f; a.ab[s] = 0.35f; a.elb[s] = 0.1f;
+        }
+        a.lean = 0.05f;
+        float down = smooth01(t / 0.18f) * (1 - smooth01((t - 0.62f) / 0.25f));
+        a.roll = side * 1.25f * down;
+        w = smooth01(t / 0.05f) * (1 - smooth01((t - 0.75f) / 0.15f));
+        break;
+    }
+    case WP_ACT_TACKLE: {        /* lunge: front leg stabs at the ball, low, arms out for balance */
+        float k1 = smooth01(t / 0.08f);
+        a.hip[1] = 1.05f * k1; a.knee[1] = 0.15f;
+        a.hip[0] = -0.35f; a.knee[0] = 0.7f;
+        a.leg_out[0] = a.leg_out[1] = 0.06f;
+        a.crouch = 0.22f * k1;
+        a.lean = 0.32f;
+        for (int s = 0; s < 2; s++) { a.sh[s] = 0.3f; a.ab[s] = 0.7f; a.elb[s] = 0.4f; }
+        w = smooth01(t / 0.05f) * (1 - smooth01((t - 0.35f) / 0.15f));
         break;
     }
     case WP_ACT_JUMP_HEADER:
@@ -279,6 +303,18 @@ static void solve(const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarSt
     for (int i = 0; i < 4; i++) lowest = fminf(lowest, J[feet[i]].z);
     float shift = (0.05f * k + P->z) - lowest;
     for (int i = 0; i < J_COUNT; i++) J[i].z += shift;
+    if (o.roll != 0.0f) {                               /* tip the whole body sideways about a point on the ground */
+        float cr = cosf(o.roll), sr = sinf(o.roll), pz = P->z;
+        for (int i = 0; i < J_COUNT; i++) {
+            float lx = (J[i].x - x) * Lt.x + (J[i].y - y) * Lt.y;   /* sideways offset */
+            float fz = J[i].z - pz;
+            float fwd = (J[i].x - x) * F.x + (J[i].y - y) * F.y;
+            float nl = lx * cr - fz * sr, nz = lx * sr + fz * cr;
+            J[i].x = x + F.x * fwd + Lt.x * nl;
+            J[i].y = y + F.y * fwd + Lt.y * nl;
+            J[i].z = fmaxf(nz, 0.04f) + pz;
+        }
+    }
 }
 
 void wp_avatar_toe_pos(const WpAvatarPose *pose, const WpAvatarLook *look, const WpAvatarStyle *style,

@@ -148,8 +148,20 @@
 #define T_KEEPER_REACH     FX(1.0)    /* keepers take a loose ball within this (hands) ... */
 #define T_KEEPER_HANDS_Z   FX(1.45)   /* ... up to this high (body height until CP0.3b adds hands: higher = parry) ... */
 #define T_KEEPER_CATCH_REL FX(16.0)   /* ... arriving at up to this speed (faster: it beats/bounces off him) */
-#define T_KEEPER_REACT     12         /* a keeper reacts to a shot 0.2 s after it is struck ... */
+#define T_KEEPER_REACT     20         /* a keeper reacts to a shot 0.33 s after it is struck ... */
 #define T_KEEPER_SHUFFLE   FX(5.0)    /* ... and shuffles across his line at most this fast (dives: CP0.3b) */
+#define T_DIVE_SPEED       FX(3.0)    /* keeper dive: sideways speed ... */
+#define T_DIVE_HOP         FX(1.6)    /* ... small leave-the-ground (vz) ... */
+#define T_DIVE_REACH       FX(1.0)    /* ... outstretched body from his centre toward the dive side ... */
+#define T_DIVE_HANDS       FX(0.25)   /* ... a ball within this of that line is reached ... */
+#define T_DIVE_TOP         FX(2.2)    /* ... up to this high ... */
+#define T_DIVE_CATCH_REL   FX(18.0)   /* ... caught at body height up to this speed, else parried */
+#define T_DIVE_EXTEND      15         /* ticks for the dive to stretch to full reach */
+#define T_DIVE_LIVE        30         /* ticks of a dive in which he can still make the save */
+#define T_DIVE_TICKS       54         /* whole dive incl. getting up */
+#define T_DIVE_MIN_GAP     FX(0.7)    /* he only dives for shots crossing this far from him ... */
+#define T_DIVE_WHEN        FX(0.55)   /* ... arriving within this (s) */
+#define T_AIM_POST_MARGIN  FX(0.6)    /* aim-assisted shots go this far inside the post (scales with the goal) */
 #define T_KEEPER_RUSH_V    FX(8.0)    /* he only comes out for loose balls slower than this (never to cut out a shot) */
 
 /* ---- kicks ---- */

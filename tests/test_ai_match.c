@@ -2,6 +2,7 @@
  * code-order or mirror bug), the game must look like football (shots, goals, passes that mostly arrive, tackles),
  * and nobody may get stuck. Start states are nudged after every reset (harness only) so self-play doesn't replay. */
 #include <stdio.h>
+#include <math.h>
 #include "test_util.h"
 #include "sim_test_helpers.h"
 #include "sim/sim_internal.h"
@@ -75,6 +76,9 @@ static int run_format(int seven, int matches) {
     CHECKF(stuck == 0, "%ld stuck players", stuck);
     long ps = poss[0] + poss[1];
     CHECKF(poss[0] * 100 > ps * 40 && poss[1] * 100 > ps * 40, "possession imbalance");
-    CHECKF(shots[0] * 3 > shots[1] * 2 && shots[1] * 3 > shots[0] * 2, "shot imbalance %ld-%ld", shots[0], shots[1]);
+    /* identical teams: the shot difference must be within ~2.5 sigma of chance (|a-b| <= 2.5 sqrt(a+b) + 4), a
+     * real order/mirror bias (CP0.3a: 75-192) is far outside it; small samples stay meaningful */
+    long dshots = shots[0] > shots[1] ? shots[0] - shots[1] : shots[1] - shots[0], sum = shots[0] + shots[1];
+    CHECKF((double)dshots <= 2.5 * sqrt((double)sum) + 4.0, "shot imbalance %ld-%ld", shots[0], shots[1]);
     return 0;
 }

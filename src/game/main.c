@@ -157,6 +157,8 @@ static void draw_gallery(Game *g, int w, int h) {
         {"header rise", -PI / 3, 0, 0, 0.35f, WP_ACT_JUMP_HEADER, 0.18f, false},
         {"header nod", -PI / 3, 0, 0, 0.58f, WP_ACT_JUMP_HEADER, 0.34f, false},
         {"keeper", -PI / 2, 0, 0, 0, 0, 0, true},       {"run side", 0, 5, PI / 3, 0, 0, 0, false},
+        {"keeper dive", -PI / 2, 0, 0, 0.2f, WP_ACT_KEEPER_DIVE, 0.30f, true},
+        {"tackle", -PI / 6, 0, 0, 0, WP_ACT_TACKLE, 0.15f, false},
     };
     int np = (int)(sizeof poses / sizeof poses[0]);
     const WpAvatarStyle *st = &wp_avatar_styles[g->rctx.style];
