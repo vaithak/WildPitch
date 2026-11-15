@@ -26,7 +26,11 @@
 #include "game/keymap.h"
 #include "game/menu.h"
 
-static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen */
+static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen (40 m pitch) */
+/* bigger pitches show a bit more (7v7 55 m: x1.19) so the wide view still reads the game */
+static float zoom_view(int zoom, const SimState *s) {
+    return ZOOM_VIEW_M[zoom] * (0.5f + 0.5f * ((float)s->pitch.length / 65536.0f) / 40.0f);
+}
 static const char *ZOOM_NAME[3] = {"wide", "medium", "close"};
 
 typedef struct {
@@ -258,7 +262,7 @@ static void apply_vsync(Game *g) {
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, autoplay = false, force_card = false, menu_shot = false;
+    bool gallery = false, demo = false, autoplay = false, force_card = false, menu_shot = false, five = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
@@ -273,7 +277,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--autoplay-header") && i + 1 < argc) { autoplay = true; autoplay_header = (float)atof(argv[++i]); }
         else if (!strcmp(argv[i], "--check-kick-pose")) return check_kick_pose();
         else if (!strcmp(argv[i], "--check-keymap")) return check_keymap();
-        else if (!strcmp(argv[i], "--menu")) menu_shot = true;      /* with --screenshot: capture the Controls screen */
+        else if (!strcmp(argv[i], "--menu")) menu_shot = true;
+        else if (!strcmp(argv[i], "--5v5")) five = true;             /* the old 5-a-side format (40 x 25 m) */      /* with --screenshot: capture the Controls screen */
     }
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -303,7 +308,8 @@ int main(int argc, char **argv) {
     int vs = 0;
     bool vsync = SDL_GetRenderVSync(g.ren, &vs) && vs != 0;
 
-    WpMatchConfig cfg = sim_default_config();
+    /* the match format: 7-a-side by default (owner, CP0.3a); harness modes keep the 5v5 their scripts were made for */
+    WpMatchConfig cfg = (five || autoplay || demo || gallery) ? sim_default_config() : sim_config_7v7();
     sim_init(&g.cur, &cfg);
     g.demo = demo;
     if (demo) demo_setup(&g.cur);
@@ -411,7 +417,7 @@ int main(int argc, char **argv) {
             g.cam.cy += (fy_ * 0.5f - 1.5f - g.cam.cy) * ease;
             WpCamera cam = g.cam;
             cam.w = tw; cam.h = th;
-            cam.ppm = (float)tw / ZOOM_VIEW_M[g.zoom];
+            cam.ppm = (float)tw / zoom_view(g.zoom, &g.cur);
             if (f > 1) {
                 if (!g.lowres || g.lowres_w != tw || g.lowres_h != th) {
                     if (g.lowres) SDL_DestroyTexture(g.lowres);
@@ -472,7 +478,7 @@ int main(int argc, char **argv) {
             if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
             int me = g.cur.seat_player[0];       /* for agents cropping a player out of the frame */
             if (me >= 0 && !gallery) {
-                WpCamera c = g.cam; c.w = w; c.h = h; c.ppm = (float)w / ZOOM_VIEW_M[g.zoom];
+                WpCamera c = g.cam; c.w = w; c.h = h; c.ppm = (float)w / zoom_view(g.zoom, &g.cur);
                 WpScreenPt sp = wp_project(&c, (float)g.cur.players[me].pos.x / 65536.0f, (float)g.cur.players[me].pos.y / 65536.0f, 0);
                 printf("seat0_screen %d %d\n", (int)sp.x, (int)sp.y);
             }

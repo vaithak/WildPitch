@@ -1,7 +1,7 @@
 /* aimatch.c - AI vs AI matches (no human seats) to judge the instinct brain: goals, shots, passes, tackles,
  * possession per team (the two teams are identical: a big imbalance = a bias bug), outs, stuck players.
  * Start states are varied per match (harness-only nudges) so self-play doesn't replay one sequence.
- * usage: aimatch [matches=6] [minutes=5]
+ * usage: aimatch [matches=6] [minutes=5] [seven=0]
  * build: cc -std=c17 -O2 -Isrc -Itests -Itools/playtest tools/playtest/aimatch.c build/libwp_sim.a -lm -o /tmp/aimatch */
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,12 +9,12 @@
 #include "sim/sim_internal.h"
 
 int main(int argc, char **argv) {
-    int matches = argc > 1 ? atoi(argv[1]) : 6, minutes = argc > 2 ? atoi(argv[2]) : 5;
+    int matches = argc > 1 ? atoi(argv[1]) : 6, minutes = argc > 2 ? atoi(argv[2]) : 5, seven = argc > 3 && atoi(argv[3]);
     static SimState s;
     long goals[2] = {0}, shots[2] = {0}, passes[2] = {0}, completed[2] = {0}, tackles[2] = {0}, poss[2] = {0};
     long outs = 0, ticks = 0, stuck = 0, kicks[2] = {0}, out_kind[8] = {0}, third[2] = {0};
     for (int m = 0; m < matches; m++) {
-        WpMatchConfig cfg = sim_default_config();
+        WpMatchConfig cfg = seven ? sim_config_7v7() : sim_default_config();
         cfg.seed = (uint64_t)(m + 1);
         sim_init(&s, &cfg);
         for (int k = 0; k < WP_MAX_SEATS; k++) s.seat_player[k] = -1;
@@ -22,8 +22,9 @@ int main(int argc, char **argv) {
         s.ball.pos = fv2_make(FX_INT((m % 5) - 2), FX_INT((m % 3) - 1));   /* nudge the start */
         WpInput in; memset(&in, 0, sizeof in);
         WpRng hr; wp_rng_seed(&hr, (uint64_t)(1000 + m), 7);     /* harness-only nudges after every reset */
-        int last_kicker = -1, last_kind = 0; fv2 last_pos[10]; int still[10] = {0};
-        for (int i = 0; i < 10; i++) last_pos[i] = s.players[i].pos;
+        int np = 2 * s.n_per_side;
+        int last_kicker = -1, last_kind = 0; fv2 last_pos[WP_MAX_PLAYERS]; int still[WP_MAX_PLAYERS] = {0};
+        for (int i = 0; i < np; i++) last_pos[i] = s.players[i].pos;
         for (long t = 0; t < 60L * 60 * minutes; t++) {
             sim_step(&s, &in);
             ticks++;
@@ -51,7 +52,7 @@ int main(int argc, char **argv) {
                     s.players[s.ball.owner].team == s.players[last_kicker].team) completed[s.players[last_kicker].team]++;
                 last_kicker = -1;
             }
-            if (t % 60 == 0) for (int i = 0; i < 10; i++) {   /* outfield player not moving for 10 s = stuck */
+            if (t % 60 == 0) for (int i = 0; i < np; i++) {   /* outfield player not moving for 10 s = stuck */
                 if (s.players[i].role == WP_ROLE_KEEPER) continue;
                 if (fv2_len(fv2_sub(s.players[i].pos, last_pos[i])) < FX(0.3)) { if (++still[i] == 10) stuck++; }
                 else still[i] = 0;

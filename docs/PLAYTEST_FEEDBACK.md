@@ -91,3 +91,6 @@ Format:
   Defaults as asked ("spring" read as sprint); chip W, switch Q, look P (my picks, rebindable).
 - **Feedback (verbatim):** "now the shoot is getting intercepted in between"
 - **Action:** measure live shot outcomes (goal / keeper / body block / defender control / wide), fix the cause.
+- **Feedback (verbatim):** "also please increase now 7v7 and increase the pitch size, it is getting otugh to test with 5v5"
+- **Action:** 7-a-side format (keeper + 2-3-1) on 55 x 35 m with 5 m goals as the game default (`--5v5` to go
+  back); formations generalised per format; 5v5 regression tests unchanged + a 7v7 AI-match test.

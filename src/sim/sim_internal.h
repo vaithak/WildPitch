@@ -17,6 +17,7 @@
 void players_step(SimState *s, const WpInput *in);
 void ball_step(SimState *s);
 void match_place_kickoff(SimState *s);
+void formation_frac(int n_per_side, int k, fx *fxl, fx *fyl);   /* formation spot (sim.c) */
 
 /* signed shortest difference a - b between binary angles */
 static inline int32_t ang_diff(wp_angle a, wp_angle b) { return (int16_t)(uint16_t)(a - b); }

@@ -6,6 +6,33 @@
 
 #define WP_SIMSTATE_SIZE_EXPECTED 1928  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
+/* 7-a-side (CP0.3a, owner request): bigger pitch and goals, keeper + 2-3-1 */
+WpMatchConfig sim_config_7v7(void) {
+    WpMatchConfig c = sim_default_config();
+    c.n_per_side = 7;
+    c.pitch.length = FX(55.0);
+    c.pitch.width = FX(35.0);
+    c.pitch.goal_width = FX(5.0);
+    c.pitch.goal_height = FX(2.0);
+    c.pitch.goal_depth = FX(1.5);
+    return c;
+}
+
+/* Formation spot k of n (fractions of half-length / half-width, team 0 orientation, kick-off shape):
+ * 5 = keeper + 2-1-1, 7 = keeper + 2-3-1; others: a placeholder spread. Shared by kick-offs and the AI's shape. */
+void formation_frac(int n, int k, fx *fxl, fx *fyl) {
+    static const fx form5[5][2] = {
+        {FX(-0.92), FX(0.0)}, {FX(-0.55), FX(-0.45)}, {FX(-0.55), FX(0.45)}, {FX(-0.30), FX(0.0)}, {FX(-0.06), FX(0.0)},
+    };
+    static const fx form7[7][2] = {
+        {FX(-0.93), FX(0.0)}, {FX(-0.62), FX(-0.40)}, {FX(-0.62), FX(0.40)},
+        {FX(-0.34), FX(-0.62)}, {FX(-0.36), FX(0.0)}, {FX(-0.34), FX(0.62)}, {FX(-0.06), FX(0.0)},
+    };
+    if (n == 7 && k < 7) { *fxl = form7[k][0]; *fyl = form7[k][1]; return; }
+    if (k < 5) { *fxl = form5[k][0]; *fyl = form5[k][1]; return; }
+    *fxl = FX(-0.5) + (fx)(k - 5) * FX(0.08); *fyl = (fx)((k % 3) - 1) * FX(0.5);
+}
+
 WpMatchConfig sim_default_config(void) {
     WpMatchConfig c;
     memset(&c, 0, sizeof c);
@@ -23,22 +50,16 @@ WpMatchConfig sim_default_config(void) {
  * Larger sides fall back to a placeholder spread until per-format formations exist (ROADMAP "Format support").
  * Resets ALL transient player state so nothing (a jump, a kick) survives a reset. */
 void match_place_kickoff(SimState *s) {
-    static const fx form5[5][2] = {
-        {FX(-0.92), FX(0.0)},   /* keeper */
-        {FX(-0.55), FX(-0.45)}, {FX(-0.55), FX(0.45)},
-        {FX(-0.30), FX(0.0)},
-        {FX(-0.06), FX(0.0)},
-    };
     fx hl = s->pitch.length / 2, hw = s->pitch.width / 2;
     for (int i = 0; i < 2 * s->n_per_side; i++) {
         WpPlayer *p = &s->players[i];
         int team = i / s->n_per_side, k = i % s->n_per_side;
         fx fxl, fyl;
-        if (k < 5) { fxl = form5[k][0]; fyl = form5[k][1]; }
-        else { fxl = FX(-0.5) + (fx)(k - 5) * FX(0.08); fyl = (fx)((k % 3) - 1) * FX(0.5); }
+        formation_frac(s->n_per_side, k, &fxl, &fyl);
         fx px = fx_mul(fxl, hl), py = fx_mul(fyl, hw);
         if (team == 1) { px = -px; py = -py; }
-        if (k == 4 && team != s->kickoff_team) px = team == 0 ? -FX(3.5) : FX(3.5);  /* outside the circle */
+        if (k == s->n_per_side - 1 && s->n_per_side >= 5 && team != s->kickoff_team)   /* striker: outside the circle */
+            px = team == 0 ? -FX(3.5) : FX(3.5);
         fx stamina = p->stamina;
         memset(p, 0, sizeof *p);
         p->stamina = stamina;

@@ -263,3 +263,11 @@ Defaults (owner): arrows move, **E** sprint, **S** pass (hold: through ball; nea
 Controls: Enter on an action, press the new key (a key already in use is swapped, never shared), R = defaults.
 Saved immediately as text (`action = Key Name`, SDL key names) in the SDL pref dir (`controls.cfg`), loaded at
 startup (not in harness/capture modes). `src/game/keymap.c`, `src/game/menu.c`; ctest `keymap` (`--check-keymap`).
+
+## D-025 — 7v7 is the game's format now (2026-11-15, owner request)
+Owner: "increase now 7v7 and increase the pitch size, it is getting tough to test with 5v5". `sim_config_7v7()`:
+7 a side (keeper + 2-3-1), 55 × 35 m pitch, 5 × 2 m goals (1.5 m deep). The game starts 7v7 (`--5v5` = the old
+format; harness modes `--autoplay*/--demo/--gallery` keep 5v5). `sim_default_config()` stays 5v5 = the regression
+format (tests, golden hash). Formations are one table per format (`formation_frac`, shared by kick-offs and the AI
+shape); forward runs by formation depth (not index); the striker = last index. Pitch markings and camera zoom scale
+with the pitch. AI vs AI 7v7 (30 × 5 min): goals 58–60, shots 132–125, 76% passes arrive. 11v11 later (ROADMAP).

@@ -6,10 +6,6 @@
  *  - Keepers: stay on the line, shading toward the ball side. No RNG: pure function of the state. */
 #include "sim/sim_internal.h"
 
-/* kickoff shape (fractions of half-length/width, team 0 orientation): keeper, 2 defenders, midfielder, striker */
-static const fx SHAPE5[5][2] = {
-    {FX(-0.92), FX(0.0)}, {FX(-0.55), FX(-0.45)}, {FX(-0.55), FX(0.45)}, {FX(-0.30), FX(0.0)}, {FX(-0.06), FX(0.0)},
-};
 
 void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSeatInput *out) {
     fv2 d = fv2_sub(target, p->pos);
@@ -74,7 +70,8 @@ void team_input(const SimState *s, int i, WpSeatInput *out) {
         team_steer(p, t, FX(0.15), FX(1.0), out);
         return;
     }
-    fx fxl = k < 5 ? SHAPE5[k][0] : FX(-0.5), fyl = k < 5 ? SHAPE5[k][1] : 0;
+    fx fxl, fyl;
+    formation_frac(s->n_per_side, k, &fxl, &fyl);
     fx bx = fx_mul(fx_mul(fxl, hl), sg), by = fx_mul(fx_mul(fyl, hw), sg);
     int human_team = team_has_seat(s, team), attacking = possession_team(s) == team;
     fv2 t;

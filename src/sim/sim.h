@@ -183,7 +183,8 @@ typedef struct {
     WpPitch  pitch;
 } WpMatchConfig;
 
-WpMatchConfig sim_default_config(void);
+WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */
+WpMatchConfig sim_config_7v7(void);       /* 7-a-side, 55 x 35 m, 5 m goals (the game's default) */
 /* Start a jump for player i (no-op if already airborne). Gameplay triggers come in CP0.2. */
 void     sim_player_jump(SimState *s, int i, uint8_t action);
 /* Start a kick action with explicit parameters (used by AI later, tests and --demo). No-op if busy. */

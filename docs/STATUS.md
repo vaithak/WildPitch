@@ -8,6 +8,8 @@ jumps to our AI team-mate/keeper who wins the ball; the human controls the keepe
 (player stats, AI aerial duels, keeper dives/poses, difficulty) after feedback.
 
 ## What works now
+- **7v7 (D-025):** the game now starts 7-a-side (keeper + 2-3-1) on a 55 × 35 m pitch with 5 m goals
+  (`--5v5` for the old format). AI vs AI 7v7 balanced (goals 58–60 over 30 × 5 min).
 - **CP0.3a (D-022/D-023):** the blue team plays: presses, marks, covers, tackles, passes, runs in behind, shoots;
   your red team-mates support, run, cover and mark; keepers position and catch. **J near their ball = tackle**
   (lunge; well-timed wins it, mistimed commits you). Bodies block. If a team-mate wins it, you get control.
@@ -44,7 +46,7 @@ jumps to our AI team-mate/keeper who wins the ball; the human controls the keepe
   the physics box, F3 shows ball speed/height/spin/owner/phase/events, control hints on screen.
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
-- Flags: `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
+- Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (12 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
   (golden `b536eddf99f2591c`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.

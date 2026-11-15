@@ -90,6 +90,8 @@ Not playable; invisible plumbing every later CP depends on.
 - Possession rules (D-022: anyone can win it, closest wins, tackles, bodies block, control follows our ball),
   instinct brain for all non-human players (D-023), keeper positioning/catching, faster exact isqrt.
 
+### CP0.3a+ — 7v7 on a 55 × 35 m pitch (owner request) ✅ 🟡  (D-025)
+
 ### CP0.3b — Stats, aerial duels, keeper dives, difficulty ⏭ 🟡
 
 ### CP0.3 — "Instinct AI" (original plan, now CP0.3a + CP0.3b) 🟡

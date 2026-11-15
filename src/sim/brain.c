@@ -98,14 +98,12 @@ static Cand *add(Ctx *x, uint8_t act, int8_t mate, fv2 at) {
     return c;
 }
 
-/* the formation spot (2-1-1, team 0 orientation) shifted with the ball; in possession pushed up */
-static const fx SHAPE5[5][2] = {
-    {FX(-0.92), FX(0.0)}, {FX(-0.55), FX(-0.45)}, {FX(-0.55), FX(0.45)}, {FX(-0.30), FX(0.0)}, {FX(-0.06), FX(0.0)},
-};
+/* the formation spot (team 0 orientation) shifted with the ball; in possession pushed up */
 static fv2 home_spot(const Ctx *x, int attacking) {
     const SimState *s = x->s;
     int k = x->i % s->n_per_side;
-    fx fxl = k < 5 ? SHAPE5[k][0] : FX(-0.5), fyl = k < 5 ? SHAPE5[k][1] : 0;
+    fx fxl, fyl;
+    formation_frac(s->n_per_side, k, &fxl, &fyl);
     fx bxa = s->ball.pos.x * x->sg;                       /* ball x in attack terms */
     fx hx = fx_mul(fxl, x->hl) + fx_mul(bxa, FX(0.55)) + (attacking ? FX(4.0) : -FX(1.0));
     fx hy = fx_mul(fyl, x->hw) + fx_mul(s->ball.pos.y * x->sg, FX(0.3));
@@ -210,8 +208,10 @@ static void gen_off_ball(Ctx *x) {
             c->f[F_COST] = fx_max(dist(at, p->pos), dist(at, home_spot(x, 1)) / 2);
             c->f[F_CROWD] = crowd(x, at);
         }
-    int k = x->i % s->n_per_side;
-    if (k >= 3) {                                         /* midfielder / striker: run in behind */
+    fx fxk, fyk;
+    formation_frac(s->n_per_side, x->i % s->n_per_side, &fxk, &fyk);
+    (void)fyk;
+    if (fxk > -FX(0.40)) {                                /* midfielders / striker: run in behind */
         fx last = -x->hl;                                 /* deepest outfield opponent, attack terms */
         int o0 = (1 - x->team) * s->n_per_side;
         for (int j = o0; j < o0 + s->n_per_side; j++)

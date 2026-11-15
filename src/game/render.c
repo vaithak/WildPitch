@@ -64,12 +64,12 @@ static void draw_pitch(SDL_Renderer *r, const WpCamera *c, const WpPitch *p) {
     line3(r, c, -hl, -hw, 0, -hl, hw, 0); line3(r, c, hl, -hw, 0, hl, hw, 0);
     line3(r, c, 0, -hw, 0, 0, hw, 0);
     /* centre circle + penalty areas */
-    float cr = 3.0f;
+    float cr = hl * 0.15f;                                /* 3 m on the 40 m pitch, scales with the format */
     for (int i = 0; i < 32; i++) {
         float a0 = (float)i * 6.2831853f / 32, a1 = (float)(i + 1) * 6.2831853f / 32;
         line3(r, c, cosf(a0) * cr, sinf(a0) * cr, 0, cosf(a1) * cr, sinf(a1) * cr, 0);
     }
-    float bx = 6.0f, bw = 6.0f;
+    float bx = hl * 0.30f, bw = hw * 0.48f;             /* penalty areas: 6 x 12 m on the 40 x 25 m pitch */
     for (int sgn = -1; sgn <= 1; sgn += 2) {
         float gx = (float)sgn * hl, ix = gx - (float)sgn * bx;
         line3(r, c, gx, -bw, 0, ix, -bw, 0); line3(r, c, ix, -bw, 0, ix, bw, 0); line3(r, c, ix, bw, 0, gx, bw, 0);
