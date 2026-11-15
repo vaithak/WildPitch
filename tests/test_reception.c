@@ -112,12 +112,13 @@ int main(void) {
         for (int kind = 0; kind < 2; kind++)
             for (int d = 0; d < 4; d++)
                 for (int when = 0; when < 4; when++) {   /* nudge after hand-off / mid-flight / hold late / hold from hand-off */
-                    int miss = 0, n = 0; fx maxc = 0;
+                    int miss = 0, n = 0, runs_bad = 0; fx maxc = 0;
                     for (int pl = 0; pl < 6; pl++) {
                         fv2 mate = fv2_make(-FX(10.0) + FX_INT(7 + pl * 2), FX_INT((pl % 3) * 3 - 3));
                         scene(fv2_make(-FX(10.0), 0), mate);
                         pass_to_mate(kind ? 24 : 6, NOIN, 0, fv2_make(0, 0));
-                        int got = -1;
+                        int got = -1, scored = 0;
+                        fv2 start = s.players[MATE].pos;
                         for (int t = 0; t < 300 && got < 0; t++) {
                             WpSeatInput in = NOIN;
                             int nudge = when == 0 ? t < 12 : when == 1 ? (t >= 20 && t < 32) : when == 2 ? t >= 25 : 1;
@@ -125,17 +126,25 @@ int main(void) {
                             if (s.ball.owner < 0 && fv2_len(fv2_sub(s.ball.pos, s.players[MATE].pos)) < FX(1.5) && fv2_len(rel) > maxc) maxc = fv2_len(rel);
                             if (nudge) { in.move_x = dirs[d][0]; in.move_y = dirs[d][1]; }
                             if (when == 0 && d == 0 && t < 12) { in.move_x = 127; }   /* "release": held then let go */
-                            step2(in, NOIN);
+                            if (step2(in, NOIN) & WP_EV_GOAL) { scored = 1; break; }   /* empty net (keepers parked) */
                             if (s.ball.owner >= 0) got = s.ball.owner;
                         }
                         n++; miss += got != MATE;
+                        if (got != MATE && (dirs[d][0] || dirs[d][1])) {   /* a takeover must be a real run that way */
+                            fv2 mv = fv2_sub(s.players[MATE].pos, start);
+                            fx along = fx_mul(mv.x, FX_INT(dirs[d][0]) / 127) + fx_mul(mv.y, FX_INT(dirs[d][1]) / 127);
+                            if (along < FX(1.0) && !scored) runs_bad++;
+                        }
                     }
                     printf("receive %-7s %-8s %-18s: %d/%d missed\n", kind ? "through" : "tap", dn[d],
                            when == 0 ? "nudge early" : when == 1 ? "nudge mid" : when == 2 ? "hold late" : "hold from hand-off", miss, n);
                     CHECKF(maxc < T_CONTROL_MAX_REL, "closing speed %.1f m/s (bounce-off)", tod(maxc));
                     /* holding straight back toward the passer for the rest of the flight is a deliberate takeover */
-                    int deliberate = d == 3 && when >= 2;
+                    /* a HELD (>= 250 ms) direction that isn't toward the ball is a deliberate takeover (owner: standing
+                     * receivers can be taken over to make a run): misses allowed, but he must have run that way */
+                    int deliberate = when >= 2 && (d == 1 || d == 2);
                     if (!deliberate) CHECKF(miss <= 1, "%s %s %d: %d/%d missed", kind ? "through" : "tap", dn[d], when, miss, n);
+                    CHECKF(runs_bad == 0, "%s %s %d: %d takeovers didn't run the stick's way", kind ? "through" : "tap", dn[d], when, runs_bad);
                 }
     }
 

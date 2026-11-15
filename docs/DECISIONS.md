@@ -187,6 +187,9 @@ received, and the moving key is pressed, player moves ahead without reception". 
   otherwise pass out of clean reach (one coming to him rolls in to his foot); the inherited stick is ignored after a
   hand-off to the keeper and after a deflection even when control stays put (and while latched it doesn't dribble).
   Known: a team-mate beyond 26 m isn't picked (untargeted 12 m/s ball instead).
+- **Owner decisions (CP0.2c playtest):** J hold stays "deeper" (bar = how far ahead); no separate through-ball key;
+  a STANDING receiver (meet at his feet) is taken over by holding any direction that isn't toward the ball for
+  250 ms — so you can make a run while the pass travels (quick presses still receive).
 - Not built from the report's plan (yet): the 200 ms first-touch stick buffer (the touch already follows the stick
   held at control), time-based (0.25 s) switch hysteresis (still 2 m distance). CP0.3 AI: one-twos / passer
   follow-up runs, off-ball run timing, pass-lane scoring (passes still hit cones standing in lanes).

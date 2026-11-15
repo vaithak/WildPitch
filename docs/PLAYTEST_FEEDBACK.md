@@ -67,3 +67,10 @@ Format:
 - **Action:** research `reports/Through ball and pass reception.md` + headless playtest agent findings (copied to
   `research_notes/Through ball and pass reception/playtest_findings.md`) → CP0.2c / D-020, all nine findings as
   acceptance tests in `tests/test_reception.c` (one-twos left to CP0.3). Owner: "go ahead and fix them".
+
+## CP0.2c — 2026-11-15
+- **Feedback (verbatim):** "keep deeper, no separate key, yes. Also, do a deeper research on the pass receiver
+  selection method, whether our matchs with open source and good commercial games approaches or can we improve it?"
+  (answers: J hold = deeper/softer stays; no separate through-ball key; YES a standing receiver should be easier to
+  take over to make a run while the ball is coming.)
+- **Action:** takeover rule for standing receivers; research `reports/Pass receiver selection.md`.

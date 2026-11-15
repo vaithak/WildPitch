@@ -95,7 +95,8 @@ in stride; longer hold = deeper and softer (the bar = how far ahead). Taps to a 
 pass travels, press or release keys freely: he still gets it, and the direction you hold picks where he meets it
 (toward = attack it, along = take it on the run); only holding straight back for 1/4 s gives you full manual. A tap
 is now anything up to 200 ms. Deflected passes switch you to the best-placed man and he chases the ball.
-Questions: through ball depth/pace right? Should the bar mean "deeper" (now) or "firmer"? Separate through key?
+A standing receiver: hold a direction (not toward the ball) for 1/4 s to take over and make a run instead.
+Owner decided: bar = deeper (kept), no separate through key.
 
 ## Playtest guide (CP0.2b — focus: through balls, lofts, headers)
 New on top of CP0.2a: **hold J** = through ball — the white bar fills = how far ahead of your team-mate it goes;

@@ -7,7 +7,8 @@
  *    cancels this: released or unchanged = no opinion; any other direction PICKS among the reachable meeting points
  *    (along the ball = meet it later on the move, toward it = attack it, sideways = line up that side). Full manual
  *    control only after the stick points > 120 deg away from the meet for 250 ms, a SWITCH press, the ball having
- *    gone (no reachable point for 6 ticks) or the pass ending.
+ *    gone (no reachable point for 6 ticks) or the pass ending. A standing receiver (meet at his feet) is taken
+ *    over by holding any direction that isn't toward the ball for 250 ms (to make a run while it travels).
  *  - Deflection off anyone: switch at once to the team-mate with the best time to the ball.
  *  - Loose ball: auto-switch to the outfield team-mate nearest the ball (hysteresis + cooldown).
  *  - After any auto-switch the stick the human was holding is ignored (the new man chases the ball) until it
@@ -139,7 +140,11 @@ static void recv_update(SimState *s, int me, const WpSeatInput *si) {
     s->recv_speed = speed;
     /* takeover: stick held well away from the meeting point, or the ball has gone */
     fv2 dg = fv2_sub(goal, p->pos);
-    if (opinion && fv2_len(dg) > FX(0.5) && fv2_dot(pref, fv2_norm(dg)) < -FX(0.5)) {
+    /* away from the meet (> 120 deg), or - for a standing receive, where the meet is at his feet - any direction
+     * that isn't toward the ball: the human wants to make a run (owner decision, CP0.2c) */
+    int away = fv2_len(dg) > FX(0.5) ? fv2_dot(pref, fv2_norm(dg)) < -FX(0.5)
+                                     : fv2_dot(pref, fv2_norm(to_ball)) < FX(0.3);
+    if (opinion && away) {
         if (s->recv_away < 255) s->recv_away++;
     } else {
         s->recv_away = 0;
