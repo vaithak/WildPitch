@@ -96,7 +96,12 @@ void bodies_separate(SimState *s);
 /* team.c */
 void team_input(const SimState *s, int i, WpSeatInput *out);
 void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSeatInput *out);
-void team_steer_speed(const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed */
+void team_steer_speed(const SimState *s, const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed (m/s, his own top speeds) */
+
+/* stats.c (D-034) */
+void stats_init(SimState *s, uint8_t mode);
+fx   stat_k(const SimState *s, int i, int which);           /* (stat - 50) / 50; 0 when stats are neutral */
+fx   player_top_speed(const SimState *s, int i, int sprint);  /* THE top speed (pace, later fatigue) */
 
 /* Is `at` inside `team`'s own penalty area? (depth 15% of the length, half-width 24% of the width; render matches) */
 /* back-pass rule (D-032): a keeper uses his hands only in his own box and not on a ball his team-mate deliberately

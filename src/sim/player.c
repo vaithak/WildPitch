@@ -387,7 +387,7 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     int has;
     fv2 dir = stick_dir(in, &has);
     if (p->z > 0) return;                                 /* airborne: momentum only */
-    fx top = (in->buttons & WP_BTN_SPRINT) ? T_SPRINT_SPEED : T_WALK_SPEED;
+    fx top = player_top_speed(s, i, (in->buttons & WP_BTN_SPRINT) != 0);
     /* dribbling slows you while the ball is at your feet; ramps off smoothly (no flicker at the reach edge)
      * when you're running onto a ball that got away */
     if (s->ball.owner == i) {
@@ -411,7 +411,7 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
         return;
     }
     if (p->action == WP_ACT_TACKLE) {                     /* lunging, then committed: can't turn or accelerate */
-        p->vel = fv2_clamp_len(p->vel, p->kick.done ? FX(2.5) : T_SPRINT_SPEED);
+        p->vel = fv2_clamp_len(p->vel, p->kick.done ? FX(2.5) : player_top_speed(s, i, 1));
         return;
     }
     int step_up = 0;
@@ -419,7 +419,7 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
         fv2_len(fv2_sub(s->ball.pos, p->pos)) > T_TOUCH_REACH - FX(0.15)) {
         /* stick released with the ball out of foot reach: step up to it (at most jogging), then stop it */
         dir = fv2_norm(fv2_sub(s->ball.pos, p->pos));
-        top = fx_min(top, T_WALK_SPEED);
+        top = fx_min(top, player_top_speed(s, i, 0));
         has = step_up = 1;
     }
     if (has && !step_up && s->ball.owner == i) {
@@ -517,7 +517,7 @@ static void control_owner(SimState *s, int i, const WpSeatInput *in) {
          * covers straight runs, cuts and reversals (a reversal becomes a drag-back). */
         fx T = FX_INT(gap) / WP_TICK_HZ;
         fx lead = sprint ? T_TOUCH_LEAD_SPRINT : T_TOUCH_LEAD_JOG;
-        fx top = fx_mul(sprint ? T_SPRINT_SPEED : T_WALK_SPEED, T_DRIBBLE_SPEED_MUL);
+        fx top = fx_mul(player_top_speed(s, i, sprint), T_DRIBBLE_SPEED_MUL);
         fv2 v_end = fv2_add(p->vel, fv2_clamp_len(fv2_sub(fv2_scale(mdir, top), p->vel), fx_mul(T_ACCEL, T)));
         fv2 p_pred = fv2_add(p->pos, fv2_scale(fv2_add(p->vel, v_end), T / 2));
         fv2 target = fv2_add(p_pred, fv2_scale(mdir, lead));

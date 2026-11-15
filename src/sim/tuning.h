@@ -38,6 +38,9 @@
 #define T_BOARD_H          FX(0.9)    /* board height: a ball below it rebounds */
 #define T_BOARD_REST       FX(0.3)    /* rebound speed kept */
 #define T_BOARD_BODY       FX(0.35)   /* players stay this far inside the boards */
+/* player stats (D-034): 1..99, 50 = the old player; k = (stat - 50) / 50 */
+#define T_STAT_SPREAD      10         /* generated stats: slot template +- this (zero-sum per team) */
+#define T_STAT_PACE        FX(0.07)   /* top speeds x (1 + this * k) */
 #define T_KICKOFF_R_FRAC   FX(0.0871) /* centre-circle radius / pitch length (9.15 / 105, a real pitch) */
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */

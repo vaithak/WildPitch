@@ -34,9 +34,9 @@ static fx dist(fv2 a, fv2 b) { return fv2_len(fv2_sub(a, b)); }
  * press point goal-side of it */
 static fx time_to_ball(const SimState *s, int j, fv2 press_pt, int carried) {
     const WpPlayer *p = &s->players[j];
-    if (carried) return fx_div(dist(p->pos, press_pt), T_SPRINT_SPEED);
+    if (carried) return fx_div(dist(p->pos, press_pt), player_top_speed(s, (int)(p - s->players), 1));
     Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
-    return m.found ? m.t : FX(5.0) + fx_div(dist(p->pos, s->ball.pos), T_SPRINT_SPEED);
+    return m.found ? m.t : FX(5.0) + fx_div(dist(p->pos, s->ball.pos), player_top_speed(s, (int)(p - s->players), 1));
 }
 
 /* pick with hysteresis: lowest t among eligible; the incumbent keeps it unless t_c + 0.1 < 0.85 (t_inc + 0.1) */
@@ -114,7 +114,7 @@ void team_plan_update(SimState *s) {
             for (int k = 0; k < n; k++) {
                 int j = base + k;
                 ok[k] = s->players[j].role != WP_ROLE_KEEPER && j != pl->winner && !seat_has(s, j);
-                tt[k] = fx_div(dist(s->players[j].pos, cpt), T_SPRINT_SPEED);
+                tt[k] = fx_div(dist(s->players[j].pos, cpt), player_top_speed(s, j, 1));
             }
             pl->cover = (int8_t)pick(tt, ok, n, base, pl->cover);
         } else {

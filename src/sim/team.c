@@ -19,14 +19,16 @@ void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSe
     out->move_y = (int8_t)fx_clamp(v.y / FX_ONE, -127, 127);
 }
 
-void team_steer_speed(const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out) {
+void team_steer_speed(const SimState *s, const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out) {
+    int i = (int)(p - s->players);
+    fx walk = player_top_speed(s, i, 0), spr = player_top_speed(s, i, 1);
     fv2 d = fv2_sub(target, p->pos);
     fx dist = fv2_len(d);
     out->move_x = out->move_y = 0;
     out->buttons = 0;
     if (dist < FX(0.05) || speed <= 0) return;
-    int sprint = speed > T_WALK_SPEED;
-    fx mag = fx_min(fx_div(speed, sprint ? T_SPRINT_SPEED : T_WALK_SPEED), FX_ONE);
+    int sprint = speed > walk;
+    fx mag = fx_min(fx_div(speed, sprint ? spr : walk), FX_ONE);
     fv2 v = fv2_scale(d, fx_div(fx_mul(mag, FX(127.0)), dist));
     out->move_x = (int8_t)fx_clamp(v.x / FX_ONE, -127, 127);
     out->move_y = (int8_t)fx_clamp(v.y / FX_ONE, -127, 127);

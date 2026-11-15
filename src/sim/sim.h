@@ -159,6 +159,12 @@ typedef struct {
  * run through a planned meet at just-in-time speed (runners; in-stride through balls keep >= 4.5 m/s) */
 enum { WP_PLAN_CLOSEST = 0, WP_PLAN_RUN = 1, WP_PLAN_STRIDE = 2 };
 
+/* Player stats (D-034), 1..99 with 50 = the old all-equal player. Kept in SimState (kick-off resets don't touch
+ * them). WP_STATS_NEUTRAL: everyone 50 and every effect off - bit-identical to the pre-stats sim. */
+enum { WP_STAT_PACE = 0, WP_STAT_CONTROL, WP_STAT_PASSING, WP_STAT_SHOOTING, WP_STAT_TACKLING, WP_STAT_STAMINA,
+       WP_STAT_KEEPING, WP_STAT_N };
+enum { WP_STATS_NEUTRAL = 0, WP_STATS_MIRRORED = 1, WP_STATS_OWN = 2 };   /* MIRRORED: team 1 = team 0 slot by slot */
+
 typedef struct {
     uint32_t tick;
     WpRng    rng;
@@ -202,6 +208,8 @@ typedef struct {
     uint8_t  pick_stick_age[WP_MAX_SEATS];/* ... and ticks since (255 = none) */
     int8_t   pick_diag[WP_MAX_SEATS][2]; /* last keyboard diagonal ... */
     uint8_t  pick_diag_age[WP_MAX_SEATS];
+    uint8_t  stats_mode;             /* WP_STATS_* */
+    uint8_t  stats[WP_MAX_PLAYERS][WP_STAT_N];
     WpPlayer players[WP_MAX_PLAYERS];
 } SimState;
 
@@ -210,6 +218,7 @@ typedef struct {
     uint8_t  n_per_side;             /* 1..WP_MAX_PER_SIDE */
     WpPitch  pitch;
     uint8_t  ai_level[2];             /* per team; sim_default_config(): both NORMAL */
+    uint8_t  stats_mode;              /* WP_STATS_*; generated from the seed (sim_default_config(): NEUTRAL) */
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */

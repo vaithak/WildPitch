@@ -408,7 +408,7 @@ static void keeper(Ctx *x, WpSeatInput *out) {
     at.y = clampf(at.y, -gw, gw);
     /* a shot coming: after reacting (T_KEEPER_REACT), shuffle across to where it will cross my line */
     fx vin = -b->vel.x * x->sg;                           /* speed toward my goal */
-    fx cap = T_SPRINT_SPEED;
+    fx cap = player_top_speed(s, x->i, 1);
     int shot = 0;
     if (b->owner < 0 && vin > FX(4.0)) {
         fx t = fx_div(fx_abs(b->pos.x - p->pos.x), vin);
@@ -445,7 +445,7 @@ static void keeper(Ctx *x, WpSeatInput *out) {
     p->ai_act = AI_KEEP;
     p->ai_goal = at;
     fx d = dist(at, p->pos);
-    team_steer_speed(p, at, fx_min(fx_mul(d, FX(5.0)), cap), out);
+    team_steer_speed(s, p, at, fx_min(fx_mul(d, FX(5.0)), cap), out);
 }
 
 void brain_input(SimState *s, int i, WpSeatInput *out) {
@@ -536,7 +536,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         fv2 at = home_spot(&x, 0);
         p->ai_act = AI_SHAPE;
         p->ai_goal = at;
-        team_steer_speed(p, at, fx_min(fx_mul(dist(at, p->pos), FX(2.0)), T_WALK_SPEED), out);
+        team_steer_speed(s, p, at, fx_min(fx_mul(dist(at, p->pos), FX(2.0)), player_top_speed(s, i, 0)), out);
         return;
     }
 
@@ -605,7 +605,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < LV_PASS_REACT[lv]) break;
         Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
         p->ai_goal = m.pos;
-        team_steer_speed(p, m.pos, fx_min(fx_mul(dist(m.pos, p->pos), FX(4.0)) + FX(2.0), T_SPRINT_SPEED), out);
+        team_steer_speed(s, p, m.pos, fx_min(fx_mul(dist(m.pos, p->pos), FX(4.0)) + FX(2.0), player_top_speed(s, i, 1)), out);
         return;
     }
     case AI_PRESS: {
@@ -621,19 +621,20 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
             tackle_start(s, i);
             return;
         }
-        team_steer_speed(p, at, fx_min(fx_mul(dist(at, p->pos), FX(4.0)) + FX(1.0), T_SPRINT_SPEED), out);
+        team_steer_speed(s, p, at, fx_min(fx_mul(dist(at, p->pos), FX(4.0)) + FX(1.0), player_top_speed(s, i, 1)), out);
         return;
     }
     case AI_RECEIVE: {
         fx d = dist(p->ai_goal, p->pos);
-        team_steer_speed(p, p->ai_goal, fx_min(fx_mul(d, FX(4.0)), T_SPRINT_SPEED), out);
+        team_steer_speed(s, p, p->ai_goal, fx_min(fx_mul(d, FX(4.0)), player_top_speed(s, i, 1)), out);
         return;
     }
     default: break;
     }
     if (p->ai_act == AI_NONE) return;
     fx d = dist(p->ai_goal, p->pos);
-    fx v = p->ai_act == AI_RUN || p->ai_act == AI_COVER ? T_SPRINT_SPEED : fx_min(fx_mul(d, FX(2.0)), T_SPRINT_SPEED);
+    fx top = player_top_speed(s, i, 1);
+    fx v = p->ai_act == AI_RUN || p->ai_act == AI_COVER ? top : fx_min(fx_mul(d, FX(2.0)), top);
     if (d < FX(0.4)) v = 0;
-    team_steer_speed(p, p->ai_goal, v, out);
+    team_steer_speed(s, p, p->ai_goal, v, out);
 }

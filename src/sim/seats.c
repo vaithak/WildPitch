@@ -59,6 +59,7 @@ Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
     const WpBall *b = &s->ball;
     fv2 pos = b->pos, v = b->vel;
     fx z = b->z, vz = b->vz, dt = FX(0.05), best_cost = 0;
+    fx reach_v = fx_mul(player_top_speed(s, (int)(p - s->players), 1), FX(0.8125));   /* 6.5 m/s for an 8 m/s sprinter */
     Meet m = {b->pos, 0, 0};
     for (int k = 1; k <= 80; k++) {
         fx hs = fv2_len(v);
@@ -76,7 +77,7 @@ Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
         if (z > FX(1.9)) continue;
         fv2 to = fv2_sub(pos, p->pos);
         fx d = fv2_len(to), t = dt * k;
-        if (fx_div(d, FX(6.5)) + FX(0.15) > t) continue;
+        if (fx_div(d, reach_v) + FX(0.15) > t) continue;
         fx cost = d;
         if (has_pref) {
             fx c = d < FX(0.3) ? FX_ONE : fv2_dot(pref, fv2_scale(to, fx_div(FX_ONE, d)));
@@ -122,13 +123,13 @@ static void recv_update(SimState *s, int me, const WpSeatInput *si) {
     if (!opinion && s->pass_plan != WP_PLAN_CLOSEST && left > 3) {
         goal = s->pass_meet;                          /* run THROUGH the plan, arriving just in time */
         speed = fx_div(fv2_len(fv2_sub(goal, p->pos)), FX_INT(left) / WP_TICK_HZ);
-        speed = fx_clamp(speed, s->pass_plan == WP_PLAN_STRIDE ? FX(4.5) : 0, T_SPRINT_SPEED);
+        speed = fx_clamp(speed, s->pass_plan == WP_PLAN_STRIDE ? FX(4.5) : 0, player_top_speed(s, (int)(p - s->players), 1));
         s->recv_gone = 0;
     } else {
         Meet m = meet_choose(s, p, pref, opinion);
         if (m.found) s->recv_gone = 0; else if (s->recv_gone < 255) s->recv_gone++;
         goal = m.pos;
-        speed = fx_min(fx_mul(fv2_len(fv2_sub(goal, p->pos)), FX(4.0)), T_SPRINT_SPEED);   /* arrive, don't overrun */
+        speed = fx_min(fx_mul(fv2_len(fv2_sub(goal, p->pos)), FX(4.0)), player_top_speed(s, (int)(p - s->players), 1));   /* arrive, don't overrun */
     }
     /* head-on in the ball's last 0.5 s: don't sprint into it (closing speed stays controllable) */
     fv2 to_ball = fv2_sub(b->pos, p->pos);
@@ -263,10 +264,10 @@ void seats_assist_receive(const SimState *s, int seat, WpSeatInput *io) {
     const WpPlayer *p = &s->players[me];
     uint16_t buttons = io->buttons;
     if (s->pass_target == me && s->pass_stick[0] != -128) {
-        team_steer_speed(p, s->recv_goal, s->recv_speed, io);
+        team_steer_speed(s, p, s->recv_goal, s->recv_speed, io);
     } else if (s->latch_ticks[seat] && s->ball.owner < 0) {
         Meet m = meet_choose(s, p, fv2_make(0, 0), 0);
-        team_steer_speed(p, m.pos, fx_min(fx_mul(fv2_len(fv2_sub(m.pos, p->pos)), FX(4.0)), T_SPRINT_SPEED), io);
+        team_steer_speed(s, p, m.pos, fx_min(fx_mul(fv2_len(fv2_sub(m.pos, p->pos)), FX(4.0)), player_top_speed(s, me, 1)), io);
     } else {
         return;
     }
