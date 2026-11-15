@@ -53,6 +53,10 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
+0. **Ball physics research done (2026-11-15)** after owner said "ball physics still looks a bit weird": see
+   `reports/Football game ball physics.md` (notes in `research_notes/`). Proposed plan R1 (render rotation) → R2
+   (remove possession velocity overrides) → R3 (impulse bounce) → R6 in CP0.2; R4/R5 optional. Waiting for the owner
+   to pick which steps to do before CP0.2.
 1. Log the owner's CP0.1c playtest feedback in `docs/PLAYTEST_FEEDBACK.md`; adjust `src/sim/tuning.h` if needed.
 2. Re-plan and start CP0.2 per ROADMAP: aimed passing (tap short / hold through ball), switch player, teammates
    holding shape with basic runs, receiving/first touch from passes, **playable contextual headers** (D-010:
