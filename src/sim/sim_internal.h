@@ -76,7 +76,7 @@ void tackle_start(SimState *s, int i);
 void tackle_step(SimState *s, int i);
 /* keeper.c */
 void keeper_dive_start(SimState *s, int i, int side);
-void keeper_step(SimState *s, int i);
+void keeper_step(SimState *s, int i, const WpInput *in);
 /* player.c */
 void bodies_separate(SimState *s);
 /* team.c */

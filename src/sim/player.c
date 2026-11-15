@@ -621,7 +621,7 @@ void players_step(SimState *s, const WpInput *in) {
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
         header_step(s, i);
         tackle_step(s, i);
-        keeper_step(s, i);
+        keeper_step(s, i, in);
         air_and_timers(p);
     }
     {   /* head contact: of everyone who can head it this tick, the nearest head wins (not the lower index) */

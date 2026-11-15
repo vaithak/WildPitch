@@ -15,7 +15,7 @@ void keeper_dive_start(SimState *s, int i, int side) {
     p->vz = T_DIVE_HOP;
 }
 
-void keeper_step(SimState *s, int i) {
+void keeper_step(SimState *s, int i, const WpInput *in) {
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
     if (p->action != WP_ACT_KEEPER_DIVE || p->kick.done || s->phase != WP_PHASE_PLAY) return;
@@ -38,6 +38,7 @@ void keeper_step(SimState *s, int i) {
         b->owner = (int8_t)i;
         p->touch_cooldown = 0;
         s->events |= WP_EV_TOUCH;
+        seats_on_gain(s, i, in);                          /* our keeper caught it: control jumps to him (D-022) */
         return;
     }
     /* parried: pushed back out from his goal and on round the side he dived */
