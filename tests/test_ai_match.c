@@ -17,7 +17,7 @@ int main(void) {
 static int run_format(int seven, int matches) {
     static SimState s;
     long goals[2] = {0}, shots[2] = {0}, passes[2] = {0}, done[2] = {0}, tackles[2] = {0}, poss[2] = {0};
-    long stuck = 0, ticks = 0;
+    long stuck = 0, ticks = 0, headers = 0, crosses = 0;
     for (int m = 0; m < matches; m++) {
         WpMatchConfig cfg = seven ? sim_config_7v7() : sim_default_config();
         sim_init(&s, &cfg);
@@ -41,6 +41,8 @@ static int run_format(int seven, int matches) {
             if (s.ball.owner >= 0) poss[s.players[s.ball.owner].team]++;
             if (s.events & WP_EV_GOAL) goals[s.players[s.ball.last_touch >= 0 ? s.ball.last_touch : 0].team]++;
             if (s.events & WP_EV_TACKLE) tackles[s.players[s.ball.last_touch].team]++;
+            if (s.events & WP_EV_HEADER) headers++;
+            if ((s.events & WP_EV_KICK) && s.players[s.ball.last_touch].kick.kind == WP_KICK_LOB) crosses++;
             if (s.events & WP_EV_KICK) {
                 last_kicker = s.ball.last_touch; last_kind = s.players[last_kicker].kick.kind;
                 int tm = s.players[last_kicker].team;
@@ -74,6 +76,8 @@ static int run_format(int seven, int matches) {
     CHECKF((double)S / mins > 1.0, "shot rate %.2f/min", (double)S / mins);
     CHECKF(D * 100 > P * 50, "only %ld/%ld passes arrive", D, P);
     CHECKF(stuck == 0, "%ld stuck players", stuck);
+    printf("  aerial: %ld crosses/lofted, %ld headers\n", crosses, headers);
+    CHECKF(headers >= 3, "AI aerial duels: only %ld headers", headers);
     long ps = poss[0] + poss[1];
     CHECKF(poss[0] * 100 > ps * 40 && poss[1] * 100 > ps * 40, "possession imbalance");
     /* identical teams: the shot difference must be within ~2.5 sigma of chance (|a-b| <= 2.5 sqrt(a+b) + 4), a

@@ -607,10 +607,10 @@ void players_step(SimState *s, const WpInput *in) {
                 mv[i] = pin[i];
             }
             seats_assist_receive(s, seat, &mv[i]);
-            header_assist_move(s, i, &mv[i]);
         }
         else if (s->flags & WP_SIMF_STATIC_OTHERS) pin[i] = mv[i] = (WpSeatInput){0, 0, 0};
         else { brain_input(s, i, &pin[i]); mv[i] = pin[i]; }
+        header_assist_move(s, i, &mv[i]);                 /* going for a header: the legs step under it */
     }
     for (int i = 0; i < np; i++) {
         int seat = seat_of(s, i);
@@ -619,10 +619,26 @@ void players_step(SimState *s, const WpInput *in) {
         WpPlayer *p = &s->players[i];
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
-        if (seat >= 0) header_step(s, i, &pin[i]);
+        header_step(s, i);
         tackle_step(s, i);
         keeper_step(s, i);
         air_and_timers(p);
+    }
+    {   /* head contact: of everyone who can head it this tick, the nearest head wins (not the lower index) */
+        int best = -1; fx bd = 0;
+        for (int i = 0; i < np; i++) {
+            fx d = header_contact_dist(s, i);
+            if (d >= 0 && (best < 0 || d < bd)) { best = i; bd = d; }
+        }
+        if (best >= 0) {
+            WpSeatInput aim = pin[best];
+            if (seat_of(s, best) < 0) {                   /* the AI aims at its chosen target */
+                fv2 d = fv2_norm(fv2_sub(s->players[best].ai_goal, s->ball.pos));
+                aim.move_x = (int8_t)fx_clamp(d.x * 127 / FX_ONE, -127, 127);
+                aim.move_y = (int8_t)fx_clamp(d.y * 127 / FX_ONE, -127, 127);
+            }
+            header_contact(s, best, &aim);
+        }
     }
     bodies_separate(s);                                   /* players block each other */
     if (s->ball.owner >= 0) {

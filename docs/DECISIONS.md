@@ -282,3 +282,11 @@ with the pitch. AI vs AI 7v7 (30 × 5 min): goals 58–60, shots 132–125, 76% 
   drags a corner-aimed shot ~1 m to the middle); aim-assisted shots go 0.6 m inside the post (scales with the goal).
 - Control never stays on our keeper once he's played/lost the ball (the AI keeps goal).
 7v7 live shots 7–16 m out (wide angles incl.): goal 36% (weak 13% / medium 43% / hard 52%), was 19%.
+
+## D-027 — AI aerial duels and crosses (2026-11-15, CP0.3b)
+AI players go for headers (`header_start` from brain.c): only the team's first man to the ball, on his decision beat
+— at goal if within 14 m with a shooting chance, a clearance upfield/wide in our third, otherwise nodded on (pass
+pick finds a mate). The AI's aim is its `ai_goal` (not its movement stick). Head contact is resolved after everyone
+moves: of all heads that can reach the ball this tick, the NEAREST wins (no index-order bias); the legs-only step
+under the ball (`header_assist_move`) applies to AI and humans. AI carriers wide in the attacking third get a CROSS
+candidate (lofted pass to a team-mate within 13 m of goal). AI vs AI: ~3.5 crosses/min, ~2 headers/min (7v7).

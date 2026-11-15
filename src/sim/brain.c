@@ -18,7 +18,7 @@
 #include "sim/sim_internal.h"
 
 enum { AI_NONE = 0, AI_SHAPE, AI_SUPPORT, AI_RUN, AI_CHASE, AI_PRESS, AI_COVER, AI_MARK, AI_RECEIVE,
-       AI_DRIBBLE, AI_PASS, AI_THROUGH, AI_SHOOT, AI_KEEP, AI_N };
+       AI_DRIBBLE, AI_PASS, AI_THROUGH, AI_SHOOT, AI_KEEP, AI_CROSS, AI_HEAD, AI_N };
 
 /* candidate features (fx). F_BIAS is always 1. */
 enum { F_FWD = 0,    /* metres gained toward the opponent goal (target vs ball) */
@@ -46,6 +46,8 @@ static const fx W[AI_N][NF] = {
     [AI_THROUGH] = {FX(0.20), FX(0.30),  FX(0.80),  -FX(0.06),  FX(1.0),   0,         0,          -FX(1.2)},
     [AI_SHOOT]   = {0,        0,         FX(0.30),  0,          FX(14.0),  0,         0,          -FX(1.0)},
     [AI_KEEP]    = {0,        0,         0,         0,          0,         0,         0,          FX(1.0)},
+    [AI_CROSS]   = {FX(0.10), FX(0.30),  0,         -FX(0.04),  FX(6.0),   0,         0,          -FX(1.2)},
+    [AI_HEAD]    = {0,        0,         0,         0,          0,         0,         0,          FX(1.0)},
 };
 
 typedef struct { uint8_t act; int8_t mate; fv2 at; fx f[NF]; fx score; } Cand;
@@ -268,6 +270,20 @@ static void gen_on_ball(Ctx *x) {
             }
         }
     }
+    /* cross: from wide in the attacking third, a lofted ball to a team-mate near the goal (headers / volleys) */
+    if (fx_abs(b->pos.y) > fx_mul(x->hw, FX(0.40)) && b->pos.x * x->sg > fx_mul(x->hl, FX(0.35)))
+        for (int j = x->team * s->n_per_side; j < (x->team + 1) * s->n_per_side; j++) {
+            const WpPlayer *q2 = &s->players[j];
+            if (j == x->i || q2->role == WP_ROLE_KEEPER) continue;
+            fx dq = dist(q2->pos, x->opp_goal);
+            if (dq > FX(13.0) || dist(q2->pos, b->pos) < FX(6.0)) continue;
+            if ((c = add(x, AI_CROSS, (int8_t)j, q2->pos))) {
+                c->f[F_FWD] = (q2->pos.x - b->pos.x) * x->sg;
+                c->f[F_OPEN] = nearest_opp(x, q2->pos);
+                c->f[F_COST] = dist(q2->pos, b->pos);
+                c->f[F_THREAT] = FX_ONE - fx_div(dq, FX(13.0));
+            }
+        }
     fx q = shot_quality(x, b->pos);
     if (q > 0 && (c = add(x, AI_SHOOT, -1, x->opp_goal))) {
         c->f[F_THREAT] = q;
@@ -299,7 +315,7 @@ static void do_kick(SimState *s, int i, uint8_t kind, int to, fv2 at, fx power) 
         k.to = 0;
     } else {
         k.power = kind == WP_KICK_THROUGH ? FX(0.4) : T_PASS_SPEED;
-        k.windup = T_KICK_WINDUP_PASS;
+        k.windup = kind == WP_KICK_LOB ? T_KICK_WINDUP_CHIP : T_KICK_WINDUP_PASS;
     }
     sim_player_kick(s, i, &k);
     (void)p;
@@ -394,6 +410,22 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     int decide = ((s->tick + (uint32_t)(i % s->n_per_side)) % T_AI_DECIDE) == 0   /* staggered by role: mirror-fair */ || p->ai_act == AI_NONE ||
                  (owner && p->ai_act < AI_DRIBBLE) || (!owner && p->ai_act >= AI_DRIBBLE && p->ai_act != AI_KEEP);
     if (s->pass_target == i && p->ai_act != AI_RECEIVE) decide = 1;
+    /* aerial duel: a ball coming in high - the team's first man (on his decision beat) goes for a header. At goal near
+     * their box, a clearance near ours, otherwise nod it on to a team-mate. The aim target is ai_goal. */
+    int jump;
+    if ((decide || s->pass_target == i) && p->action == WP_ACT_NONE && b->owner < 0 && !owner &&
+        ball_rank(&x) == 0 && header_wanted(s, i, &jump)) {
+        fx to_goal = dist(p->pos, x.opp_goal);
+        int at_goal = to_goal < FX(14.0) && shot_quality(&x, p->pos) > 0;
+        header_start(s, i, at_goal, jump);
+        p->ai_act = AI_HEAD;
+        if (at_goal) p->ai_goal = shot_target(&x);
+        else if (p->pos.x * x.sg < -fx_mul(x.hl, FX(0.3)))                     /* our end: clear it upfield, wide */
+            p->ai_goal = fv2_make(fx_mul(x.hl, FX_INT(x.sg)), p->pos.y > 0 ? x.hw : -x.hw);
+        else p->ai_goal = fv2_add(p->pos, fv2_make(FX_INT(8 * x.sg), 0));       /* nod it on (pass_pick finds a mate) */
+        return;
+    }
+    if (p->ai_act == AI_HEAD && (p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER)) return;
     /* a pass by the other team has just been struck: defenders need a moment to react (keep doing what they were) */
     if (s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < T_AI_PASS_REACT) decide = 0;
     if (decide) {
@@ -411,10 +443,11 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     }
     /* carry it out */
     switch (p->ai_act) {
-    case AI_PASS: case AI_THROUGH: case AI_SHOOT:
+    case AI_PASS: case AI_THROUGH: case AI_SHOOT: case AI_CROSS:
         if (!owner) { p->ai_act = AI_NONE; break; }
         if (p->ai_hold < T_AI_FIRST_TOUCH || p->action != WP_ACT_NONE) break;    /* control it first */
         if (p->ai_act == AI_SHOOT) do_kick(s, i, WP_KICK_SHOT, -1, shot_target(&x), T_AI_SHOT_POWER);
+        else if (p->ai_act == AI_CROSS) do_kick(s, i, WP_KICK_LOB, p->ai_mate, s->players[p->ai_mate].pos, 0);
         else do_kick(s, i, p->ai_act == AI_THROUGH ? WP_KICK_THROUGH : WP_KICK_PASS, p->ai_mate,
                      s->players[p->ai_mate].pos, 0);
         p->ai_act = AI_NONE;

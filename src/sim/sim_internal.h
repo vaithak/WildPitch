@@ -58,7 +58,9 @@ wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int ha
 /* header.c */
 int  header_wanted(const SimState *s, int i, int *jump);
 void header_start(SimState *s, int i, int shot, int jump);
-void header_step(SimState *s, int i, const WpSeatInput *in);
+void header_step(SimState *s, int i);                 /* take-off timing, give up when missed */
+fx   header_contact_dist(const SimState *s, int i);   /* head-ball distance if he can head it now, else -1 */
+void header_contact(SimState *s, int i, const WpSeatInput *in);
 int  header_action_ends(const WpPlayer *p);
 void header_assist_move(const SimState *s, int i, WpSeatInput *io);
 

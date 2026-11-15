@@ -48,7 +48,7 @@ void header_start(SimState *s, int i, int shot, int jump) {
 }
 
 /* per tick while a header attempt is live: take off on time, then look for head contact */
-void header_step(SimState *s, int i, const WpSeatInput *in) {
+void header_step(SimState *s, int i) {
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
     if (p->kick.kind != WP_KICK_HEADER || p->kick.done) return;
@@ -71,7 +71,6 @@ void header_step(SimState *s, int i, const WpSeatInput *in) {
         return;
     }
     fv2 head = fv2_add(p->pos, fv2_from_angle(p->facing, HEAD_FWD));
-    fx hz = p->z + HEAD_Z;
     /* missed: the ball has gone past (or someone has it) -> give up now, body collision back, free soon */
     fv2 to_head = fv2_sub(head, b->pos);
     if (b->owner >= 0 || (fv2_dot(to_head, b->vel) < 0 && fv2_len(to_head) > HEAD_REACH_XY)) {
@@ -79,8 +78,26 @@ void header_step(SimState *s, int i, const WpSeatInput *in) {
         if (p->action == WP_ACT_STAND_HEADER) p->kick.windup = (uint8_t)(p->action_timer + 1 > 255 ? 255 : p->action_timer + 1);
         return;
     }
-    if (b->owner >= 0 || fx_abs(b->z - hz) > HEAD_REACH_Z || fv2_len(fv2_sub(b->pos, head)) > HEAD_REACH_XY) return;
-    /* contact: direction from the human's stick now */
+}
+
+/* this tick, can player i head the ball? returns the head-ball distance (contest: the nearest head wins), or -1 */
+fx header_contact_dist(const SimState *s, int i) {
+    const WpPlayer *p = &s->players[i];
+    const WpBall *b = &s->ball;
+    if (p->kick.kind != WP_KICK_HEADER || p->kick.done || b->owner >= 0) return -1;
+    if (p->action != WP_ACT_JUMP_HEADER && p->action != WP_ACT_STAND_HEADER) return -1;
+    if (p->action == WP_ACT_JUMP_HEADER && !p->kick.windup) return -1;
+    fv2 head = fv2_add(p->pos, fv2_from_angle(p->facing, HEAD_FWD));
+    fx hz = p->z + HEAD_Z;
+    fx d = fv2_len(fv2_sub(b->pos, head));
+    if (fx_abs(b->z - hz) > HEAD_REACH_Z || d > HEAD_REACH_XY) return -1;
+    return d + fx_abs(b->z - hz);
+}
+
+/* head contact by player i: direction from `in`'s stick (the human's, or the AI's aim) */
+void header_contact(SimState *s, int i, const WpSeatInput *in) {
+    WpPlayer *p = &s->players[i];
+    WpBall *b = &s->ball;
     int has;
     fv2 aim = fv2_make((fx)in->move_x * (FX_ONE / 127), (fx)in->move_y * (FX_ONE / 127));
     has = in->move_x != 0 || in->move_y != 0;
