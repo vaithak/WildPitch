@@ -130,6 +130,7 @@
 #define T_TACKLE_WINDUP    6          /* ticks from the lunge to the foot arriving */
 #define T_TACKLE_LUNGE     FX(3.0)    /* extra speed toward the ball when lunging (m/s) */
 #define T_TACKLE_REACH     FX(0.8)    /* the ball must be this close to the tackling foot at contact */
+#define T_TACKLE_BLOCK_V   FX(1.5)    /* a won tackle sends the ball back toward the tackler this fast (+60% his speed) */
 #define T_TACKLE_STUN      24         /* the tackled player can't touch the ball again for this long */
 #define T_TACKLE_TICKS     30         /* whole tackle action (recovery included) */
 #define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
@@ -140,9 +141,10 @@
 #define T_AI_FIRST_TOUCH   10         /* an AI carrier controls the ball this long before passing/shooting */
 #define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
 #define T_AI_TACKLE_DIST   FX(0.95)    /* AI tackles when the ball is this close ... */
-#define T_AI_TACKLE_EXPOSED FX(0.6)  /* ... and this far from the carrier's feet (between touches) */
+#define T_AI_TACKLE_EXPOSED FX(0.6)  /* ... and this far from the carrier's feet (between touches) ... */
+#define T_AI_TACKLE_SHIELD FX(0.3)    /* ... or (carrier slow < 2 m/s, holding it) this far */
 #define T_KEEPER_REACH     FX(1.3)    /* keepers take a loose ball within this (hands) ... */
-#define T_KEEPER_HANDS_Z   FX(2.3)    /* ... up to this high ... */
+#define T_KEEPER_HANDS_Z   FX(1.45)   /* ... up to this high (body height until CP0.3b adds hands: higher = parry) ... */
 #define T_KEEPER_CATCH_REL FX(22.0)   /* ... arriving at up to this speed (faster: it beats/bounces off him) */
 
 /* ---- kicks ---- */

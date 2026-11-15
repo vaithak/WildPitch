@@ -364,6 +364,14 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     p->ai_hold = owner ? (uint8_t)(p->ai_hold < 255 ? p->ai_hold + 1 : 255) : 0;
 
     if (p->role == WP_ROLE_KEEPER && !owner) { keeper(&x, out); return; }
+    /* kickoff: the team not kicking off holds its shape until the ball is first touched */
+    if (b->last_touch < 0 && b->owner < 0 && b->pos.x == 0 && b->pos.y == 0 && p->team != s->kickoff_team) {
+        fv2 at = home_spot(&x, 0);
+        p->ai_act = AI_SHAPE;
+        p->ai_goal = at;
+        team_steer_speed(p, at, fx_min(fx_mul(dist(at, p->pos), FX(2.0)), T_WALK_SPEED), out);
+        return;
+    }
 
     int decide = ((s->tick + (uint32_t)(i % s->n_per_side)) % T_AI_DECIDE) == 0   /* staggered by role: mirror-fair */ || p->ai_act == AI_NONE ||
                  (owner && p->ai_act < AI_DRIBBLE) || (!owner && p->ai_act >= AI_DRIBBLE && p->ai_act != AI_KEEP);
@@ -411,7 +419,8 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         /* tackle when the carrier's ball is exposed (away from his feet) right in front of me */
         fx db = dist(b->pos, p->pos), exposed = dist(b->pos, s->players[b->owner].pos);
         fv2 face = fv2_from_angle(p->facing, FX_ONE);
-        if (p->action == WP_ACT_NONE && db < T_AI_TACKLE_DIST && exposed > T_AI_TACKLE_EXPOSED &&
+        fx need = fv2_len(s->players[b->owner].vel) < FX(2.0) ? T_AI_TACKLE_SHIELD : T_AI_TACKLE_EXPOSED;
+        if (decide && p->action == WP_ACT_NONE && db < T_AI_TACKLE_DIST && exposed > need &&   /* at his decision beat */
             fv2_dot(face, fv2_sub(b->pos, p->pos)) > 0) {
             tackle_start(s, i);
             return;

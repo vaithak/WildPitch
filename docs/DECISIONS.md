@@ -241,5 +241,8 @@ between ball and goal centre, meet a shot's line, come for loose balls they reac
 1.3 m up to 2.3 m high). Attack-direction geometry (one code path for both teams). No dice: decisions every 6 ticks,
 staggered BY ROLE (staggering by index made mirrored players decide on different ticks → measured bias), first touch
 before an AI pass. Verification: `tests/test_ai_match.c` (AI vs AI, nudged starts: balance + football-like rates),
-`tools/playtest/aimatch.c`, mirror-symmetry harness. Not yet (CP0.3b): player stats, AI aerial duels, keeper
-dives/poses, difficulty, AI set pieces.
+`tools/playtest/aimatch.c`, mirror-symmetry harness. Tackles (CP0.3a re-check): AI tackles a running carrier when his ball
+is ≥ 0.6 m from his feet, a slow/holding carrier at ≥ 0.3 m, only on its decision beat (reaction); a won tackle
+blocks the ball back toward the tackler, who recovers at once. Kickoff: the non-kicking team holds shape until the
+first touch. Keeper catches capped at body height (1.45 m) until CP0.3b adds hands. Not yet (CP0.3b): player
+stats, AI aerial duels, keeper dives/poses/hands, difficulty, AI set pieces.

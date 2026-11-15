@@ -11,7 +11,11 @@ jumps to our AI team-mate/keeper who wins the ball; the human controls the keepe
 - **CP0.3a (D-022/D-023):** the blue team plays: presses, marks, covers, tackles, passes, runs in behind, shoots;
   your red team-mates support, run, cover and mark; keepers position and catch. **J near their ball = tackle**
   (lunge; well-timed wins it, mistimed commits you). Bodies block. If a team-mate wins it, you get control.
-  AI vs AI (12 × 3 min): ~0.9 goals/min, 65% passes arrive, possession 51/49, nobody stuck.
+  AI vs AI (20 × 5 min): ~0.6 goals/min, ~60% passes arrive, possession 49/51, ~7 tackles/min, nobody stuck.
+  Human-vs-AI checks: standing/jogging/sprinting on the ball all get dispossessed (block tackles go to the tackler);
+  on our kickoff we reach the ball first; one-twos now happen (the passer runs past). Receiver sweep with brain
+  team-mates: pick rate 72%, untargeted out 5%, but 35% of (all-direction) taps are intercepted - defenders defend.
+  The golden hash covers an all-AI last quarter (AI shots, tackles, keepers on the ball).
 - **CP0.2d (D-021):** a white ring under the team-mate a pass would go to right now (amber = an opponent near that
   lane) — the pass always goes to the ringed man; diagonals and wide team-mates are easier to hit on a keyboard;
   the keeper is reachable but only as a last resort; a pass with nobody there rolls into space and stops inside
@@ -41,7 +45,7 @@ jumps to our AI team-mate/keeper who wins the ball; the human controls the keepe
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (11 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism
-  (golden `f09c7cc2902a3f89`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+  (golden `b536eddf99f2591c`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~1,080× real time (15 µs/tick with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,
@@ -102,8 +106,11 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 carrier's ball is close in front of you to tackle (too early/far = you lunge past and lose a moment). Your red
 team-mates cover, mark, support and make runs; if one wins the ball, control jumps to him. Their keeper positions
 and catches — scoring from 10–16 m is now ~22% in tests (was 39% vs a shuffling keeper).
+Notes: control does NOT auto-switch while blue has the ball or is passing — press **Q** to pick the defender you
+want. Tackles have no avatar pose yet (the player lunges). Keepers can't catch above 1.45 m yet (high shots bounce
+off them). The ~22% scoring figure includes being tackled while charging a shot, not just saves.
 Judge: are your team-mates helpful (in good spots, making runs)? Is blue beatable but not dumb? Tackling feel?
-Too many/few tackles or turnovers? Keeper too good/bad?
+Too many/few tackles or turnovers (AI vs AI ~7/min)? Keeper too good/bad?
 
 ## Playtest guide (CP0.2d — focus: who gets the pass)
 Watch the white ring: it sits under whoever J would pass to right now (amber when a blue player is near the lane).
