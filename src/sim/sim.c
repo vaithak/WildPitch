@@ -7,24 +7,24 @@
 #define WP_SIMSTATE_SIZE_EXPECTED 2040  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
- * 6 x 2.1 m goals (close to the 9-a-side standard) */
+ * 5.6 x 2.1 m goals (7.32/68 of the width, like a real pitch) */
 WpMatchConfig sim_config_7v7(void) {
     WpMatchConfig c = sim_default_config();
     c.n_per_side = 7;
     c.pitch.length = FX(80.0);
     c.pitch.width = FX(52.0);
-    c.pitch.goal_width = FX(6.0);
+    c.pitch.goal_width = FX(5.6);
     c.pitch.goal_height = FX(2.1);
     c.pitch.goal_depth = FX(1.5);
     return c;
 }
 
-/* the game's 5-a-side: 60 x 39 m (1.54), 5 x 2 m goals. sim_default_config() keeps the 40 x 25 m regression format. */
+/* the game's 5-a-side: 60 x 39 m (1.54), 4.2 x 2 m goals (real goal-to-width ratio). sim_default_config() keeps the 40 x 25 m regression format. */
 WpMatchConfig sim_config_5v5(void) {
     WpMatchConfig c = sim_default_config();
     c.pitch.length = FX(60.0);
     c.pitch.width = FX(39.0);
-    c.pitch.goal_width = FX(5.0);
+    c.pitch.goal_width = FX(4.2);
     c.pitch.goal_height = FX(2.0);
     c.pitch.goal_depth = FX(1.3);
     return c;

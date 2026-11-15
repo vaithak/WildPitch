@@ -23,6 +23,15 @@ int main(int argc, char **argv) {
         B.players[mi(i, n)] = p;
     }
     B.ball.pos = neg(A.ball.pos);
+    B.kickoff_team = (uint8_t)(1 - A.kickoff_team);
+    for (int t = 0; t < 2; t++) {                    /* team-indexed plan (D-030): swap, rotate, remap indices */
+        WpTeamPlan q = A.plan[t];
+        q.focus = neg(q.focus);
+        int8_t *ix[4] = {&q.winner, &q.cover, &q.near_sup, &q.runner};
+        for (int k = 0; k < 4; k++) if (*ix[k] >= 0) *ix[k] = (int8_t)mi(*ix[k], n);
+        for (int k = 0; k < n; k++) if (q.mark[k] >= 0) q.mark[k] = (int8_t)mi(q.mark[k], n);
+        B.plan[1 - t] = q;
+    }
     WpInput in; memset(&in, 0, sizeof in);
     for (int t = 0; t < 3000; t++) {
         sim_step(&A, &in); sim_step(&B, &in);

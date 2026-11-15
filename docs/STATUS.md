@@ -6,8 +6,9 @@ _Last updated: 2026-11-15 by Claude session #1_
 **CP0.3b+ — Team play + bigger pitches (D-030/D-031): ✅ done, waiting for the owner's playtest.**
 Next: **CP0.3c player stats** (own hand-over: it shifts calibrated numbers). Open polish from the team-shape report:
 slot swaps (players exchanging positions on runs), an F3 overlay of plan roles, shape thresholds as CI checks,
-the `tools/playtest/mirror.c` exact-mirror check diverges at tick 1-4 (tie-break asymmetry; shots/goals balance
-statistically, so low priority).
+AI shot conversion is high (~45-50% of AI shots score, mostly 1v1s under 10 m; arcade games ~30-40%) - tune the
+keeper / defending after the owner's playtest. `tools/playtest/mirror.c`: first different decision at tick ~240-270
+(fixed-point rounding drift; was tick 1 from the team-staggered plan update, fixed).
 
 ### Playtest guide (CP0.3b+)
 1. `./build/wildpitch` — 7v7 on the new 80 × 52 m pitch (5v5: `--5v5`, 60 × 39 m). Is the size right? Zoom with C.
@@ -21,17 +22,18 @@ statistically, so low priority).
 ## What works now
 - **Team play (D-030):** both teams play from a team plan: one ball-winner, a cover, capped markers, rest defence,
   near-support and a far-side runner; formation blocks for in/out of possession slide with the ball. AI vs AI 7v7:
-  team length ~25 m, ~2 players within 10 m of the ball (was 4 = the swarm), ~0.9 goals/min, 63% passes arrive.
-- **Pitches (D-031):** 7v7 80 × 52 m (goal 6 m), 5v5 60 × 39 m — real 1.54 proportions, markings scale.
+  team length ~25 m, ~2 players within 10 m of the ball (was 4 = the swarm), AI vs AI 7v7 (30 × 5 min): goals 58–53, shots
+  109–99, ~0.74 goals/min, 62% passes arrive; back line stays goal-side of their deepest man (no offside yet).
+- **Pitches (D-031):** 7v7 80 × 52 m (goal 5.6 m), 5v5 60 × 39 m (goal 4.2 m) — real 1.54 proportions, markings scale.
 - **Owner's CP0.3b requests (D-029):** keepers hold the ball in their hands after a save in their box (throw S /
   high throw A / punt D, 6 s limit); real throw-ins, corners and goal kicks with takers and a 4 m distance rule;
   control auto-switches to the best defender when they have the ball.
 - **CP0.3b:** keepers dive (catch or parry; pose), shots keep their aim (corner shots beat him), tackles have a
   lunge pose; AI players win headers (shots near goal, clearances, nod-ons) and cross from wide; difficulty
   Easy/Normal/Hard for the opposition (Esc menu, Restart match). 7v7 has its own golden + harnesses. 7v7 shots
-  7–16 m: goal 36% (weak 13%, medium 43%, hard 52%). AI vs AI 7v7: ~2 headers/min.
-- **7v7 (D-025):** the game now starts 7-a-side (keeper + 2-3-1) on a 55 × 35 m pitch with 5 m goals
-  (`--5v5` for the old format). AI vs AI 7v7 balanced (goals 58–60 over 30 × 5 min).
+  7–16 m: goal 36% (weak 13%, medium 43%, hard 52%) [pre-D-031; on the 80 m pitch 4–13 m: ~53%]. AI vs AI 7v7: ~2 headers/min.
+- **7v7 (D-025):** the game now starts 7-a-side (keeper + 2-3-1) (now 80 × 52 m, D-031)
+  (`--5v5` for 5-a-side).
 - **CP0.3a (D-022/D-023):** the blue team plays: presses, marks, covers, tackles, passes, runs in behind, shoots;
   your red team-mates support, run, cover and mark; keepers position and catch. **J near their ball = tackle**
   (lunge; well-timed wins it, mistimed commits you). Bodies block. If a team-mate wins it, you get control.
@@ -70,7 +72,7 @@ statistically, so low priority).
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (12 ctest entries, all passing):** test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden `b536eddf99f2591c`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+  (golden 5v5 `fd23a2b711d2e5bd`, 7v7 `b5f5025c79a205ee`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

@@ -70,7 +70,7 @@ void team_plan_update(SimState *s) {
         else if (us == 0) pl->poss_fade = fx_max(pl->poss_fade - FX_ONE / 30, 0);
         for (int k = 0; k < n; k++) { pl->role[k] = WP_PR_ZONE; }
         if (s->phase != WP_PHASE_PLAY && s->phase != WP_PHASE_OUT) { pl->winner = pl->cover = -1; continue; }
-        if (s->tick % T_PLAN_EVERY != (uint32_t)(t * 2 % T_PLAN_EVERY)) {   /* heavy part: every few ticks */
+        if (s->tick % T_PLAN_EVERY != 0) {   /* heavy part: every few ticks */
             if (pl->winner >= 0) pl->role[pl->winner - base] = WP_PR_WIN;
             if (pl->cover >= 0) pl->role[pl->cover - base] = WP_PR_COVER;
             for (int k = 0; k < n; k++) if (pl->mark[k] >= 0) pl->role[k] = WP_PR_MARK;

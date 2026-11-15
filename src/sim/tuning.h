@@ -35,7 +35,7 @@
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */
 #define T_AI_RESTART_DELAY 40         /* AI takers line it up this long first ... */
-#define T_AI_CORNER_WAIT   240        /* ... and on a corner wait (up to 4 s; ai_hold is 8-bit) for two team-mates in the box */
+#define T_AI_CORNER_WAIT   420        /* ... and on a corner wait (up to 7 s, restart_ticks) for two team-mates in the box */
 
 /* ---- players ---- */
 #define T_ACCEL            FX(18.0)
@@ -143,6 +143,8 @@
 #define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
 
 /* ---- team plan (team_plan.c, D-030) ---- */
+#define T_SHAPE_LAST_GAP   FX(1.5)    /* back line stays this far goal-side of their deepest outfield man ... */
+#define T_SHAPE_LAST_MIN   FX(9.0)    /* ... but never deeper than this from our goal line (no offside yet) */
 #define T_PLAN_EVERY       3          /* the plan's heavy part (winner/cover/marks) refreshes every N ticks */
 #define T_PLAN_FOCUS_RATE  FX(0.07)   /* shape follows a smoothed ball (per-tick blend, ~0.25 s) */
 #define T_PLAN_MARK_ZONE   FX(9.0)    /* a marker only takes an opponent within this of his own spot */
@@ -159,6 +161,9 @@
 #define T_AI_TACKLE_EXPOSED_BY_LEVEL {FX(0.75), FX(0.6), FX(0.5)}
 #define T_AI_COMMIT        FX(0.8)    /* utility bonus for sticking with the current action/target */
 #define T_AI_FIRST_TOUCH   10         /* an AI carrier controls the ball this long before passing/shooting */
+#define T_AI_AIM_ERR       FX(0.3)    /* AI shot aim error (uniform +-, m at the goal line): base ... */
+#define T_AI_AIM_ERR_M     FX(0.05)   /* ... + this per metre of distance ... */
+#define T_AI_AIM_ERR_PRESS FX(0.6)    /* ... + this with a defender within 2 m */
 #define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
 #define T_AI_SHOT_RANGE    FX(22.0)   /* AI considers shooting within this of goal */
 #define T_AI_CROSS_ZONE    FX(16.0)   /* crosses / corner targets: team-mates within this of goal */

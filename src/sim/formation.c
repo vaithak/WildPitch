@@ -70,6 +70,16 @@ fv2 shape_spot(const SimState *s, int team, int k) {
         fx limit = bx - FX(1.5), over = fx_max(p.x - limit, 0);
         p.x -= fx_mul(over, FX_ONE - w);
     }
+    /* no offside yet (CP0.4): the back line stays goal-side of their deepest outfield man, so nobody camps in behind
+     * (not deeper than T_SHAPE_LAST_MIN from our goal line; the keeper owns that space) */
+    if (f->slot[k][2] == 0) {
+        fx deep = hl;
+        int o0 = (1 - team) * s->n_per_side;
+        for (int j = o0; j < o0 + s->n_per_side; j++)
+            if (s->players[j].role != WP_ROLE_KEEPER) deep = fx_min(deep, fx_mul(s->players[j].pos.x, sg));
+        fx line = fx_max(deep - T_SHAPE_LAST_GAP, -hl + T_SHAPE_LAST_MIN);
+        if (p.x > line) p.x = line;
+    }
     p.x = fx_clamp(p.x, -hl + FX(2.0), hl - FX(4.0));
     p.y = fx_clamp(p.y, -hw + FX(1.0), hw - FX(1.0));
     return fv2_make(fx_mul(p.x, sg), fx_mul(p.y, sg));

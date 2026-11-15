@@ -334,11 +334,19 @@ Owner: "right now it is like everyone going towards the ball". Research: `report
 - **Measured (7v7, AI vs AI, `shape_metrics.h`, printed by test_ai_match):** on the old 55 m pitch team length
   11 → 19 m, area 89 → 223 m² in possession / 172 out, players within 10 m of the ball 4.0 → 2.3, def–mid gap
   1.5 → 7.9 m, goal-side 2.0 → 2.65. On the new 80 m pitch: length ~25 m, width ~28 m, area ~430 / 380 m²,
-  near-ball 1.7 / 2.0, goal-side 2.8 of 6. Goals ~0.9/min, shots ~0.9/min, 63% of passes arrive.
+  near-ball 1.7 / 2.0, goal-side ~2.9 of 6. AI vs AI 7v7 (30 × 5 min): goals 58–53, shots 109–99, 62% passes arrive.
+- **No offside yet (until CP0.4):** back-line slots (mindset 0) stay 1.5 m goal-side of the opponents' deepest
+  outfield man (never deeper than 9 m from goal). Without it, strikers camped behind the line and AI shots were
+  breakaways (shooters had 0.5 defenders goal-side; 35/57 with nobody within 3 m → 15).
+- **Mirror-fair plan:** both teams' heavy plan update runs on the same tick (a per-team stagger made the exact-mirror
+  check diverge at tick 1). AI shots now carry an aim error (uniform ±(0.3 + 0.05/m + 0.6 under pressure) m at the
+  goal line, one `SimState.rng` draw) instead of perfect far-corner placement; shot quality falls off quadratically
+  (shoots from the box edge). AI corner takers wait up to 7 s (`restart_ticks`) for two team-mates in the box.
 
 ## D-031 — Pitches 1.5× bigger, real proportions (2026-11-15, owner request)
 Owner: "increase both for all formats by some factor (1.5) but ensuring proportion matches that of actual soccer
-fields". Real pitch 105 × 68 = 1.544. **7v7: 80 × 52 m** (was 55 × 35), goal 6 × 2.1 m. **5v5: 60 × 39 m** (was
-40 × 25), goal 5 × 2 m. Boxes, circle and markings scale with the pitch; zoom view scales with length. The 40 × 25
+fields". Real pitch 105 × 68 = 1.544. **7v7: 80 × 52 m** (was 55 × 35), goal 5.6 × 2.1 m. **5v5: 60 × 39 m** (was
+40 × 25), goal 4.2 × 2 m — goal width = 7.32/68 of the pitch width, like a real pitch (6 m goals made 58–83%
+of AI shots score). Boxes, circle and markings scale with the pitch; zoom view scales with length. The 40 × 25
 `sim_default_config` stays ONLY as the regression/harness pitch (5v5 golden, scripted tests); test_ai_match now
 plays the real game formats. AI shooting range 22 m, cross zone 16 m, shot utility re-weighted for the longer field.

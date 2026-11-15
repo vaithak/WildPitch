@@ -121,7 +121,8 @@ static fx leash(const Ctx *x) { return FX(1.5) - slot_mindset(x->s, x->i % x->s-
 static fx shot_quality(const Ctx *x, fv2 at) {
     fx d = dist(at, x->opp_goal);
     if (d > T_AI_SHOT_RANGE) return 0;
-    fx q = FX_ONE - fx_div(d, T_AI_SHOT_RANGE);
+    fx r = fx_div(d, T_AI_SHOT_RANGE);
+    fx q = FX_ONE - fx_mul(r, r);                       /* stays worth it from the edge of the box */
     fx ay = fx_abs(at.y), wide = fx_max(ay - x->s->pitch.goal_width, 0);
     q = fx_mul(q, FX_ONE - clampf(fx_div(wide, FX(6.0)), 0, FX_ONE));
     fx lane = fx_min(pass_lane_clear(x->s, x->team, at, x->opp_goal), FX(2.0));
@@ -467,7 +468,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         if (p->ai_hold < T_AI_RESTART_DELAY || p->action != WP_ACT_NONE) return;
         int best = -1; fx bs = 0;
         int corner = s->restart_kind == WP_RS_CORNER, throw_in = s->restart_kind == WP_RS_THROW;
-        if (corner && p->ai_hold < T_AI_CORNER_WAIT) {    /* wait for two team-mates to get into the box */
+        if (corner && s->restart_ticks < T_AI_CORNER_WAIT) {   /* wait for two team-mates to get into the box */
             int in_box = 0;
             for (int j = x.team * s->n_per_side; j < (x.team + 1) * s->n_per_side; j++)
                 if (j != i && dist(s->players[j].pos, x.opp_goal) < FX(12.0)) in_box++;
@@ -579,7 +580,15 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     case AI_PASS: case AI_THROUGH: case AI_SHOOT: case AI_CROSS:
         if (!owner) { p->ai_act = AI_NONE; break; }
         if (p->ai_hold < T_AI_FIRST_TOUCH || p->action != WP_ACT_NONE) break;    /* control it first */
-        if (p->ai_act == AI_SHOOT) do_kick(s, i, WP_KICK_SHOT, -1, shot_target(&x), T_AI_SHOT_POWER);
+        if (p->ai_act == AI_SHOOT) {            /* aim at the far side of the keeper, with an error that grows with
+                                                 * distance and pressure (one RNG draw: SimState.rng) */
+            fv2 tgt = shot_target(&x);
+            fx err = T_AI_AIM_ERR + fx_mul(dist(b->pos, x.opp_goal), T_AI_AIM_ERR_M);
+            if (nearest_opp(&x, b->pos) < FX(2.0)) err += T_AI_AIM_ERR_PRESS;
+            fx dy = wp_rng_fx_signed(&s->rng, err);
+            tgt.y += dy;
+            do_kick(s, i, WP_KICK_SHOT, -1, tgt, T_AI_SHOT_POWER);
+        }
         else if (p->ai_act == AI_CROSS) do_kick(s, i, WP_KICK_LOB, p->ai_mate, s->players[p->ai_mate].pos, 0);
         else do_kick(s, i, p->ai_act == AI_THROUGH ? WP_KICK_THROUGH : WP_KICK_PASS, p->ai_mate,
                      s->players[p->ai_mate].pos, 0);
