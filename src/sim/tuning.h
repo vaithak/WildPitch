@@ -70,6 +70,8 @@
 #define T_SWITCH_COOL      30         /* ticks between auto-switches */
 #define T_SWITCH_LOCK_MANUAL 90       /* after a manual switch, no auto-switch for this long */
 #define T_SWITCH_HYST      FX(2.0)    /* auto-switch only to a team-mate this much nearer the ball */
+#define T_SWITCH_DEF_HYST  FX(3.0)    /* they have it: switch to the man this much nearer the goal-side spot ... */
+#define T_SWITCH_DEF_COOL  45         /* ... at most every 0.75 s */
 #define T_PASS_FLIGHT_MAX  240        /* a pass in flight stops blocking auto-switch after this many ticks */
 /* passes & reception (D-020: solve the meeting point, steer the receiver, widen the foot) */
 #define T_PASS_ARR_MIN     FX(8.0)    /* tap pass arrival pace: MIN + PER_M * (distance - 5 m), capped at MAX */

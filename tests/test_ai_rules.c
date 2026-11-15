@@ -127,5 +127,21 @@ int main(void) {
             if (c == 0) CHECK(dived);
         }
     }
+    /* 6. they attack while our controlled man is up the pitch: control switches to the defender goal-side of the ball */
+    {
+        WpMatchConfig c7 = sim_config_7v7();
+        sim_init(&s, &c7);
+        int me = s.seat_player[0];                                   /* our striker, far up */
+        s.players[me].pos = fv2_make(FX(10.0), 0);
+        int theirs = 2 * s.n_per_side - 1;
+        s.players[theirs].pos = fv2_make(-FX(8.0), FX(2.0));
+        s.ball.pos = fv2_make(-FX(8.4), FX(2.0)); s.ball.owner = (int8_t)theirs; s.ball.last_touch = (int8_t)theirs;
+        for (int t = 0; t < 20; t++) step1(NOIN);
+        int now = s.seat_player[0];
+        printf("they attack: control moved from %d to %d (%.1f m from the ball)\n", me, now,
+               tod(fv2_len(fv2_sub(s.ball.pos, s.players[now].pos))));
+        CHECKF(now != me && s.players[now].role != WP_ROLE_KEEPER, "no switch to a defender");
+        CHECK(fv2_len(fv2_sub(s.ball.pos, s.players[now].pos)) < FX(10.0));
+    }
     return TEST_DONE();
 }

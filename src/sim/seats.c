@@ -217,6 +217,24 @@ void seats_update(SimState *s, const WpInput *in) {
             }
             continue;
         }
+        /* they have the ball (or their pass is travelling): switch to the team-mate best placed to defend - the one
+         * nearest a spot just goal-side of the ball - when he's clearly better than the current man */
+        int theirs = (b->owner >= 0 && s->players[b->owner].team != p->team) ||
+                     (s->pass_target >= 0 && s->players[s->pass_from].team != p->team);
+        if (theirs) {
+            if (s->switch_cool[k]) continue;
+            fx sg = p->team == 0 ? FX_ONE : -FX_ONE;
+            fv2 spot = fv2_add(b->pos, fv2_make(-fx_mul(sg, FX(1.5)), 0));
+            int best = -1; fx bd = 0;
+            for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
+                if (s->players[j].role == WP_ROLE_KEEPER || (j != me && seat_owns(s, j))) continue;
+                fx d = fv2_len(fv2_sub(spot, s->players[j].pos));
+                if (best < 0 || d < bd) { best = j; bd = d; }
+            }
+            fx dme = fv2_len(fv2_sub(spot, p->pos));
+            if (best >= 0 && best != me && dme - bd > T_SWITCH_DEF_HYST) do_switch(s, k, best, T_SWITCH_DEF_COOL, si, 1);
+            continue;
+        }
         if (s->switch_cool[k] || s->pass_target >= 0 || b->owner >= 0) continue;
         fx dn;
         int to = nearest_to_ball(s, p->team, me, &dn);

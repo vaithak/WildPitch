@@ -98,3 +98,12 @@ Format:
 ## CP0.3a (7v7) — 2026-11-15
 - **Feedback (verbatim):** "it is a good game, keep going ahead with further planned improvements"
 - **Action:** CP0.3b: baselines in 7v7, keeper dives/parries, AI aerial duels, difficulty → playtest; then stats.
+
+## CP0.3b — 2026-11-15
+- **Feedback (verbatim):** "why are keepers not holding ball in hand once saved? also, why is throw-ins and corners not
+  enforced properly? also, controlling defender should automatically switch. after these are done, we need to
+  work/deep research on how to ensure players maintain formation and play like a team nicely and collaboratively?
+  this needs to be done for both our team and their team, right now it is like everyone going towards the ball."
+- **Action:** (1) auto-switch to the best defender when they have the ball; (2) keeper holds the ball in his hands
+  after a save in his box, distributes (throw / punt), time limit; (3) real restarts: throw-ins, corners, goal
+  kicks with takers and distance rules; (4) then deep research on team shape / collaborative play (both teams).
