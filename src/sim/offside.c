@@ -31,6 +31,7 @@ void offside_on_kick(SimState *s, int kicker) {
                                         s->restart_kind == WP_RS_CORNER)) return;   /* no offside from these */
     s->offside_team = (uint8_t)team;
     s->offside_from = (int8_t)kicker;
+    s->offside_x = fx_mul(offside_line(s, team), FX_INT(team_dir(s, team)));
     for (int j = team * s->n_per_side; j < (team + 1) * s->n_per_side; j++)
         if (j != kicker && offside_position(s, j)) s->offside_mask = (uint16_t)(s->offside_mask | (1u << j));
 }

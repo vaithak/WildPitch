@@ -122,7 +122,8 @@ typedef struct {
 enum { WP_ROLE_KEEPER = 0, WP_ROLE_OUTFIELD = 1 };
 
 enum { WP_PHASE_KICKOFF = 0, WP_PHASE_PLAY = 1, WP_PHASE_GOAL = 2, WP_PHASE_OUT = 3, WP_PHASE_HALFTIME = 4,
-       WP_PHASE_FULLTIME = 5 };
+       WP_PHASE_FULLTIME = 5,
+       WP_PHASE_SETUP = 6 };   /* players walking into place for a restart (D-044) */
 
 /* Per-tick event flags (cleared every tick). Presentation ORs them across the ticks of a frame to drive
  * sound/juice and to skip interpolation on teleports (WP_EV_RESET). */
@@ -196,6 +197,7 @@ typedef struct {
     uint8_t  offside_team;
     uint8_t  rules;                  /* WP_RULE_*: fouls and offside on (the game) or off (bare test pitch) */
     int8_t   offside_from;           /* who played it (his own later touches start a new phase) */
+    fx       offside_x;              /* where the offside line was (world x) when that pass was played - for the HUD */
     uint8_t  adv_ticks;              /* advantage being played after a foul (D-040): ticks left */
     uint8_t  adv_team;               /* ... for this team ... */
     fv2      adv_spot;               /* ... the foul was here */

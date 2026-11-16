@@ -115,7 +115,7 @@ static int run_format(int seven, int matches) {
            tackles[0], tackles[1], 100.0 * (double)poss[0] / (double)(poss[0] + poss[1]), 100.0 * (double)poss[1] / (double)(poss[0] + poss[1]), stuck);
     /* sanity band, not a target: 36 min samples carry +-~3 goals of Poisson noise (5v5 ~0.25-0.4/min in CP0.3e) */
     CHECKF((double)G / mins > 0.15 && (double)G / mins < 2.0, "goal rate %.2f/min", (double)G / mins);
-    CHECKF((double)S / mins > 0.7, "shot rate %.2f/min", (double)S / mins);   /* restarts take time (D-029) */
+    CHECKF((double)S / mins > 0.5, "shot rate %.2f/min", (double)S / mins);   /* restarts + their walk-in transitions take clock time (D-029/D-044) */
     CHECKF(D * 100 > P * 50, "only %ld/%ld passes arrive", D, P);
     CHECKF(stuck == 0, "%ld stuck players", stuck);
     printf("  aerial: %ld crosses/lofted, %ld headers\n", crosses, headers);

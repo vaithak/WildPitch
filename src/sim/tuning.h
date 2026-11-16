@@ -87,6 +87,8 @@
 #define T_CHASE_STICK_MIN  48         /* stick magnitude (of 127) below this never chases */
 #define T_CHASE_MATES      3          /* team-mates nearest the ball compared for "is it mine" */
 #define T_SWITCH_TIME_K    FX(0.5)    /* time-based loose-ball switch: challenger needs < this x my time (YSoccer) */
+#define T_SETUP_MAX        240        /* restart transition (D-044): at most 4 s of walking into place ... */
+#define T_SETUP_ARRIVE     FX(0.4)    /* ... the taker counts as at the ball within this */
 #define T_KICKOFF_R_FRAC   FX(0.0871) /* centre-circle radius / pitch length (9.15 / 105, a real pitch) */
 #define T_RESTART_MAX      600        /* a set piece not taken in 10 s is abandoned (ball live) */
 #define T_GOALKICK_DEPTH   FX(2.5)    /* goal kick spot: this far out from the goal line, centred */
@@ -139,6 +141,9 @@
 #define T_PASS_ARR_MIN     FX(8.0)    /* tap pass arrival pace: MIN + PER_M * (distance - 5 m), capped at MAX */
 #define T_PASS_ARR_PER_M   FX(0.3)    /* (CP0.3a feedback "passes very slow, intercepted": was 5.5 + 0.25/m, max 9) */
 #define T_PASS_ARR_MAX     FX(12.0)
+#define T_PASS_LEAD_MARGIN_X FX(2.5)  /* a pass never leads a runner closer than this to the goal line ... */
+#define T_PASS_LEAD_MARGIN_Y FX(2.0)  /* ... or the touchline (was 1.0 / 1.0, owner: passes ran out) */
+#define T_PASS_EDGE_MIN    FX(4.5)    /* near a line a pass is weighted to die inside it, but arrives at least this fast */
 #define T_PASS_MAX         FX(24.0)   /* hardest ground pass */
 #define T_PASS_CONE_DEG    55         /* receivers within this angle of the stick are candidates */
 #define T_PASS_W_ANGLE     10         /* pass pick points per degree off the stick ... */

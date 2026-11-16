@@ -492,7 +492,8 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     out->buttons = 0;
     /* the ball is dead between goal and kick-off: stand still. Before a set piece (OUT pause) everyone repositions
      * - the ball can't be played, so only movement matters */
-    if (s->phase != WP_PHASE_PLAY && s->phase != WP_PHASE_OUT) { p->ai_act = AI_NONE; p->ai_hold = 0; return; }
+    if (s->phase != WP_PHASE_PLAY && s->phase != WP_PHASE_OUT && s->phase != WP_PHASE_SETUP) { p->ai_act = AI_NONE; p->ai_hold = 0; return; }
+    if (s->phase == WP_PHASE_SETUP && i == s->restart_taker) return;   /* the sim walks him to the ball (D-044) */
     Ctx x;
     x.s = s; x.i = i; x.team = p->team; x.sg = team_dir(s, p->team); x.n = 0;
     x.hl = s->pitch.length / 2; x.hw = s->pitch.width / 2;
@@ -581,6 +582,15 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         sim_player_kick(s, i, &k);
         return;
     }
+    {   /* keep the distance the restart needs - walk out of the zone (D-044) */
+        fv2 lg;
+        if (!owner && restart_legal_target(s, i, &lg)) {
+            p->ai_act = AI_SHAPE;
+            p->ai_goal = lg;
+            team_steer_speed(s, p, lg, fx_min(fx_mul(dist(lg, p->pos), FX(3.0)) + FX(1.0), player_top_speed(s, i, 0)), out);
+            return;
+        }
+    }
     {   /* throw-in / goal kick for us: spread out to receive it (CP0.3e) */
         fv2 at;
         if (!owner && setpiece_spot(s, i, &at)) {
@@ -592,11 +602,10 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         }
     }
     /* kickoff: the team not kicking off holds its shape until the ball is first touched */
-    if (s->restart_kind == WP_RS_KICKOFF && p->team != s->restart_team) {
-        fv2 at = home_spot(&x, 0);
+    if (s->restart_kind == WP_RS_KICKOFF && i != s->restart_taker) {   /* kick-off: everyone waits for it (owner) */
         p->ai_act = AI_SHAPE;
-        p->ai_goal = at;
-        team_steer_speed(s, p, at, fx_min(fx_mul(dist(at, p->pos), FX(2.0)), player_top_speed(s, i, 0)), out);
+        p->ai_goal = p->pos;
+        out->move_x = out->move_y = 0;
         return;
     }
 
@@ -695,6 +704,10 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     }
     if (p->ai_act == AI_NONE) return;
     fx d = dist(p->ai_goal, p->pos);
+    if (s->restart_kind && s->restart_kind != WP_RS_KICKOFF) {   /* a restart: never head into the zone (D-044) */
+        fv2 lg;
+        if (restart_legal_point(s, i, p->ai_goal, &lg)) { p->ai_goal = lg; d = dist(p->ai_goal, p->pos); }
+    }
     if (possession(s) == p->team && (p->ai_act == AI_SHAPE || p->ai_act == AI_SUPPORT || (p->ai_act == AI_RUN && !run_go(&x)))) {
         fx ol = offside_line(s, p->team) - T_ONSIDE_MARGIN;       /* off the ball, stay onside (D-041) */
         if (p->ai_goal.x * x.sg > ol) p->ai_goal.x = ol * x.sg;

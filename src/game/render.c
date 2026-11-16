@@ -167,6 +167,12 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
     draw_pitch(r, cam, &cur->pitch);
     wp_stadium_draw_back(r, &ctx->stadium, cam, &cur->pitch, ctx->time);
     draw_goal(r, cam, &cur->pitch, -1);
+    if (cur->restart_kind == WP_RS_FREEKICK && cur->restart_indirect && cur->phase != WP_PHASE_PLAY) {
+        /* offside given (D-041): the line where it was when the pass was played */
+        float ox = tof(cur->offside_x), hw = tof(cur->pitch.width) / 2;
+        SDL_SetRenderDrawColor(r, 255, 220, 40, 255);
+        for (int k = -1; k <= 1; k++) line3(r, cam, ox + (float)k * 0.04f, -hw, 0.01f, ox + (float)k * 0.04f, hw, 0.01f);
+    }
 
     DrawItem items[WP_MAX_PLAYERS + 1];
     float px[WP_MAX_PLAYERS], py[WP_MAX_PLAYERS], pz[WP_MAX_PLAYERS];

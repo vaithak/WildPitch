@@ -497,3 +497,21 @@ after being tackled), so a lob press can't become a slide by accident. The slide
 decelerating at 9 m/s^2; the leading foot (0.85 m ahead) wins the ball within 0.75 m between ticks 4 and 28 and
 knocks it on; reaching a man before the ball, or through a running man from behind, is a foul (a penalty in the
 box); 1.17 s on the ground - committed. Human-only for now (AI slides = tuning AI fouls; later).
+
+## D-044 — Restart transitions, kick-off hold, zone-aware AI, passes that stay in (2026-11-16, owner feedback)
+- **Transitions** (`WP_PHASE_SETUP`, restart.c): after the whistle/OUT pause the ball is placed and the taker RUNS
+  to it while everyone walks into place (the AI heads for legal spots: out of the box for goal kicks, 9.15 m
+  scaled for corners / free kicks, the line-up for penalties); the restart goes live once the taker is there and
+  nobody (AI) is still inside a zone, at most 4 s, or at once when a human presses an action button (skip).
+  Statue isolation tests keep the instant restart. The clock runs (stoppage covers it).
+- **Kick-off:** nobody but the taker moves until the ball is played (owner: "why does the opponent team start moving
+  even before the first pass").
+- **Zones:** during a restart an AI player's movement target is projected out of the zone it may not enter (no more
+  walking into the box at a goal kick and being pushed back).
+- **Passes near a line** (owner: "the ball is passed outside of the field because prediction goes out"): the
+  receiver lead is kept 2.5 m / 2.0 m inside the goal / touch lines (was 1 m), and the arrival pace is capped so a
+  missed pass stops inside the pitch (>= 4.5 m/s). AI vs AI 100 min: outs after passes 107 -> 39 (completion
+  79% -> 75%: softer balls near the lines get cut out a bit more).
+- **Offside display:** the line where it was when the pass was played (`SimState.offside_x`) is drawn across the
+  pitch during the stoppage, with a big "O F F S I D E" banner.
+- test_ai_match shot floor 0.7 -> 0.5/min (restarts and their transitions take clock time).

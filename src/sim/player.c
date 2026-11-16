@@ -186,10 +186,18 @@ static fv2 pass_solve(const SimState *s, int r, fx pace, fv2 *meet, fx *t_meet, 
     for (int it = 0; it < 3; it++) {
         fx d = fv2_len(fv2_sub(aim, b));
         v0 = launch_for(d, pass_arrive(d, pace), T_PASS_MAX, &f);
-        aim = clamp_box(s, fv2_add(q->pos, fv2_scale(q->vel, f)), FX(1.0), FX(1.0));
+        aim = clamp_box(s, fv2_add(q->pos, fv2_scale(q->vel, f)), T_PASS_LEAD_MARGIN_X, T_PASS_LEAD_MARGIN_Y);
     }
     fx d = fv2_len(fv2_sub(aim, b));
-    v0 = launch_for(d, pass_arrive(d, pace), T_PASS_MAX, &f);
+    /* owner: "the ball is passed outside of the field because prediction goes out" - near a line the pass is weighted
+     * so that, if he misses it, it stops inside the pitch (never softer than T_PASS_EDGE_MIN) */
+    fx va = pass_arrive(d, pace);
+    if (d > FX(0.5)) {
+        fv2 u = fv2_scale(fv2_sub(aim, b), fx_div(FX_ONE, d));
+        fx room = ray_exit_dist(aim, u, s->pitch.length / 2 - FX(0.5), s->pitch.width / 2 - FX(0.5));
+        va = fx_max(fx_min(va, ball_roll_speed_for(room)), T_PASS_EDGE_MIN);
+    }
+    v0 = launch_for(d, va, T_PASS_MAX, &f);
     fx away = fv2_dot(q->vel, fv2_norm(fv2_sub(q->pos, b)));
     *meet = aim;
     *t_meet = f;
@@ -453,6 +461,15 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     }
     int winding = p->action == WP_ACT_KICK && !p->kick.done;
     if (winding) top = fx_mul(top, T_KICK_SPEED_MUL);
+    {   /* restart setup (D-044): the taker runs to the ball by himself */
+        fv2 wd; fx ws;
+        if (restart_taker_walk(s, i, &wd, &ws)) {
+            fv2 dv = fv2_sub(fv2_scale(wd, ws), p->vel);
+            p->vel = fv2_add(p->vel, fv2_clamp_len(dv, fx_mul(T_ACCEL, WP_DT)));
+            if (ws > 0) p->facing = fx_atan2(wd.y, wd.x);
+            return;
+        }
+    }
     if (restart_is_taker(s, i)) {                         /* taking a set piece: stands still, may turn to aim */
         p->vel = fv2_make(0, 0);
         if (has) {

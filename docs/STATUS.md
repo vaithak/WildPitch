@@ -3,7 +3,8 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.4 — "A real match" (D-040..D-042): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free
+**CP0.4 — "A real match" (D-040..D-044): ✅ done, waiting for the owner's playtest.** + slide tackle (D-043),
+restart transitions / kick-off hold / passes that stay in / offside line (D-044). Fouls / advantage / free
 kicks / penalties, offside, gamepad (hotplug), instant replay. Next (owner, 2026-11-16): slide tackle on the LOB
 key (A / pad West - EA FC and eFootball both put the slide on their lob/cross button), then CP0.5: lofted-pass power
 meter, aerial receiving (foot / chest / head, chained touches like chest-then-pass, header passes) - deep research
@@ -17,6 +18,9 @@ Open: AI scoring with offside is ~22% lower (42 vs 54 goals per 100 min); AI nev
    on the line and time their runs.
 3. A gamepad (if you have one): plug it in any time; A pass, B shoot, X lob, Y chip, RB sprint, LB switch, Start menu.
 4. Press R (or pad Back) during play: the last 10 s replay (R again = slow motion; any other key = back to play).
+5. Slide tackle: A (pad X) with their carrier within 3 m - win it from the side; from behind = foul.
+6. Restarts: after a throw-in / corner / goal kick / free kick everyone walks into place (press S/D/A/W to skip);
+   at a kick-off nobody moves until it's played; offside shows the line and a big OFFSIDE.
 
 ### Playtest guide (CP0.3e)
 1. Throw-in: the taker holds it over his head; S throws it (two hands, feet planted), it drops into your mate;

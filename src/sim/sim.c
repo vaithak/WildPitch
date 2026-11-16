@@ -144,13 +144,16 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
 
 /* Goal celebration -> kickoff reset; temporary out-of-play rule: ball placed just inside the line. */
 static void match_flow(SimState *s, const WpInput *in) {
-    if (s->phase == WP_PHASE_PLAY || s->phase >= WP_PHASE_HALFTIME || s->phase_timer == 0) return;   /* clock.c owns HT/FT */
+    if (s->phase == WP_PHASE_SETUP) { restart_setup_step(s, in); return; }   /* D-044 */
+    if (s->phase == WP_PHASE_PLAY || s->phase == WP_PHASE_HALFTIME || s->phase == WP_PHASE_FULLTIME || s->phase_timer == 0)
+        return;                                           /* clock.c owns HT/FT */
     if (--s->phase_timer) return;
     if (s->phase == WP_PHASE_GOAL) {
         match_place_kickoff(s);
         sim_kickoff_setpiece(s);
     } else if (s->phase == WP_PHASE_OUT) {
-        restart_place(s, in);                             /* throw-in / corner / goal kick (D-029) */
+        restart_setup(s, in);                             /* walk into place, then the restart (D-029/D-044) */
+        return;
     }
     s->phase = WP_PHASE_PLAY;
 }
@@ -197,7 +200,7 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, s->restart_kind); fnv_i(&f, s->restart_team); fnv_i(&f, s->restart_taker); fnv_i(&f, s->restart_ticks);
     fnv_i(&f, s->restart_spot.x); fnv_i(&f, s->restart_spot.y);
     fnv_i(&f, s->restart_indirect); fnv_i(&f, s->indirect_live); fnv_i(&f, s->offside_mask); fnv_i(&f, s->offside_team); if (s->rules) fnv_i(&f, s->rules);
-    fnv_i(&f, s->offside_from); fnv_i(&f, s->adv_ticks); fnv_i(&f, s->adv_team); fnv_i(&f, s->adv_spot.x); fnv_i(&f, s->adv_spot.y);
+    fnv_i(&f, s->offside_from); fnv_i(&f, s->offside_x); fnv_i(&f, s->adv_ticks); fnv_i(&f, s->adv_team); fnv_i(&f, s->adv_spot.x); fnv_i(&f, s->adv_spot.y);
     for (int t = 0; t < 2; t++) {
         const WpTeamPlan *pl = &s->plan[t];
         fnv_i(&f, pl->focus.x); fnv_i(&f, pl->focus.y); fnv_i(&f, pl->poss_fade); fnv_i(&f, pl->trans_ticks);

@@ -234,6 +234,37 @@ static float from_hands_pose(const WpAvatarPose *P, Pose *a, float t) {
     return w;
 }
 
+/* Sliding tackle (sim: WP_ACT_SLIDE, 70 ticks; the right foot is live ~0.85 m ahead, low, ticks 4..28).
+ * Fills the action pose `a` (pre-filled with the base pose) and returns its blend weight.
+ *  - drop (0..4 ticks): hips go down, right leg shoots out along facing, left leg folds under.
+ *  - slide (to ~0.5 s): on the left hip, pelvis ~0.2 m, right leg straight out with the foot just off the grass,
+ *    left knee near the grass, torso leaning back, left hand down behind for support, right arm up for balance.
+ *  - get up: sits up onto the left knee (right foot planted), then blends back to the stand by tick ~68.
+ * No run cycle: the action weight is 1 throughout the slide. Heights come from the ground-contact pass in
+ * solve() (the lowest foot point sits on the grass), so the leg angles here set how low the pelvis is. */
+static float slide_pose(Pose *a, float t) {
+    float d = smooth01(t / 0.067f);                       /* the drop: done by the first live tick */
+    float up = smooth01((t - 0.50f) / 0.32f);             /* roll forward onto the knee */
+    /* slide keyframe (right = lead, index 1; left = trailing, index 0) */
+    float h1 = 1.37f, k1 = 0.02f, o1 = 0.03f;             /* straight out, foot ~0.1 m up, toes up */
+    float h0 = 1.25f, k0 = 3.10f, o0 = 0.40f;             /* thigh forward-out, shin folded back under */
+    float s0 = -0.50f, e0 = 0.10f, b0 = 0.30f;            /* left arm: hand on the grass behind */
+    float s1 = 2.60f, e1 = 0.30f, b1 = 0.70f;             /* right arm: up and out */
+    float lean = -0.62f, nod = 0.40f, roll = -0.22f;      /* ~35 deg back, eyes on the ball, on the left hip (roll < 0) */
+    /* kneel keyframe: left knee down, right foot planted, sitting up and forward */
+    h0 = key(h0, 0.00f, up); k0 = key(k0, 1.80f, up); o0 = key(o0, 0.08f, up);
+    h1 = key(h1, 1.45f, up); k1 = key(k1, 1.45f, up); o1 = key(o1, 0.10f, up);
+    s0 = key(s0, 0.35f, up); e0 = key(e0, 0.55f, up); b0 = key(b0, 0.30f, up);
+    s1 = key(s1, 0.45f, up); e1 = key(e1, 0.60f, up); b1 = key(b1, 0.35f, up);
+    lean = key(lean, 0.30f, up); nod = key(nod, 0.0f, up); roll = key(roll, 0.0f, up);
+    a->hip[1] = key(a->hip[1], h1, d); a->knee[1] = key(a->knee[1], k1, d); a->leg_out[1] = key(a->leg_out[1], o1, d);
+    a->hip[0] = key(a->hip[0], h0, d); a->knee[0] = key(a->knee[0], k0, d); a->leg_out[0] = key(a->leg_out[0], o0, d);
+    a->sh[0] = key(a->sh[0], s0, d); a->elb[0] = key(a->elb[0], e0, d); a->ab[0] = key(a->ab[0], b0, d);
+    a->sh[1] = key(a->sh[1], s1, d); a->elb[1] = key(a->elb[1], e1, d); a->ab[1] = key(a->ab[1], b1, d);
+    a->lean = key(a->lean, lean, d); a->nod = key(a->nod, nod, d); a->roll = key(a->roll, roll, d);
+    return 1.0f - smooth01((t - 0.80f) / 0.33f);          /* kneel -> stand, back to locomotion by ~1.13 s */
+}
+
 static void build_pose(const WpAvatarPose *P, Pose *o) {
     float amp = clampf(P->speed / 7.0f, 0, 1);
     float run = smooth01(P->speed / 1.2f);           /* 0 idle .. 1 moving */
@@ -345,6 +376,9 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         w = smooth01(t / 0.05f) * (1 - smooth01((t - 0.35f) / 0.15f));
         break;
     }
+    case WP_ACT_SLIDE:
+        w = slide_pose(&a, t);
+        break;
     case WP_ACT_JUMP_HEADER:
     case WP_ACT_STAND_HEADER: {  /* lasts until landing (~0.69 s for a full jump) */
         for (int s = 0; s < 2; s++) {

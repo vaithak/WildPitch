@@ -90,7 +90,12 @@ void slide_step(SimState *s, int i);
 /* restart.c (D-029) */
 void restart_out(SimState *s, int touchline, fx x_or_y, int goal_side);
 void restart_place(SimState *s, const WpInput *in);
-void restart_foul(SimState *s, int team, fv2 spot, int indirect);   /* free kick / penalty to team (D-040/041) */
+void restart_foul(SimState *s, int team, fv2 spot, int indirect);
+void restart_setup(SimState *s, const WpInput *in);        /* D-044: the walk into place */
+void restart_setup_step(SimState *s, const WpInput *in);
+int  restart_taker_walk(const SimState *s, int i, fv2 *dir, fx *speed);
+int  restart_legal_target(const SimState *s, int j, fv2 *out);
+int  restart_legal_point(const SimState *s, int j, fv2 pos, fv2 *out);   /* same, for a point he's heading to */   /* free kick / penalty to team (D-040/041) */
 void restart_step(SimState *s);
 int  restart_is_taker(const SimState *s, int i);
 /* keeper.c */

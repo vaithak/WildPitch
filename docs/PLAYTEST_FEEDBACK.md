@@ -187,3 +187,9 @@ Format:
   move back first if gone out of play - these can be skippable but atleast have a transition, same for corner."
 - **Action:** slide = LOB key (advisor + EA FC / eFootball both use their lob/cross button); then CP0.5 with deep
   research on aerial reception.
+- **Feedback (verbatim, mid-CP0.4):** "similarly good visual portray of offside like showing the line and writing
+  offside on top and not just out, also during kickoff, why does opponent team start moving even before first pass?
+  it doesn't look good, also during goal kicks the opponent team tries to come into the D, but stopped by rules, but
+  still it doesn't look good. Also, when making passes by trajectory prediction of receiver, many times the ball is
+  passed outside of the field because prediction goes out. Improve on these also."
+- **Action:** D-044 (all four), committed with the restart transitions.

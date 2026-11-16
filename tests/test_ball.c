@@ -142,10 +142,11 @@ int main(void) {
     ev = run_seat(&s, NOIN, 40);
     CHECK(!(ev & WP_EV_GOAL) && (ev & WP_EV_OUT));
     CHECK(s.score[0] == 0);
-    run_seat(&s, NOIN, T_OUT_PAUSE_TICKS);
-    /* D-029: over their bar, last touched by us -> GOAL KICK for them, taken by their keeper at the spot */
+    /* D-029: over their bar, last touched by us -> GOAL KICK for them, taken by their keeper on the goal-area line
+     * (D-038) once the restart is live (after the D-044 setup) */
+    for (int t = 0; t < T_OUT_PAUSE_TICKS + T_SETUP_MAX && !(s.phase == WP_PHASE_PLAY && s.restart_taker >= 0); t++) run_seat(&s, NOIN, 1);
     CHECKF(s.phase == WP_PHASE_PLAY && s.restart_kind == WP_RS_GOALKICK && s.restart_team == 1 &&
-           s.ball.owner == s.n_per_side && fx_abs(s.ball.pos.x - (hl - T_GOALKICK_DEPTH)) < FX(0.5) &&
+           s.ball.owner == s.n_per_side && fx_abs(s.ball.pos.x - (hl - fx_mul(s.pitch.length, T_GOALAREA_FRAC))) < FX(0.5) &&
            fx_abs(s.ball.vel.x) < FX(0.1), "phase %d x %.2f kind %d taker %d", s.phase, tod(s.ball.pos.x), s.restart_kind, s.restart_taker);
 
     /* wide of the post: out, not a goal */

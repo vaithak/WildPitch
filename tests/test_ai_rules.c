@@ -243,7 +243,7 @@ int main(void) {
         int blue = 2 * s.n_per_side - 2;
         s.ball.pos = fv2_make(FX(3.0), (s.pitch.width / 2) - FX(1.5)); s.ball.vel = fv2_make(0, FX(4.0)); s.ball.owner = -1;
         s.ball.last_touch = (int8_t)blue;
-        for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
+        for (int t = 0; t < 400 && !(s.restart_kind && s.restart_taker >= 0 && s.phase == WP_PHASE_PLAY); t++) step1(NOIN);
         int taker = s.restart_taker;
         fx closest_blue = FX(99.0);
         for (int t = 0; t < 30; t++) {
@@ -287,7 +287,7 @@ int main(void) {
         sim_init(&s, &c7);
         s.ball.pos = fv2_make(-((s.pitch.length / 2) - FX(1.0)), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1;
         s.ball.last_touch = (int8_t)blue;
-        for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
+        for (int t = 0; t < 400 && !(s.restart_kind && s.restart_taker >= 0 && s.phase == WP_PHASE_PLAY); t++) step1(NOIN);
         printf("goal kick: kind %d team %d taker %d (keeper %d)\n", s.restart_kind, s.restart_team, s.restart_taker,
                s.restart_taker >= 0 && s.players[s.restart_taker].role == WP_ROLE_KEEPER);
         CHECK(s.restart_kind == WP_RS_GOALKICK && s.restart_team == 0 && s.restart_taker == 0);
@@ -306,7 +306,7 @@ int main(void) {
         sim_init(&s, &c7);
         s.ball.pos = fv2_make(-((s.pitch.length / 2) - FX(1.0)), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1;
         s.ball.last_touch = 2;
-        for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
+        for (int t = 0; t < 400 && !(s.restart_kind && s.restart_taker >= 0 && s.phase == WP_PHASE_PLAY); t++) step1(NOIN);
         fx near = FX(99.0);
         for (int t = 0; t < 60 && s.restart_kind == WP_RS_CORNER; t++) {
             step1(NOIN);

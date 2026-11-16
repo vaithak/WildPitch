@@ -39,7 +39,7 @@ static int assign(const SimState *s, int i, const fv2 *spot, int ns, const uint8
 /* free kicks near goal: the defending team's wall; penalties: everyone else along the edge of the box (D-040) */
 static int foul_spot(const SimState *s, int i, fv2 *at) {
     int kind = s->restart_kind, def = 1 - s->restart_team, n = s->n_per_side;
-    int live = s->phase == WP_PHASE_OUT || (s->phase == WP_PHASE_PLAY && s->restart_taker >= 0);
+    int live = s->phase == WP_PHASE_OUT || s->phase == WP_PHASE_SETUP || (s->phase == WP_PHASE_PLAY && s->restart_taker >= 0);
     if (!live) return 0;
     int taker = predicted_taker(s);
     fx hl = s->pitch.length / 2;
@@ -77,7 +77,7 @@ int setpiece_spot(const SimState *s, int i, fv2 *at) {
     int kind = s->restart_kind;
     if (kind == WP_RS_FREEKICK || kind == WP_RS_PENALTY) return foul_spot(s, i, at);
     if (kind != WP_RS_THROW && kind != WP_RS_GOALKICK) return 0;
-    int live = s->phase == WP_PHASE_OUT ||
+    int live = s->phase == WP_PHASE_OUT || s->phase == WP_PHASE_SETUP ||
                (s->phase == WP_PHASE_PLAY && s->restart_taker >= 0 && s->ball.owner == s->restart_taker);
     if (!live || s->players[i].team != s->restart_team || s->players[i].role == WP_ROLE_KEEPER) return 0;
     int taker = predicted_taker(s);

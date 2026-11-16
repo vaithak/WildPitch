@@ -594,6 +594,17 @@ int main(int argc, char **argv) {
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
                 const char *sub = vc->phase == WP_PHASE_HALFTIME ? "teams change ends" : "Esc - menu - Restart match";
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(sub), (float)h * 0.22f + 34, sub);
+            } else if (vc->restart_kind == WP_RS_FREEKICK && vc->restart_indirect && vc->phase != WP_PHASE_PLAY) {
+                const char *msg = "O F F S I D E";                /* D-041: big, like GOAL; the line is drawn on the pitch */
+                float sc = 4.0f;
+                SDL_SetRenderScale(g.ren, sc, sc);
+                SDL_SetRenderDrawColor(g.ren, 255, 220, 40, 255);
+                SDL_RenderDebugText(g.ren, ((float)w / sc - 8.0f * (float)strlen(msg)) * 0.5f, (float)h / sc * 0.22f, msg);
+                SDL_SetRenderScale(g.ren, 1, 1);
+                SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
+                char ob[48];
+                snprintf(ob, sizeof ob, "indirect free kick - %s", vc->restart_team == 0 ? "RED" : "BLUE");
+                SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(ob), (float)h * 0.22f + 34, ob);
             } else if (vc->phase == WP_PHASE_GOAL) {
                 const char *msg = "G O A L !";
                 float sc = 4.0f;

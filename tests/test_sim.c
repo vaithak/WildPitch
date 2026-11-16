@@ -90,7 +90,7 @@ int main(void) {
     s.flags |= WP_SIMF_STATIC_OTHERS;
     for (int i = 0; i < 2 * s.n_per_side; i++) s.players[i].pos = fv2_make(FX_INT(i * 3 - 15), -FX(14.0));
     s.ball.pos = fv2_make(0, FX(11.0)); s.ball.vel = fv2_make(0, FX(8.0));
-    steps(&s, (WpSeatInput){0, 0, 0}, 120);
+    steps(&s, (WpSeatInput){0, 0, 0}, 40);                 /* (before the throw-in is placed) */
     CHECKF(s.ball.pos.y < s.pitch.width / 2 + T_BOARD_SIDE && s.ball.vel.y <= 0, "ball through the boards: y %.2f",
            (double)s.ball.pos.y / 65536.0);
     return TEST_DONE();

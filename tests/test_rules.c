@@ -26,7 +26,7 @@ static void scene(int half) {
     memset(&NO, 0, sizeof NO);
 }
 static void steps(int n) { for (int t = 0; t < n; t++) sim_step(&s, &NO); }
-static void wait_restart(void) { for (int t = 0; t < 200 && !(s.phase == WP_PHASE_PLAY && s.restart_taker >= 0); t++) steps(1); }
+static void wait_restart(void) { for (int t = 0; t < 400 && !(s.phase == WP_PHASE_PLAY && s.restart_taker >= 0); t++) steps(1); }
 
 /* tackler i lunges now at foot position toward `to` (the tackle's foot arrives next tick) */
 static void lunge(int i, fv2 to) {
