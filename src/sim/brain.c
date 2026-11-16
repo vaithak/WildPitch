@@ -46,7 +46,7 @@ static const fx W[AI_N][NF] = {
     [AI_DRIBBLE] = {FX(0.30), FX(0.40),  FX(0.30),  0,          0,         0,         -FX(0.8),   0,          -FX(0.6)},
     [AI_PASS]    = {FX(0.13), FX(0.30),  FX(1.60),  -FX(0.06),  0,         0,         0,          0,          -FX(0.4)},
     [AI_THROUGH] = {FX(0.18), FX(0.30),  FX(1.60),  -FX(0.06),  FX(1.0),   0,         0,          0,          -FX(1.2)},
-    [AI_SHOOT]   = {0,        0,         FX(0.30),  0,          FX(24.0),  0,         0,          0,          -FX(1.0)},
+    [AI_SHOOT]   = {0,        0,         FX(0.30),  0,          FX(32.0),  0,         0,          0,          -FX(1.0)},
     [AI_KEEP]    = {0,        0,         0,         0,          0,         0,         0,          0,          FX(1.0)},
     [AI_CROSS]   = {FX(0.10), FX(0.30),  0,         -FX(0.04),  FX(6.0),   0,         0,          0,          -FX(1.2)},
     [AI_HEAD]    = {0,        0,         0,         0,          0,         0,         0,          0,          FX(1.0)},
@@ -546,7 +546,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         WpKick k = {0};
         fv2 d = fv2_sub(s->players[best].pos, b->pos);
         k.kind = kind; k.dir = fx_atan2(d.y, d.x); k.to = (uint8_t)(best + 1); k.foot = 1;
-        k.power = kind == WP_KICK_THROW ? T_THROW_SPEED : T_PASS_SPEED;
+        k.power = kind == WP_KICK_THROW ? T_THROW_SPEED : kind == WP_KICK_LOB ? 0 : T_PASS_SPEED;   /* lob: no meter */
         k.windup = kind == WP_KICK_PASS ? T_KICK_WINDUP_PASS : T_KICK_WINDUP_CHIP;
         sim_player_kick(s, i, &k);
         return;

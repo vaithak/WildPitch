@@ -515,3 +515,12 @@ box); 1.17 s on the ground - committed. Human-only for now (AI slides = tuning A
 - **Offside display:** the line where it was when the pass was played (`SimState.offside_x`) is drawn across the
   pitch during the stoppage, with a big "O F F S I D E" banner.
 - test_ai_match shot floor 0.7 -> 0.5/min (restarts and their transitions take clock time).
+
+## D-045 — Lofted-pass power meter (2026-11-16, owner request)
+Owner: "there should be power meter in lofted pass also, that will decide how far to lob in air". A (lob) now uses
+the shared hold/release mechanic: a tap (<= 12 ticks) is the old lob to the ringed team-mate; a hold shows a violet
+meter and the ball lands lob_meter_dist(h) = 12 .. 45 m along the aim - a team-mate within 4 m (+12%) of that spot
+gets it (led onto his run), otherwise it drops into space. Targeted lobs now lead the receiver by the real flight
+time (~2 vz/g; was a fixed 0.8 s). Measured: 17.5 / 25.7 / 34.0 m on the meter land at 18.7 / 27.5 / 36.2 m. AI lobs
+and crosses are unchanged (no meter). Also: AI shot utility weight 24 -> 32 (D-041 cost back: 49 goals / 110 shots
+per 100 AI minutes, vs 54 / 109 before offside).

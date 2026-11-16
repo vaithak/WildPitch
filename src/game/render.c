@@ -244,7 +244,8 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
             };
             /* a pass tap shows nothing; past the tap window it's a through ball and gets the bar (+ backswing) */
             int charging = p->charge_kind != 0xFF &&
-                           p->kick_charge > (p->charge_kind == WP_KICK_PASS ? T_PASS_TAP_TICKS : 0);
+                           p->kick_charge > (p->charge_kind == WP_KICK_PASS ? T_PASS_TAP_TICKS
+                                             : p->charge_kind == WP_KICK_LOB ? T_LOB_TAP_TICKS : 0);   /* taps: no bar */
             if (charging) {
                 float dxb = bx - px[i], dyb = by - py[i];
                 if (dxb * dxb + dyb * dyb < 4.0f) pose.charge01 = (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
@@ -263,6 +264,8 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                     if (charging) {   /* power bar while charging (through ball: lead distance) */
                         float c = p->charge_kind == WP_KICK_PASS
                                 ? (float)(p->kick_charge - T_PASS_TAP_TICKS) / (float)(T_CHARGE_MAX_TICKS - T_PASS_TAP_TICKS)
+                                : p->charge_kind == WP_KICK_LOB      /* lob meter: how far (D-045) */
+                                ? (float)(p->kick_charge - T_LOB_TAP_TICKS) / (float)(T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS)
                                 : (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
                         float bw = 1.1f * cam->ppm * m.s, bh = 0.16f * cam->ppm * m.s + 2.0f;
                         float x0 = m.x - bw * 0.5f, y0 = m.y - rad * 0.8f - bh - 4.0f;
@@ -271,6 +274,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                         SDL_RenderFillRect(r, &bg);
                         if (p->charge_kind == WP_KICK_CHIP) SDL_SetRenderDrawColor(r, 90, 200, 255, 255);
                         else if (p->charge_kind == WP_KICK_PASS) SDL_SetRenderDrawColor(r, 240, 240, 245, 255);
+                        else if (p->charge_kind == WP_KICK_LOB) SDL_SetRenderDrawColor(r, 200, 130, 255, 255);   /* lob: violet */
                         else SDL_SetRenderDrawColor(r, (Uint8)(120 + 135 * c), (Uint8)(230 - 150 * c), 60, 255);
                         SDL_RenderFillRect(r, &fg);
                     }

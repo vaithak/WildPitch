@@ -189,6 +189,10 @@
 #define T_SWITCH_LATCH_TICKS 30       /* after an auto-switch the held stick is ignored until it changes (max) */
 #define T_LOB_VZ_BASE      FX(4.0)    /* lofted pass: vz = BASE + PER_M * distance, clamped */
 #define T_LOB_VZ_PER_M     FX(0.22)
+#define T_LOB_TAP_TICKS    12         /* lob (D-045): A released within this = lofted to the ringed mate ... */
+#define T_LOB_MIN_D        FX(12.0)   /* ... held longer = the meter: it lands this far (just past the tap) ... */
+#define T_LOB_MAX_D        FX(45.0)   /* ... up to this far (full meter) along the aim */
+#define T_LOB_SNAP         FX(4.0)    /* a team-mate within this (+12% of the distance) of the landing spot gets it */
 #define T_LOB_VZ_MIN       FX(5.0)
 #define T_LOB_VZ_MAX       FX(9.5)
 #define T_HEADER_SHOT      FX(11.0)   /* header at goal: base speed (+25% of the incoming ball's speed) */

@@ -117,6 +117,9 @@ int  offside_position(const SimState *s, int j);
 void offside_on_kick(SimState *s, int kicker);
 void offside_step(SimState *s);
 
+/* lob meter (D-045): hold h (0..1] -> how far the lofted ball lands */
+static inline fx lob_meter_dist(fx h) { return fx_lerp(T_LOB_MIN_D, T_LOB_MAX_D, h); }
+
 /* clock.c (D-036) */
 void clock_step(SimState *s);
 void clock_add_stoppage(SimState *s, int game_seconds);
