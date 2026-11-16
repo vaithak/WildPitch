@@ -34,8 +34,28 @@ void tackle_step(SimState *s, int i) {
     fv2 foot = fv2_add(p->pos, fv2_from_angle(p->facing, TACKLE_FOOT));
     if (s->phase != WP_PHASE_PLAY || b->z > WP_BAND_FEET_MAX) return;
     fx reach = fx_mul(T_TACKLE_REACH, FX_ONE + fx_mul(T_STAT_TACKLE, stat_k(s, i, WP_STAT_TACKLING)));   /* D-034 */
-    if (fv2_len(fv2_sub(b->pos, foot)) > reach) return;                    /* missed */
+    if (fv2_len(fv2_sub(b->pos, foot)) > reach) {         /* missed the ball - did he take the man? (D-040) */
+        if (!(s->rules & WP_RULE_FOULS)) return;
+        int o0 = (1 - p->team) * s->n_per_side;
+        for (int j = o0; j < o0 + s->n_per_side; j++)
+            if (fv2_len(fv2_sub(s->players[j].pos, foot)) < T_FOUL_REACH) {
+                if (b->owner >= 0 && s->players[b->owner].team != p->team) {   /* they still have it: play on */
+                    s->adv_ticks = T_ADVANTAGE_TICKS; s->adv_team = (uint8_t)(1 - p->team); s->adv_spot = s->players[j].pos;
+                    s->events |= WP_EV_FOUL;
+                } else restart_foul(s, 1 - p->team, s->players[j].pos, 0);
+                return;
+            }
+        return;
+    }
     int victim = b->owner;
+    if ((s->rules & WP_RULE_FOULS) && victim >= 0 && s->players[victim].team != p->team) {   /* won it, but through a running man from behind? */
+        const WpPlayer *v = &s->players[victim];
+        fx vs = fv2_len(v->vel);
+        if (vs > T_FOUL_BEHIND_V && fv2_dot(fv2_scale(v->vel, fx_div(FX_ONE, vs)), fv2_norm(fv2_sub(v->pos, p->pos))) > T_FOUL_BEHIND_COS) {
+            restart_foul(s, v->team, v->pos, 0);
+            return;
+        }
+    }
     /* a block tackle: the ball is stopped by the tackler's foot and squirts back his way (he moves with it) */
     fv2 from = victim >= 0 ? s->players[victim].pos : b->pos;
     fv2 back = fv2_sub(p->pos, from);

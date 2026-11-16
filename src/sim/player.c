@@ -359,6 +359,7 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     b->owner = -1;
     b->last_touch = (int8_t)i;
     b->no_hands = p->kick.kind == WP_KICK_HEADER ? 0 : (uint8_t)(p->team + 1);
+    offside_on_kick(s, i);                                /* D-041: who's beyond the line as it's played */
     p->immune = T_KICK_IMMUNE;
     p->touch_cooldown = 18;
     s->events |= WP_EV_KICK;

@@ -3,13 +3,20 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.4 — "A real match": 🚧 in progress.** (CP0.3e awaits the owner's playtest.)
-Plan: (1) fouls (a tackle that misses the ball but takes the man, or goes through him from behind) -> direct free
-kick (opponents 9.15 m scaled, AI wall + AI shot from range) / penalty in the box (spot 11/105, everyone out of the
-box and the D, keeper on his line); (2) offside (flagged at each pass, called when the flagged man plays it ->
-indirect free kick; AI runners hold the line, AI never passes to an offside man); (3) gamepad + instant replay
-(subagent: src/game/gamepad.c, replay.c, `--check-replay`); (4) HUD labels FOUL / FREE KICK / PENALTY / OFFSIDE;
-(5) shout button (press / drop back) if time allows. Tests + docs (D-040..).
+**CP0.4 — "A real match" (D-040..D-042): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free
+kicks / penalties, offside, gamepad (hotplug), instant replay. Next (owner, 2026-11-16): slide tackle on the LOB
+key (A / pad West - EA FC and eFootball both put the slide on their lob/cross button), then CP0.5: lofted-pass power
+meter, aerial receiving (foot / chest / head, chained touches like chest-then-pass, header passes) - deep research
+first - and restart transitions (everyone walks into place for throw-ins / goal kicks / corners, skippable).
+Open: AI scoring with offside is ~22% lower (42 vs 54 goals per 100 min); AI never slide-tackles yet.
+
+### Playtest guide (CP0.4)
+1. Mistime a tackle (S near their carrier) and take the man: FOUL - free kick to them (in your box: PENALTY). If
+   they keep the ball: ADVANTAGE, play on. Defending a free kick near goal, the AI builds a wall.
+2. Offside: pass to a team-mate beyond their last defender - OFFSIDE, indirect free kick. Your AI team-mates wait
+   on the line and time their runs.
+3. A gamepad (if you have one): plug it in any time; A pass, B shoot, X lob, Y chip, RB sprint, LB switch, Start menu.
+4. Press R (or pad Back) during play: the last 10 s replay (R again = slow motion; any other key = back to play).
 
 ### Playtest guide (CP0.3e)
 1. Throw-in: the taker holds it over his head; S throws it (two hands, feet planted), it drops into your mate;
@@ -113,7 +120,7 @@ Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (15 ctest entries, all passing):** test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
+- **Tests (18 ctest entries, all passing):** test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
   (golden 5v5 `a034042ea9bdd9a8`, 7v7 `0456aca621621227`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a

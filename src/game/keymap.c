@@ -16,6 +16,7 @@ static const struct { const char *id, *name; SDL_Scancode def; } ACTIONS[WP_KEY_
     [WP_KEY_SWITCH] = {"switch", "Switch player",               SDL_SCANCODE_Q},
     [WP_KEY_ZOOM]   = {"zoom",   "Zoom",                        SDL_SCANCODE_C},
     [WP_KEY_LOOK]   = {"look",   "Change look",                 SDL_SCANCODE_P},
+    [WP_KEY_REPLAY] = {"replay", "Replay last 10 s",            SDL_SCANCODE_R},
 };
 
 void wp_keymap_defaults(WpKeymap *m) {

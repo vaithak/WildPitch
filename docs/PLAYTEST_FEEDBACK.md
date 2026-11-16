@@ -176,3 +176,14 @@ Format:
 - **Feedback (verbatim):** "continue with next checkpoint"
 - **Action:** CP0.4 "A real match": fouls -> free kicks / penalties, offside (sim, this session); gamepad (hotplug)
   and instant replay (presentation, a parallel subagent); shout button if time allows.
+- **Feedback (verbatim, mid-CP0.4):** "also add sliding tackle, think carefully with the advisor about which key
+  should do this work, think of the choices taken by other popular games"
+- **Feedback (verbatim, mid-CP0.4):** "there should be power meter in lofted pass also, that will decide how far to
+  lob in air and we need to improve the receiving of air ball nicely - either through foot or chest or header with
+  apt physics for each stance, also allow passing from header directly through air ball or like chest then foot pass
+  type combination - make sure that is possible, do a deep research on this if required to make sure we do it nicely
+  ensuring good system design approach. Next, currently there are no transitions available, for example, during
+  outside giving a transition so that everyone goes into place, similarly during goal kick, allowing defenders to
+  move back first if gone out of play - these can be skippable but atleast have a transition, same for corner."
+- **Action:** slide = LOB key (advisor + EA FC / eFootball both use their lob/cross button); then CP0.5 with deep
+  research on aerial reception.

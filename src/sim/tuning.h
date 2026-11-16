@@ -202,8 +202,6 @@
 #define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
 
 /* ---- team plan (team_plan.c, D-030) ---- */
-#define T_SHAPE_LAST_GAP   FX(1.5)    /* back line stays this far goal-side of their deepest outfield man ... */
-#define T_SHAPE_LAST_MIN   FX(9.0)    /* ... but never deeper than this from our goal line (no offside yet) */
 #define T_PLAN_EVERY       3          /* the plan's heavy part (winner/cover/marks) refreshes every N ticks */
 #define T_PLAN_FOCUS_RATE  FX(0.07)   /* shape follows a smoothed ball (per-tick blend, ~0.25 s) */
 #define T_PLAN_MARK_ZONE   FX(9.0)    /* a marker only takes an opponent within this of his own spot */
@@ -220,9 +218,9 @@
 #define T_AI_TACKLE_EXPOSED_BY_LEVEL {FX(0.75), FX(0.6), FX(0.5)}
 #define T_AI_COMMIT        FX(0.8)    /* utility bonus for sticking with the current action/target */
 #define T_AI_FIRST_TOUCH   10         /* an AI carrier controls the ball this long before passing/shooting */
-#define T_AI_AIM_ERR       FX(0.5)    /* AI shot aim error (uniform +-, m at the goal line): base ... */
+#define T_AI_AIM_ERR       FX(0.3)    /* AI shot aim error (uniform +-, m at the goal line): base ... */
 #define T_AI_AIM_ERR_M     FX(0.05)   /* ... + this per metre of distance ... */
-#define T_AI_AIM_ERR_PRESS FX(0.8)    /* ... + this with a defender within 2 m */
+#define T_AI_AIM_ERR_PRESS FX(0.6)    /* ... + this with a defender within 2 m */
 #define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
 #define T_AI_SHOT_RANGE    FX(22.0)   /* AI considers shooting within this of goal */
 #define T_AI_CROSS_ZONE    FX(16.0)   /* crosses / corner targets: team-mates within this of goal */
@@ -252,6 +250,20 @@
 #define T_AI_KEEPER_HOLD   50         /* the AI keeper looks up for this long before distributing */
 #define T_THROW_SPEED      FX(11.0)   /* keeper's throw with nobody targeted */
 #define T_THROWIN_ARRIVE_Z FX(0.9)    /* a throw-in drops into the receiver at this height */
+/* fouls, free kicks, penalties (D-040) */
+#define T_FOUL_REACH       FX(0.90)   /* a tackle that misses the ball but whose foot is this close to a man = foul */
+#define T_FOUL_BEHIND_COS  FX(0.50)   /* won from behind a running man (within ~50 deg of his back) = through him */
+#define T_FOUL_BEHIND_V    FX(2.5)    /* ... when he is running at least this fast */
+#define T_ADVANTAGE_TICKS  90         /* advantage: the fouled team keeps it this long = play on (1.5 s) */
+#define T_FOUL_PAUSE       60         /* the whistle: the ball is dead this long before the free kick */
+#define T_STOPPAGE_FOUL_S  15         /* game seconds of stoppage per foul */
+#define T_PENALTY_FRAC     FX(0.1048) /* penalty mark: 11 / 105 of the length from the goal line */
+#define T_AI_FK_SHOT_D     FX(24.0)   /* AI takes a direct free kick this close to goal as a shot */
+#define T_AI_WALL_FRAC     FX(0.40)   /* defenders build a wall for free kicks within this share of the length of goal */
+#define T_SHAPE_LAST_GAP   FX(1.5)    /* no offside rule: back line this far goal-side of their deepest man ... */
+#define T_SHAPE_LAST_MIN   FX(9.0)    /* ... never deeper than this from our goal line (D-035) */
+#define T_ONSIDE_MARGIN    FX(0.3)    /* AI attackers wait this far onside of the line (D-041) */
+#define T_AI_RUN_GO_SPACE  FX(2.5)    /* runners go in behind when our carrier has this much room (D-041) */
 #define T_ROLL_MAX         FX(18.0)   /* keeper distribution (CP0.3e): roll it along the ground up to this far ... */
 #define T_THROW_MAX        FX(32.0)   /* ... throw it overarm up to this far, punt beyond */
 #define T_ROLL_SPEED       FX(10.0)   /* untargeted roll */

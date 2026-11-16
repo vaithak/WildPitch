@@ -139,13 +139,16 @@ enum {
     WP_EV_HEADER = 1 << 9,   /* head contact (also sets WP_EV_KICK) */
     WP_EV_TACKLE = 1 << 10,  /* a tackle won the ball off its owner */
     WP_EV_WHISTLE = 1 << 11, /* the referee ended a half (D-036) */
+    WP_EV_FOUL   = 1 << 12,  /* a foul was given (D-040) */
+    WP_EV_OFFSIDE = 1 << 13, /* offside was given (D-041) */
 };
 
 enum { WP_SIMF_STATIC_OTHERS = 1 << 0 };
+enum { WP_RULE_FOULS = 1 << 0, WP_RULE_OFFSIDE = 1 << 1 };   /* WpMatchConfig.rules (D-040/D-041) */
 enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };
 /* movement assist toward the ball (D-037), per seat; OFF = the pre-D-037 sim bit for bit */
 enum { WP_ASSIST_OFF = 0, WP_ASSIST_LOW = 1, WP_ASSIST_NORMAL = 2, WP_ASSIST_HIGH = 3, WP_ASSIST_LEVELS };
-enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK, WP_RS_KICKOFF };
+enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK, WP_RS_KICKOFF, WP_RS_FREEKICK, WP_RS_PENALTY };
 
 /* Team plan (D-030): computed once per tick for both teams before anyone decides - a shared observation that says
  * who goes for the ball, who covers, who marks whom, who stays back - so the brain stops swarming the ball. */
@@ -187,6 +190,15 @@ typedef struct {
     int8_t   restart_taker;
     uint16_t restart_ticks;
     fv2      restart_spot;
+    uint8_t  restart_indirect;       /* the free kick can't score directly (offside, D-041) */
+    uint8_t  indirect_live;          /* an indirect free kick has been played and nobody else has touched it yet */
+    uint16_t offside_mask;           /* players (bit = index) flagged offside at their team's last kick (D-041) */
+    uint8_t  offside_team;
+    uint8_t  rules;                  /* WP_RULE_*: fouls and offside on (the game) or off (bare test pitch) */
+    int8_t   offside_from;           /* who played it (his own later touches start a new phase) */
+    uint8_t  adv_ticks;              /* advantage being played after a foul (D-040): ticks left */
+    uint8_t  adv_team;               /* ... for this team ... */
+    fv2      adv_spot;               /* ... the foul was here */
     WpTeamPlan plan[2];
     uint16_t events;                 /* WP_EV_* raised during the last sim_step */
     int8_t   seat_player[WP_MAX_SEATS]; /* player index each seat controls, -1 = none */
@@ -234,6 +246,7 @@ typedef struct {
     uint8_t  stats_mode;              /* WP_STATS_*; generated from the seed (sim_default_config(): NEUTRAL) */
     uint32_t half_ticks;              /* 0 = endless (tests); the game: 2 halves of 5 min = 90' at 9x (D-036) */
     uint8_t  assist_level;            /* WP_ASSIST_* for every seat (D-037) */
+    uint8_t  rules;                   /* WP_RULE_* (game formats: fouls + offside; sim_default_config: none) */
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */

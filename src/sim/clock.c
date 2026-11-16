@@ -32,7 +32,8 @@ void clock_step(SimState *s) {
         if (mins > T_STOPPAGE_MAX_MIN) mins = T_STOPPAGE_MAX_MIN;
         s->stoppage = (uint16_t)(mins * m);
     }
-    if (s->clock >= s->half_ticks + s->stoppage && s->clock > s->half_ticks && s->phase == WP_PHASE_PLAY) {
+    if (s->clock >= s->half_ticks + s->stoppage && s->clock > s->half_ticks && s->phase == WP_PHASE_PLAY &&
+        !s->restart_kind && !s->adv_ticks) {         /* never in the middle of a set piece / advantage */
         s->events |= WP_EV_WHISTLE;
         s->restart_kind = 0; s->restart_taker = -1; s->pass_target = -1;
         s->ball.owner = -1; s->ball.held = 0;

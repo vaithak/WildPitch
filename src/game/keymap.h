@@ -11,6 +11,7 @@ typedef enum {
     WP_KEY_UP, WP_KEY_DOWN, WP_KEY_LEFT, WP_KEY_RIGHT,
     WP_KEY_SPRINT, WP_KEY_PASS, WP_KEY_SHOOT, WP_KEY_LOB, WP_KEY_CHIP, WP_KEY_SWITCH,
     WP_KEY_ZOOM, WP_KEY_LOOK,
+    WP_KEY_REPLAY,                       /* CP0.4; appended so old controls.cfg files keep their meaning */
     WP_KEY_COUNT
 } WpKeyAction;
 

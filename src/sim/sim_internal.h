@@ -87,6 +87,7 @@ void tackle_step(SimState *s, int i);
 /* restart.c (D-029) */
 void restart_out(SimState *s, int touchline, fx x_or_y, int goal_side);
 void restart_place(SimState *s, const WpInput *in);
+void restart_foul(SimState *s, int team, fv2 spot, int indirect);   /* free kick / penalty to team (D-040/041) */
 void restart_step(SimState *s);
 int  restart_is_taker(const SimState *s, int i);
 /* keeper.c */
@@ -101,6 +102,12 @@ void team_steer_speed(const SimState *s, const WpPlayer *p, fv2 target, fx speed
 
 /* setpiece.c (CP0.3e): a receiving spot for player i at the pending/live throw-in or goal kick (1 = go there) */
 int  setpiece_spot(const SimState *s, int i, fv2 *at);
+
+/* offside.c (D-041) */
+fx   offside_line(const SimState *s, int team);           /* attack-frame x a team-mate may not be beyond */
+int  offside_position(const SimState *s, int j);
+void offside_on_kick(SimState *s, int kicker);
+void offside_step(SimState *s);
 
 /* clock.c (D-036) */
 void clock_step(SimState *s);

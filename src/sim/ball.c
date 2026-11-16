@@ -126,7 +126,7 @@ static void lines_and_net(SimState *s, fv2 prev, fx prev_z, fx dt) {
             fx t = fx_div(line - x0, x1 - x0);
             fx yc = prev.y + fx_mul(b->pos.y - prev.y, t);
             fx zc = prev_z + fx_mul(b->z - prev_z, t);
-            if (fx_abs(yc) < gw2 && zc < gh) {
+            if (fx_abs(yc) < gw2 && zc < gh && !s->indirect_live) {   /* (straight from an indirect free kick: no goal) */
                 int scorer = team_dir(s, 0) == (sg > 0 ? 1 : -1) ? 0 : 1;  /* the team attacking that goal */
                 s->score[scorer]++;
                 s->kickoff_team = (uint8_t)(1 - scorer);

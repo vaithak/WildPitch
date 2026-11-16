@@ -16,6 +16,7 @@ int main(int argc, char **argv) {
     for (int m = 0; m < matches; m++) {
         WpMatchConfig cfg = seven ? sim_config_7v7() : sim_default_config();
     if (getenv("WP_STATS")) cfg.stats_mode = (uint8_t)atoi(getenv("WP_STATS"));   /* 0 neutral, 1 mirrored, 2 own */
+    if (getenv("WP_RULES")) cfg.rules = (uint8_t)atoi(getenv("WP_RULES"));         /* 0 none, 1 fouls, 2 offside, 3 both */
         cfg.seed = (uint64_t)(m + 1);
         sim_init(&s, &cfg);
         for (int k = 0; k < WP_MAX_SEATS; k++) s.seat_player[k] = -1;

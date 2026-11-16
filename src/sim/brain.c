@@ -137,6 +137,13 @@ static int possession(const SimState *s) {          /* team in possession, -1 lo
     return -1;
 }
 
+/* time a run in behind (D-041): our carrier has room to play the through ball, so the runner goes from onside now */
+static int run_go(const Ctx *x) {
+    const SimState *s = x->s;
+    int o = s->ball.owner;
+    return o >= 0 && o != x->i && s->players[o].team == x->team && nearest_opp(x, s->ball.pos) > T_AI_RUN_GO_SPACE;
+}
+
 /* ---------------- candidates: off the ball (D-030: the team plan gates the ball jobs) ---------------- */
 static void set_home(Ctx *x, Cand *c, fv2 spot) {
     if (c && c->f[F_ROLE] == 0) c->f[F_HOME] = fx_mul(dist(c->at, spot), leash(x));
@@ -283,6 +290,7 @@ static void gen_off_ball(Ctx *x) {
         for (int j = o0; j < o0 + s->n_per_side; j++)
             if (s->players[j].role != WP_ROLE_KEEPER && s->players[j].pos.x * x->sg > last) last = s->players[j].pos.x * x->sg;
         fx rx = fx_min(fx_max(last + FX(3.0), b->pos.x * x->sg + FX(6.0)), x->hl - FX(4.0));
+        if (!run_go(x)) rx = fx_min(rx, offside_line(s, x->team) - T_ONSIDE_MARGIN);   /* on the shoulder (D-041) */
         fv2 at = in_pitch(x, fv2_make(rx * x->sg, p->pos.y), FX(2.0));
         if ((c = add(x, AI_RUN, -1, at))) {
             c->f[F_FWD] = (at.x - b->pos.x) * x->sg;
@@ -340,6 +348,7 @@ static void gen_on_ball(Ctx *x) {
         const WpPlayer *q = &s->players[j];
         fx d0 = dist(q->pos, b->pos);
         if (d0 < FX(3.0) || d0 > T_PASS_MAX_DIST) continue;
+        if (offside_position(s, j)) continue;             /* he'd be given offside (D-041) */
         fv2 at = fv2_add(q->pos, fv2_scale(q->vel, fx_div(d0, T_PICK_FLIGHT_V)));
         if ((c = add(x, AI_PASS, (int8_t)j, at))) {
             c->f[F_FWD] = (at.x - b->pos.x) * x->sg;
@@ -496,6 +505,18 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         if (p->ai_hold < T_AI_RESTART_DELAY || p->action != WP_ACT_NONE) return;
         int best = -1; fx bs = 0;
         int corner = s->restart_kind == WP_RS_CORNER, throw_in = s->restart_kind == WP_RS_THROW;
+        /* penalty, or a direct free kick in range: shoot (D-040) - aim away from the keeper, with the usual error */
+        if (s->restart_kind == WP_RS_PENALTY ||
+            (s->restart_kind == WP_RS_FREEKICK && !s->restart_indirect && dist(b->pos, x.opp_goal) < T_AI_FK_SHOT_D &&
+             shot_quality(&x, b->pos) > FX(0.15))) {
+            fv2 tgt = shot_target(&x);
+            fx err = T_AI_AIM_ERR + fx_mul(dist(b->pos, x.opp_goal), T_AI_AIM_ERR_M);
+            err = fx_mul(err, FX_ONE - fx_mul(T_STAT_SHOT_AIM, stat_k(s, i, WP_STAT_SHOOTING)));
+            fx dy = wp_rng_fx_signed(&s->rng, err);
+            tgt.y += dy;
+            do_kick(s, i, WP_KICK_SHOT, -1, tgt, T_AI_SHOT_POWER);
+            return;
+        }
         if (corner && s->restart_ticks < T_AI_CORNER_WAIT) {   /* wait for two team-mates to get into the box */
             int in_box = 0;
             for (int j = x.team * s->n_per_side; j < (x.team + 1) * s->n_per_side; j++)
@@ -674,6 +695,11 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     }
     if (p->ai_act == AI_NONE) return;
     fx d = dist(p->ai_goal, p->pos);
+    if (possession(s) == p->team && (p->ai_act == AI_SHAPE || p->ai_act == AI_SUPPORT || (p->ai_act == AI_RUN && !run_go(&x)))) {
+        fx ol = offside_line(s, p->team) - T_ONSIDE_MARGIN;       /* off the ball, stay onside (D-041) */
+        if (p->ai_goal.x * x.sg > ol) p->ai_goal.x = ol * x.sg;
+        d = dist(p->ai_goal, p->pos);
+    }
     fx top = player_top_speed(s, i, 1);
     if (p->stamina < T_AI_SAVE_ENERGY && p->ai_act != AI_COVER) top = player_top_speed(s, i, 0);   /* tired: jog (D-034) */
     fx v = p->ai_act == AI_RUN || p->ai_act == AI_COVER ? top : fx_min(fx_mul(d, FX(2.0)), top);

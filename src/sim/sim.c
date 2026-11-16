@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 2216  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 2240  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
  * 5.6 x 2.1 m goals (7.32/68 of the width, like a real pitch) */
@@ -19,6 +19,7 @@ WpMatchConfig sim_config_7v7(void) {
     c.stats_mode = WP_STATS_OWN;                      /* generated squads, equal totals (D-034) */
     c.half_ticks = T_HALF_TICKS;                      /* two 5-minute halves, 90' at 9x (D-036) */
     c.assist_level = WP_ASSIST_NORMAL;                /* movement assist toward the ball (D-037) */
+    c.rules = WP_RULE_FOULS | WP_RULE_OFFSIDE;        /* a real match (D-040/D-041) */
     return c;
 }
 
@@ -33,6 +34,7 @@ WpMatchConfig sim_config_5v5(void) {
     c.stats_mode = WP_STATS_OWN;
     c.half_ticks = T_HALF_TICKS;
     c.assist_level = WP_ASSIST_NORMAL;
+    c.rules = WP_RULE_FOULS | WP_RULE_OFFSIDE;
     return c;
 }
 
@@ -131,6 +133,7 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
     s->seat_player[0] = (int8_t)(s->n_per_side - 1); /* seat 0 = team 0 striker */
     s->half_ticks = cfg->half_ticks;                 /* 0 = endless (D-036) */
     s->first_kickoff = 0;
+    s->rules = cfg->rules;
     for (int k = 0; k < WP_MAX_SEATS; k++) s->assist_level[k] = cfg->assist_level < WP_ASSIST_LEVELS ? cfg->assist_level : WP_ASSIST_NORMAL;
     stats_init(s, cfg->stats_mode);                  /* draws from s->rng only when stats are on (D-034) */
     s->kickoff_team = 0;
@@ -156,8 +159,17 @@ void sim_step(SimState *s, const WpInput *in) {
     s->events = 0;
     players_step(s, in);
     ball_step(s);
+    offside_step(s);                                  /* a flagged man played it: offside (D-041) */
+    if (s->adv_ticks) {                               /* advantage (D-040): they lose it -> back for the free kick */
+        int o = s->ball.owner;
+        if (s->phase != WP_PHASE_PLAY) s->adv_ticks = 0;
+        else if (o >= 0 && s->players[o].team != s->adv_team) { s->adv_ticks = 0; restart_foul(s, s->adv_team, s->adv_spot, 0); }
+        else s->adv_ticks--;
+    }
     match_flow(s, in);
     clock_step(s);
+    if (s->indirect_live && (s->phase != WP_PHASE_PLAY ||          /* someone else touched it: an ordinary ball again */
+                             (s->ball.last_touch >= 0 && s->ball.last_touch != s->indirect_live - 1))) s->indirect_live = 0;
     for (int k = 0; k < WP_MAX_SEATS; k++) s->prev_buttons[k] = in->seat[k].buttons;
     s->tick++;
 }
@@ -184,6 +196,8 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, s->score[0]); fnv_i(&f, s->score[1]); fnv_i(&f, s->kickoff_team); fnv_i(&f, s->flags); fnv_i(&f, s->ai_level[0]); fnv_i(&f, s->ai_level[1]);
     fnv_i(&f, s->restart_kind); fnv_i(&f, s->restart_team); fnv_i(&f, s->restart_taker); fnv_i(&f, s->restart_ticks);
     fnv_i(&f, s->restart_spot.x); fnv_i(&f, s->restart_spot.y);
+    fnv_i(&f, s->restart_indirect); fnv_i(&f, s->indirect_live); fnv_i(&f, s->offside_mask); fnv_i(&f, s->offside_team); if (s->rules) fnv_i(&f, s->rules);
+    fnv_i(&f, s->offside_from); fnv_i(&f, s->adv_ticks); fnv_i(&f, s->adv_team); fnv_i(&f, s->adv_spot.x); fnv_i(&f, s->adv_spot.y);
     for (int t = 0; t < 2; t++) {
         const WpTeamPlan *pl = &s->plan[t];
         fnv_i(&f, pl->focus.x); fnv_i(&f, pl->focus.y); fnv_i(&f, pl->poss_fade); fnv_i(&f, pl->trans_ticks);

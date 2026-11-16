@@ -70,9 +70,10 @@ fv2 shape_spot(const SimState *s, int team, int k) {
         fx limit = bx - FX(1.5), over = fx_max(p.x - limit, 0);
         p.x -= fx_mul(over, FX_ONE - w);
     }
-    /* no offside yet (CP0.4): the back line stays goal-side of their deepest outfield man, so nobody camps in behind
-     * (not deeper than T_SHAPE_LAST_MIN from our goal line; the keeper owns that space) */
-    if (f->slot[k][2] == 0) {
+    if (s->rules & WP_RULE_OFFSIDE) {                     /* D-041: our men stay onside; the back line can hold */
+        fx ol = offside_line(s, team) - T_ONSIDE_MARGIN;
+        if (p.x > ol) p.x = ol;
+    } else if (f->slot[k][2] == 0) {                      /* no offside (D-035): stay goal-side of their deepest man */
         fx deep = hl;
         int o0 = (1 - team) * s->n_per_side;
         for (int j = o0; j < o0 + s->n_per_side; j++)

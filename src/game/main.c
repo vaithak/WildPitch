@@ -11,6 +11,9 @@
  *   --autoplay-chip / --autoplay-dribble   variants: chip instead of shot / sprint zigzag dribble (no shot)
  *   --check-kick-pose      numeric check: kicking instep at the ball on the contact tick (no window)
  *   --check-keymap         keymap defaults / save-load round trip / rebind swap (no window)
+ *   --check-gamepad        pure pad -> WpSeatInput mapping checks (no window, no pad needed)
+ *   --check-replay         instant replay reproduces the live sim hash tick for tick (no window)
+ *   --replay-shot          with --screenshot: start an instant replay halfway to the captured frame
  *   --screenshot F.bmp     save frame number --frames N (default 60) to F.bmp and exit
  */
 #include <SDL3/SDL.h>
@@ -26,6 +29,8 @@
 #include "game/hud.h"
 #include "game/keymap.h"
 #include "game/menu.h"
+#include "game/gamepad.h"
+#include "game/replay.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen (40 m pitch) */
 /* bigger pitches show a bit more (7v7 55 m: x1.19) so the wide view still reads the game */
@@ -47,7 +52,19 @@ typedef struct {
     double        sim_ms_avg;
     WpKeymap      km;              /* rebindable controls (Esc -> Controls) */
     WpMenu        menu;            /* pause menu; the sim is paused while it's open */
+    WpGamepad     pad;             /* first connected gamepad: seat 0 alongside the keyboard (CP0.4) */
+    WpReplayLog   rlog;            /* inputs + snapshots of the last ~12 s (instant replay) */
+    WpReplay      rp;              /* the replay's own sim copy; the live g.cur is paused, never touched */
+    bool          replay_ok;       /* not in harnesses that write the sim outside sim_step */
 } Game;
+
+static void replay_begin(Game *g) {
+    if (g->replay_ok && wp_replay_start(&g->rp, &g->rlog)) wp_render_reset_anim(&g->rctx);
+}
+static void replay_end(Game *g) {
+    wp_replay_stop(&g->rp);
+    wp_render_reset_anim(&g->rctx);   /* back to live: don't animate across the jump */
+}
 
 /* --check-keymap: defaults, text round trip, swap-on-rebind (no window) */
 static int check_keymap(void) {
@@ -68,6 +85,15 @@ static int check_keymap(void) {
     for (int i = 0; i < WP_KEY_COUNT; i++) bad += a.key[i] != b.key[i];
     wp_keymap_from_text(&b, "garbage\nshoot = NotAKey\n# comment\nlook=Return\n");
     bad += b.key[WP_KEY_LOOK] != SDL_SCANCODE_RETURN || b.key[WP_KEY_SHOOT] != a.key[WP_KEY_SHOOT];
+    /* CP0.4: replay (R) is new. An old controls.cfg without it still loads, and one that put another action on R
+     * moves replay to that action's old key (never two actions on one key) */
+    bad += a.key[WP_KEY_REPLAY] != SDL_SCANCODE_R;
+    wp_keymap_defaults(&b);
+    wp_keymap_from_text(&b, "# old file\nup = Up\ndown = Down\nleft = Left\nright = Right\nsprint = E\npass = S\n"
+                            "shoot = D\nlob = A\nchip = W\nswitch = Q\nzoom = C\nlook = R\n");
+    bad += b.key[WP_KEY_LOOK] != SDL_SCANCODE_R || b.key[WP_KEY_REPLAY] != SDL_SCANCODE_P;
+    for (int i = 0; i < WP_KEY_COUNT; i++)
+        for (int j = i + 1; j < WP_KEY_COUNT; j++) bad += b.key[i] == b.key[j];
     printf("keymap check: %s\n", bad ? "FAIL" : "ok");
     return bad ? 1 : 0;
 }
@@ -265,7 +291,7 @@ static void apply_vsync(Game *g) {
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false;
+    bool gallery = false, demo = false, replay_shot = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
@@ -281,6 +307,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--autoplay-header") && i + 1 < argc) { autoplay = true; autoplay_header = (float)atof(argv[++i]); }
         else if (!strcmp(argv[i], "--check-kick-pose")) return check_kick_pose();
         else if (!strcmp(argv[i], "--check-keymap")) return check_keymap();
+        else if (!strcmp(argv[i], "--check-gamepad")) return wp_gamepad_check();
+        else if (!strcmp(argv[i], "--check-replay")) return wp_replay_check();
+        else if (!strcmp(argv[i], "--replay-shot")) replay_shot = true;
         else if (!strcmp(argv[i], "--menu")) menu_shot = true;
         else if (!strcmp(argv[i], "--5v5")) five = true;             /* the old 5-a-side format (40 x 25 m) */      /* with --screenshot: capture the Controls screen */
     }
@@ -296,6 +325,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     apply_vsync(&g);
+    wp_gamepad_init(&g.pad);
     wp_keymap_defaults(&g.km);
     if (!(shot_path || autoplay || demo || gallery)) wp_keymap_load(&g.km);   /* the player's saved controls */
     if (board_sheet && shot_path) {                      /* visual check of the advertising-board faces (D-033) */
@@ -337,6 +367,8 @@ int main(int argc, char **argv) {
         for (int i = g.cur.n_per_side + 1; i < 2 * g.cur.n_per_side; i++)
             g.cur.players[i].pos = fv2_make(FX_INT(i * 3 - 30), (i & 1) ? FX(11.5) : -FX(11.5));
     g.prev = g.cur;
+    g.replay_ok = !(autoplay || demo || gallery);
+    wp_replay_reset(&g.rlog);
     wp_render_ctx_init(&g.rctx, g.ren, cfg.seed);
     g.rctx.style = start_style;
     g.rctx.hide_markers = demo;
@@ -348,24 +380,42 @@ int main(int argc, char **argv) {
     int frames = 0;
     long total_frames = 0;
     Uint64 start_ns = SDL_GetTicksNS();
-    bool running = true;
+    bool running = true, menu_dirty = true;
     if (menu_shot) { wp_menu_open(&g.menu); if (!getenv("WP_MENU_MAIN")) { g.menu.screen = WP_MENU_CONTROLS; g.menu.sel = WP_KEY_PASS; } else g.menu.sel = 1; }
     while (running) {
         SDL_Event e;
         if (g.menu.screen != WP_MENU_CLOSED) {
             /* paused: draw the menu, then sleep until the next event (no busy loop, nothing redrawn meanwhile) */
-            int mw, mh;
-            SDL_GetRenderOutputSize(g.ren, &mw, &mh);
-            wp_menu_draw(&g.menu, &g.km, g.ren, mw, mh);
-            if (shot_path) {                              /* visual check of the menu */
-                SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
-                if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
-                break;
+            if (menu_dirty) {                             /* redraw only when something relevant happened */
+                int mw, mh;
+                SDL_GetRenderOutputSize(g.ren, &mw, &mh);
+                wp_menu_draw(&g.menu, &g.km, g.ren, mw, mh);
+                if (shot_path) {                          /* visual check of the menu */
+                    SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
+                    if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
+                    break;
+                }
+                SDL_RenderPresent(g.ren);
+                menu_dirty = false;
             }
-            SDL_RenderPresent(g.ren);
             if (!SDL_WaitEvent(&e)) continue;
             do {
                 if (e.type == SDL_EVENT_QUIT) running = false;
+                /* joystick axis noise (a pad's sticks) must not cause redraws (runs cool) */
+                if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || e.type == SDL_EVENT_GAMEPAD_ADDED ||
+                    e.type == SDL_EVENT_GAMEPAD_REMOVED || (e.type >= SDL_EVENT_WINDOW_FIRST && e.type <= SDL_EVENT_WINDOW_LAST))
+                    menu_dirty = true;
+                wp_gamepad_event(&g.pad, &e);
+                if (wp_gamepad_is_active_button(&g.pad, &e)) {   /* pad -> the keys the menu already understands */
+                    if (e.gbutton.button == SDL_GAMEPAD_BUTTON_START && !g.menu.waiting) { g.menu.screen = WP_MENU_CLOSED; continue; }
+                    SDL_Scancode msc = wp_pad_menu_key(e.gbutton.button, g.menu.waiting);
+                    if (msc == SDL_SCANCODE_UNKNOWN) continue;
+                    SDL_Event ke;
+                    SDL_zero(ke);
+                    ke.type = SDL_EVENT_KEY_DOWN;
+                    ke.key.scancode = msc;
+                    e = ke;
+                }
                 WpMenuResult res = wp_menu_event(&g.menu, &e, &g.km);
                 if (res == WP_MENU_QUIT) running = false;
                 if (res == WP_MENU_RESTART) {                 /* new match, same format, chosen difficulty */
@@ -374,6 +424,8 @@ int main(int argc, char **argv) {
                     sim_init(&g.cur, &cfg);
                     sim_kickoff_setpiece(&g.cur);
                     g.prev = g.cur;
+                    wp_replay_reset(&g.rlog);
+                    wp_replay_stop(&g.rp);
                     wp_render_reset_anim(&g.rctx);
                 }
             } while (SDL_PollEvent(&e));
@@ -381,17 +433,35 @@ int main(int argc, char **argv) {
             acc = 0;
             continue;
         }
+        menu_dirty = true;                                /* the menu draws itself once when it opens */
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) running = false;
-            if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
+            wp_gamepad_event(&g.pad, &e);
+            bool key = e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat, btn = wp_gamepad_is_active_button(&g.pad, &e);
+            if (g.rp.active && (key || btn)) {        /* replaying: the replay key/Back toggles slow-mo, anything else skips */
+                bool again = key ? e.key.scancode == g.km.key[WP_KEY_REPLAY] : wp_pad_ui_action(e.gbutton.button) == WP_PAD_UI_REPLAY;
+                if (again) { g.rp.slow = !g.rp.slow; g.rp.sub = 0; }
+                else replay_end(&g);
+                continue;
+            }
+            if (key) {
                 SDL_Scancode sc = e.key.scancode;
                 if (sc == SDL_SCANCODE_ESCAPE && !shot_path) wp_menu_open(&g.menu);
                 if (sc == SDL_SCANCODE_F3) g.show_debug = !g.show_debug;
                 if (sc == g.km.key[WP_KEY_LOOK]) g.rctx.style = (g.rctx.style + 1) % WP_AVATAR_STYLE_COUNT;
                 if (sc == g.km.key[WP_KEY_ZOOM]) g.zoom = (g.zoom + 1) % 3;
+                if (sc == g.km.key[WP_KEY_REPLAY]) replay_begin(&g);
+            }
+            if (btn) {
+                WpPadUi ui = wp_pad_ui_action(e.gbutton.button);
+                if (ui == WP_PAD_UI_MENU && !shot_path) wp_menu_open(&g.menu);
+                if (ui == WP_PAD_UI_LOOK) g.rctx.style = (g.rctx.style + 1) % WP_AVATAR_STYLE_COUNT;
+                if (ui == WP_PAD_UI_ZOOM) g.zoom = (g.zoom + 1) % 3;
+                if (ui == WP_PAD_UI_REPLAY) replay_begin(&g);
             }
             if (e.type == SDL_EVENT_WINDOW_DISPLAY_CHANGED) apply_vsync(&g);
         }
+        if (replay_shot && shot_path && frames == shot_frame / 2 && !g.rp.active) replay_begin(&g);
         Uint64 now = SDL_GetTicksNS();
         Uint64 dt = now - last; last = now;
         if (dt > 250 * SDL_NS_PER_MS) dt = 250 * SDL_NS_PER_MS;   /* after suspend: don't fast-forward */
@@ -407,14 +477,22 @@ int main(int argc, char **argv) {
             WpInput in;
             memset(&in, 0, sizeof in);
             uint16_t frame_ev = 0;
-            while (acc >= tick_ns) {
+            while (acc >= tick_ns && g.rp.active) {     /* instant replay: re-step the copy, the live match waits */
+                acc -= tick_ns;
+                if (g.rp.slow && (++g.rp.sub & 1)) continue;   /* half speed */
+                if (!wp_replay_step(&g.rp, &g.rlog)) { replay_end(&g); break; }
+                frame_ev |= g.rp.cur.events;
+                if (g.rp.cur.events & WP_EV_RESET) { g.rp.prev = g.rp.cur; wp_render_reset_anim(&g.rctx); }
+            }
+            while (acc >= tick_ns && !g.rp.active) {
                 if (g.demo) demo_input(&g.cur, &in);
                 else if (autoplay_header > 0) {
                     if (g.cur.tick == 20) header_cross_setup(&g.cur, autoplay_header);
                     in.seat[0] = (WpSeatInput){0, 0, (uint16_t)(g.cur.tick == 21 ? WP_BTN_SHOOT : 0)};
                 }
                 else if (autoplay) autoplay_input(&g.cur, &in);
-                else in.seat[0] = wp_keymap_read(&g.km, SDL_GetKeyboardState(NULL));
+                else in.seat[0] = wp_seat_input_merge(wp_keymap_read(&g.km, SDL_GetKeyboardState(NULL)), wp_gamepad_read(&g.pad));
+                if (g.replay_ok) wp_replay_record(&g.rlog, &g.cur, &in);   /* exactly what sim_step gets */
                 Uint64 t0 = SDL_GetTicksNS();
                 g.prev = g.cur;
                 sim_step(&g.cur, &in);
@@ -430,22 +508,24 @@ int main(int argc, char **argv) {
                 acc -= tick_ns;
             }
             float alpha = (float)acc / (float)tick_ns;
+            if (g.rp.active && g.rp.slow) alpha = ((float)(g.rp.sub & 1) * (float)tick_ns + (float)acc) / (2.0f * (float)tick_ns);
+            const SimState *vp = g.rp.active ? &g.rp.prev : &g.prev, *vc = g.rp.active ? &g.rp.cur : &g.cur;   /* what we show */
 
             const WpAvatarStyle *st = &wp_avatar_styles[g.rctx.style];
             int f = st->pixel_factor;
             int tw = w / f, th = h / f;
             /* camera eases toward play (time-based so it's frame-rate independent) */
-            float bx = (float)g.cur.ball.pos.x / 65536.0f, by = (float)g.cur.ball.pos.y / 65536.0f;
-            int me = g.cur.seat_player[0];
-            float fx_ = me >= 0 ? (float)g.cur.players[me].pos.x / 65536.0f * 0.6f + bx * 0.4f : bx;
-            float fy_ = me >= 0 ? (float)g.cur.players[me].pos.y / 65536.0f * 0.6f + by * 0.4f : by;
+            float bx = (float)vc->ball.pos.x / 65536.0f, by = (float)vc->ball.pos.y / 65536.0f;
+            int me = vc->seat_player[0];
+            float fx_ = me >= 0 ? (float)vc->players[me].pos.x / 65536.0f * 0.6f + bx * 0.4f : bx;
+            float fy_ = me >= 0 ? (float)vc->players[me].pos.y / 65536.0f * 0.6f + by * 0.4f : by;
             if (g.demo) { fx_ = 0; fy_ = 0; }
             float ease = 1.0f - expf(-dts * 3.0f);
             g.cam.cx += (fx_ * 0.6f - g.cam.cx) * ease;
             g.cam.cy += (fy_ * 0.5f - 1.5f - g.cam.cy) * ease;
             WpCamera cam = g.cam;
             cam.w = tw; cam.h = th;
-            cam.ppm = (float)tw / zoom_view(g.zoom, &g.cur);
+            cam.ppm = (float)tw / zoom_view(g.zoom, vc);
             if (f > 1) {
                 if (!g.lowres || g.lowres_w != tw || g.lowres_h != th) {
                     if (g.lowres) SDL_DestroyTexture(g.lowres);
@@ -458,50 +538,63 @@ int main(int argc, char **argv) {
             SDL_SetRenderDrawColor(g.ren, 18, 40, 22, 255);
             SDL_RenderClear(g.ren);
             g.rctx.frame_events = frame_ev;
-            wp_render_match(g.ren, &g.rctx, &cam, &g.prev, &g.cur, alpha, dts);
+            wp_render_match(g.ren, &g.rctx, &cam, vp, vc, alpha, dts);
             if (f > 1) {
                 SDL_SetRenderTarget(g.ren, NULL);
                 SDL_RenderTexture(g.ren, g.lowres, NULL, NULL);
             }
             SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
-            char buf[160];
-            if (g.cur.half_ticks) {                            /* broadcast clock, 9x (D-036) */
+            char buf[256];
+            if (vc->half_ticks) {                            /* broadcast clock, 9x (D-036) */
                 int mm, ss, added, extra;
-                sim_clock_display(&g.cur, &mm, &ss, &added, &extra);
-                if (extra > 0) snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %d+%d:%02d   (+%d)", g.cur.score[0], g.cur.score[1],
+                sim_clock_display(vc, &mm, &ss, &added, &extra);
+                if (extra > 0) snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %d+%d:%02d   (+%d)", vc->score[0], vc->score[1],
                                         mm, extra / 60, extra % 60, added);
-                else if (added > 0) snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02d:%02d   (+%d)", g.cur.score[0], g.cur.score[1], mm, ss, added);
-                else snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02d:%02d   %s", g.cur.score[0], g.cur.score[1], mm, ss,
-                              g.cur.half ? "2ND HALF" : "1ST HALF");
+                else if (added > 0) snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02d:%02d   (+%d)", vc->score[0], vc->score[1], mm, ss, added);
+                else snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02d:%02d   %s", vc->score[0], vc->score[1], mm, ss,
+                              vc->half ? "2ND HALF" : "1ST HALF");
             } else {
-                unsigned secs = g.cur.tick / WP_TICK_HZ;
-                snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02u:%02u", g.cur.score[0], g.cur.score[1], secs / 60, secs % 60);
+                unsigned secs = vc->tick / WP_TICK_HZ;
+                snprintf(buf, sizeof buf, "WILDPITCH  %d - %d   %02u:%02u", vc->score[0], vc->score[1], secs / 60, secs % 60);
             }
             SDL_RenderDebugText(g.ren, 12, 12, buf);
-            {   /* hints show the player's actual keys */
+            if (g.rp.active) {                                 /* instant replay overlay */
+                const char *msg = g.rp.slow ? "REPLAY  1/2" : "REPLAY";
+                float sc = 3.0f;
+                SDL_SetRenderScale(g.ren, sc, sc);
+                SDL_SetRenderDrawColor(g.ren, 255, 90, 70, 255);
+                SDL_RenderDebugText(g.ren, (float)w / sc - 8.0f * (float)strlen(msg) - 12.0f / sc, 12.0f / sc, msg);
+                SDL_SetRenderScale(g.ren, 1, 1);
+                SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
+                snprintf(buf, sizeof buf, "REPLAY  %s%s: slow motion   any other key or button: back to live",
+                         wp_keymap_key_name(&g.km, WP_KEY_REPLAY), wp_gamepad_connected(&g.pad) ? " / Back" : "");
+            } else if (wp_gamepad_connected(&g.pad)) {         /* pad hint: its own face labels */
+                wp_gamepad_hint(&g.pad, buf, (int)sizeof buf);
+            } else {   /* hints show the player's actual keys */
                 const WpKeymap *k = &g.km;
-                snprintf(buf, sizeof buf, "%s/%s/%s/%s move  %s sprint  %s pass (hold: through, near their ball: tackle)  %s lob  "
-                         "%s shoot  %s chip  %s switch  %s zoom  %s look  Esc menu",
+                snprintf(buf, sizeof buf, "%s/%s/%s/%s move  %s sprint  %s pass (hold: through; tackle)  %s lob  "
+                         "%s shoot  %s chip  %s switch  %s zoom  %s look  %s replay  Esc menu",
                          wp_keymap_key_name(k, WP_KEY_UP), wp_keymap_key_name(k, WP_KEY_LEFT), wp_keymap_key_name(k, WP_KEY_DOWN),
                          wp_keymap_key_name(k, WP_KEY_RIGHT), wp_keymap_key_name(k, WP_KEY_SPRINT), wp_keymap_key_name(k, WP_KEY_PASS),
                          wp_keymap_key_name(k, WP_KEY_LOB), wp_keymap_key_name(k, WP_KEY_SHOOT), wp_keymap_key_name(k, WP_KEY_CHIP),
-                         wp_keymap_key_name(k, WP_KEY_SWITCH), wp_keymap_key_name(k, WP_KEY_ZOOM), wp_keymap_key_name(k, WP_KEY_LOOK));
+                         wp_keymap_key_name(k, WP_KEY_SWITCH), wp_keymap_key_name(k, WP_KEY_ZOOM), wp_keymap_key_name(k, WP_KEY_LOOK),
+                         wp_keymap_key_name(k, WP_KEY_REPLAY));
             }
             SDL_RenderDebugText(g.ren, 12, (float)h - 20, buf);
-            wp_hud_player(g.ren, &g.cur, 0, w, h);             /* controlled player's stats + energy (D-034) */
-            if (g.cur.phase == WP_PHASE_HALFTIME || g.cur.phase == WP_PHASE_FULLTIME) {
+            wp_hud_player(g.ren, vc, 0, w, h);             /* controlled player's stats + energy (D-034) */
+            if (vc->phase == WP_PHASE_HALFTIME || vc->phase == WP_PHASE_FULLTIME) {
                 char msg[64];
-                snprintf(msg, sizeof msg, "%s   RED %d - %d BLUE", g.cur.phase == WP_PHASE_HALFTIME ? "HALF TIME" : "FULL TIME",
-                         g.cur.score[0], g.cur.score[1]);
+                snprintf(msg, sizeof msg, "%s   RED %d - %d BLUE", vc->phase == WP_PHASE_HALFTIME ? "HALF TIME" : "FULL TIME",
+                         vc->score[0], vc->score[1]);
                 float sc = 3.0f;
                 SDL_SetRenderScale(g.ren, sc, sc);
                 SDL_SetRenderDrawColor(g.ren, 255, 235, 90, 255);
                 SDL_RenderDebugText(g.ren, ((float)w / sc - 8.0f * (float)strlen(msg)) * 0.5f, (float)h / sc * 0.22f, msg);
                 SDL_SetRenderScale(g.ren, 1, 1);
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
-                const char *sub = g.cur.phase == WP_PHASE_HALFTIME ? "teams change ends" : "Esc - menu - Restart match";
+                const char *sub = vc->phase == WP_PHASE_HALFTIME ? "teams change ends" : "Esc - menu - Restart match";
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(sub), (float)h * 0.22f + 34, sub);
-            } else if (g.cur.phase == WP_PHASE_GOAL) {
+            } else if (vc->phase == WP_PHASE_GOAL) {
                 const char *msg = "G O A L !";
                 float sc = 4.0f;
                 SDL_SetRenderScale(g.ren, sc, sc);
@@ -509,22 +602,29 @@ int main(int argc, char **argv) {
                 SDL_RenderDebugText(g.ren, ((float)w / sc - 8.0f * (float)strlen(msg)) * 0.5f, (float)h / sc * 0.22f, msg);
                 SDL_SetRenderScale(g.ren, 1, 1);
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
-            } else if (g.cur.phase == WP_PHASE_OUT || g.cur.restart_kind) {
-                static const char *RS[5] = {"OUT", "THROW-IN", "CORNER", "GOAL KICK", "KICK-OFF"};
-                const char *lab = RS[g.cur.restart_kind < 5 ? g.cur.restart_kind : 0];
-                char rb[48];
-                snprintf(rb, sizeof rb, "%s - %s", lab, g.cur.restart_team == 0 ? "RED" : "BLUE");
+            } else if (vc->phase == WP_PHASE_OUT || vc->restart_kind) {
+                static const char *RS[7] = {"OUT", "THROW-IN", "CORNER", "GOAL KICK", "KICK-OFF", "FREE KICK", "PENALTY"};
+                const char *lab = RS[vc->restart_kind < 7 ? vc->restart_kind : 0];
+                char rb[64];
+                if (vc->restart_kind == WP_RS_FREEKICK && vc->restart_indirect)      /* D-041 */
+                    snprintf(rb, sizeof rb, "OFFSIDE - indirect free kick %s", vc->restart_team == 0 ? "RED" : "BLUE");
+                else if (vc->restart_kind == WP_RS_FREEKICK || vc->restart_kind == WP_RS_PENALTY)   /* D-040 */
+                    snprintf(rb, sizeof rb, "FOUL - %s %s", lab, vc->restart_team == 0 ? "RED" : "BLUE");
+                else snprintf(rb, sizeof rb, "%s - %s", lab, vc->restart_team == 0 ? "RED" : "BLUE");
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(rb), 40, rb);
+            } else if (vc->adv_ticks) {                       /* D-040: foul, play on */
+                const char *ab = "ADVANTAGE";
+                SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(ab), 40, ab);
             }
             if (g.show_debug) {
-                const WpBall *b = &g.cur.ball;
+                const WpBall *b = &vc->ball;
                 float bs = sqrtf((float)b->vel.x * (float)b->vel.x + (float)b->vel.y * (float)b->vel.y) / 65536.0f;
-                snprintf(buf, sizeof buf, "tick %u  sim %.3f ms  vsync %s  frame %.1f ms", g.cur.tick, g.sim_ms_avg,
+                snprintf(buf, sizeof buf, "tick %u  sim %.3f ms  vsync %s  frame %.1f ms", vc->tick, g.sim_ms_avg,
                          vsync ? "on" : "off", (double)dts * 1000.0);
                 SDL_RenderDebugText(g.ren, 12, 28, buf);
                 snprintf(buf, sizeof buf, "ball %.1f m/s  h %.2f m  vz %.1f  spin %.1f  owner %d  phase %d  events %04x",
                          (double)bs, (double)b->z / 65536.0, (double)b->vz / 65536.0, (double)b->spin / 65536.0,
-                         b->owner, g.cur.phase, frame_ev);
+                         b->owner, vc->phase, frame_ev);
                 SDL_RenderDebugText(g.ren, 12, 40, buf);
             }
         }
@@ -553,6 +653,7 @@ int main(int argc, char **argv) {
             printf("avg %.1f fps over %.1f s (display %.0f Hz, vsync %s)\n", (double)total_frames / secs, secs,
                    m ? (double)m->refresh_rate : 0.0, vsync ? "on" : "off");
     }
+    wp_gamepad_close(&g.pad);
     SDL_Quit();
     return 0;
 }

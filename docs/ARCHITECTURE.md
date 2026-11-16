@@ -25,6 +25,7 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
   team_plan.c           per-team roles each tick (D-030): ball-winner (hysteresis), cover, capped markers, rest
                         defence, near-support, runner -> SimState.plan[2]; read by brain.c
   formation.c           ball-dependent formation blocks in/out of possession, blended by poss_fade -> shape_spot()
+  offside.c             offside line / flags / call (D-041)
   setpiece.c            receiving spots for throw-ins and goal kicks (D-038)
   clock.c               match clock (D-036): halves at 9x, stoppage time, half time / change of ends, full time
   stats.c               player stats (D-034): generation per slot, stat_k(), player_top_speed(), stamina_step()
@@ -33,6 +34,8 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
                         WpSeatInput; replaced by the CP0.3 instinct AI. SimState.flags WP_SIMF_STATIC_OTHERS = statues
 src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   main.c                window, input -> WpInput, fixed-step loop, camera, HUD, flags (--demo --gallery
+  gamepad.c             SDL3 gamepad hotplug + mapping to WpSeatInput (D-042)
+  replay.c              last-10-s replay: snapshots + input log, re-simulated (D-042)
   hud.c                 controlled player's stats + energy bar (D-034)
   stadium.c             stands, advertising boards (WILDPITCH + football, dedication at each board's right end), corner
                         flags (D-033); board positions from tuning.h T_BOARD_* (the sim's walls)

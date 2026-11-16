@@ -457,3 +457,34 @@ setting Off / Low / Normal / High, default Normal.
 - **Receiving:** no takeover once the ball is < 0.6 s away - a held stick is the first-touch direction.
 - **Chase cone (D-037) on an opponent with the ball:** a stick held roughly at the carrier (<= 12 m) is turned
   (same cone and cap) toward where you meet him; on an opponent's pass in flight it already applies.
+
+## D-040 — Fouls, free kicks, penalties, advantage (2026-11-16, CP0.4)
+- **Fouls** (`tackle.c`): a tackle whose foot misses the ball but comes within 0.9 m of an opponent, or that wins
+  the ball through a man running >= 2.5 m/s from behind (within ~60 deg of his back). AI vs AI: ~0.2-0.4 fouls/min.
+- **Advantage:** a missed-ball foul while the fouled team still has it = play on (HUD "ADVANTAGE"); if they lose it
+  within 1.5 s the free kick is given after all.
+- **Free kick** (`restart_foul`): direct, at the foul; opponents 9.15 m scaled; the defending AI builds a wall (2 in
+  5v5, 3 in 7v7) when it's within 40% of the length of goal; the AI taker shoots from <= 24 m with a decent angle,
+  otherwise passes. **Penalty** for a direct foul in the box: from the mark (11/105 of the length), the team's best
+  finisher takes it, everyone else out of the box and the D, the keeper on his line.
+- `WpMatchConfig.rules` (`WP_RULE_FOULS | WP_RULE_OFFSIDE`): on in the game formats, off on the bare regression
+  pitch (isolation tests have no real defence). The half never ends in the middle of a set piece or advantage.
+
+## D-041 — Offside (2026-11-16, CP0.4)
+`offside.c`: at every kick / header, team-mates beyond the ball and the second-last opponent in the other half are
+flagged (level = onside); if a flagged man is the next to play it - before an opponent, or an onside team-mate /
+the passer taking a new touch - offside: indirect free kick where he played it (HUD "OFFSIDE"). Throw-ins, goal
+kicks and corners can't be offside. A goal straight from an indirect free kick is a goal kick. AI: never passes to
+a man in an offside position, waits on the line (0.3 m onside) and times runs in behind when the carrier has
+2.5 m of room; formation spots stay onside. With offside on, the D-035 "last man" stand-in is off. Measured
+(7v7, 20 x 5 min, stats on): rules off 54 goals / 109 shots; fouls + offside 42 / 92 (no more camping in behind).
+
+## D-042 — Gamepad, instant replay (2026-11-16, CP0.4, subagent)
+- **Gamepad** (`gamepad.c`, SDL3 gamepad, hotplug): left stick (radial deadzone 0.2) / D-pad move; South pass /
+  tackle, East shoot, West lob, North chip, RB or RT sprint, LB switch, R3/L3 zoom/look, Back replay (slow-mo while
+  replaying), Start menu (D-pad / A / B drive the menu). Keyboard and pad together: the keyboard's direction wins,
+  buttons OR. Pure mapping unit-checked (`--check-gamepad`); untested on real hardware.
+- **Replay** (`replay.c`): the last 10-12 s re-simulated from a SimState snapshot (every 2 s) + the logged
+  WpInput of every tick (~42 KB static); R / Back starts it, R / Back toggles slow motion, any other key returns to
+  the paused live match (never written). `--check-replay` (ctest) proves the replay hash equals the live run tick by
+  tick - it fails if sim_step ever depends on anything outside SimState + WpInput.
