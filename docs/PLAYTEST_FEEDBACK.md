@@ -150,3 +150,24 @@ Format:
   "Assisted movement toward the ball" (4 researchers), then implement.
 - Owner answers on the research (AskUserQuestion): AI-pass receive help "Yes, help"; released stick "No, stand still";
   setting "Menu, default Normal". Implemented as D-037.
+
+## 2026-11-16 — after CP0.3d (clock + movement assist)
+- **Answers:** defender cone on opponents' passes: "yes"; receive help still sprints on AI passes: "yes".
+- **Feedback (verbatim):** "the throw-in should be from hands like done in actual matches with similar stance and
+  during throw-in players should be spread out like in actual matches to receive the ball, similar for coner enforce
+  minimum distance criteria, when goalkeeper passing, have cases for foot vs hand throw like in actual matches, the
+  goal kick should be taken from the line as done in actual matches with everyone going out of D area and the team
+  spreading out to receive the ball, when sprinting don't make the player's slow all the time instead when spring
+  make it like the ball is touched a bit hard thus going a bit farther from player while sprinting, only during touch
+  part is the speed a bit slow, otherwise it is still fast - now when turning direction during sprinting, it will
+  first need to reach the ball again and only then the direction changes, the press of pass button for thrugh ball
+  should have a bit bigger timer, only when pressed for that threshold should it convert to throughball with a meter
+  and the meter's power should always be more than a normal pass power (like meter's 5% should also be more than
+  that of a standard normal pass), also still there are sometimes when the pass is too slow for where the player is
+  and during that times sometimes if key is pressed the receiver moves away instead of first receiving the ball,
+  another thing the system assist to ensure defender goes towards the ball should also work for active player being
+  controlled if we are generally moving in the direction of the ball"
+- **Action:** CP0.3e (D-038..): restarts like real matches (throw-in stance from hands, distances, spread to receive;
+  corners 9.15 m scaled; goal kicks from the goal-area line, opponents out of the box); keeper distribution
+  roll / throw / punt; sprint dribble = longer knock-ons, slowdown only at the touch; through ball longer threshold +
+  always firmer than a tap; receiver can't leave a slow incoming pass; chase cone also onto an opponent's ball.

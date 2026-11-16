@@ -99,6 +99,9 @@ void team_input(const SimState *s, int i, WpSeatInput *out);
 void team_steer(const WpPlayer *p, fv2 target, fx deadzone, fx slow_radius, WpSeatInput *out);
 void team_steer_speed(const SimState *s, const WpPlayer *p, fv2 target, fx speed, WpSeatInput *out);   /* through a point at speed (m/s, his own top speeds) */
 
+/* setpiece.c (CP0.3e): a receiving spot for player i at the pending/live throw-in or goal kick (1 = go there) */
+int  setpiece_spot(const SimState *s, int i, fv2 *at);
+
 /* clock.c (D-036) */
 void clock_step(SimState *s);
 void clock_add_stoppage(SimState *s, int game_seconds);
@@ -139,6 +142,10 @@ static inline void ball_to_hands(SimState *s, int i) {
     b->held = 1;
     b->pos = fv2_add(p->pos, fv2_from_angle(p->facing, FX(0.25)));
     b->z = FX(1.0); b->vz = 0; b->vel = p->vel; b->spin = 0;
+    if (p->role != WP_ROLE_KEEPER && s->restart_kind == WP_RS_THROW) {   /* a throw-in: both hands, over his head */
+        b->pos = fv2_add(p->pos, fv2_from_angle(p->facing, FX(0.2)));   /* just inside the line (he stands outside) */
+        b->z = FX(2.15);
+    }
 }
 
 /* Can player i take control of a loose ball? Everyone in a real match (AI included, CP0.3); with

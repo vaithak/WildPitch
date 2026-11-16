@@ -226,7 +226,7 @@ int main(void) {
     {
         /* along the pitch (space ahead); D-021: a hold is longer up to the line, a tap stops 2.5 m inside it */
         fx prev = 0;
-        for (int hold = 6; hold <= 36; hold += 10) {
+        for (int hold = 6; hold <= 36; hold += (hold < T_PASS_TAP_TICKS ? T_PASS_TAP_TICKS - 6 + 2 : 36 - T_PASS_TAP_TICKS - 2)) {   /* tap, just past the threshold, full */
             scene(fv2_make(-FX(10.0), FX(6.0)), fv2_make(-FX(10.0), -FX(9.0)));
             for (int t = 0; t < hold; t++) step2((WpSeatInput){127, 0, WP_BTN_PASS}, NOIN);
             for (int t = 0; t < 12 && !(step2((WpSeatInput){127, 0, 0}, NOIN) & WP_EV_KICK); t++) {}
@@ -256,7 +256,7 @@ int main(void) {
             }
             if (s.ball.owner != 3) continue;
             fv2 to = fv2_norm(fv2_sub(s.players[4].pos, s.players[3].pos));
-            int hold = 15 + trial * 24 / 20;
+            int hold = T_PASS_TAP_TICKS + 3 + trial * (36 - T_PASS_TAP_TICKS - 3) / 20;   /* through balls across the meter */
             for (int t = 0; t < hold; t++) step2((WpSeatInput){c127(to.x), c127(to.y), WP_BTN_PASS}, NOIN);
             fx x_kick = 0; int kicked = 0, got = -1; uint16_t ev = 0;
             fx max_back = 0;

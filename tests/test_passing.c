@@ -96,7 +96,7 @@ int main(void) {
     CHECKF(s.seat_player[0] == MATE, "auto-switch to the player nearest a loose ball: seat %d", s.seat_player[0]);
     CHECK(s.players[ME].charge_kind == 0xFF && s.players[ME].kick_charge == 0);
     /* 5. through ball (hold J): lands in the space AHEAD of the receiver, who runs onto it and gets it */
-    for (int hold = 14; hold <= 36; hold += 22) {
+    for (int hold = T_PASS_TAP_TICKS + 2; hold <= 36; hold += 36 - T_PASS_TAP_TICKS - 2) {   /* just past the threshold, full */
         scene(&s, fv2_make(-FX(12.0), 0), fv2_make(-FX(4.0), FX(3.0)), fv2_make(-FX(12.0), -FX(9.0)));
         fv2 to = fv2_norm(fv2_sub(s.players[MATE].pos, s.players[ME].pos));
         int8_t sx = (int8_t)(to.x * 127 / FX_ONE), sy = (int8_t)(to.y * 127 / FX_ONE);
@@ -111,7 +111,7 @@ int main(void) {
         printf("through ball (hold %d): received by %d, %.1f m beyond where he started\n", hold, got,
                tod(s.players[MATE].pos.x - mate_x0));
         CHECKF(got == MATE, "through ball hold %d: ended with %d", hold, got);
-        CHECKF(s.players[MATE].pos.x - mate_x0 > (hold > 20 ? FX(6.0) : FX(1.5)), "through ball hold %d: only %.1f m ahead",
+        CHECKF(s.players[MATE].pos.x - mate_x0 > (hold > T_PASS_TAP_TICKS + 8 ? FX(6.0) : FX(1.5)), "through ball hold %d: only %.1f m ahead",
                hold, tod(s.players[MATE].pos.x - mate_x0));
     }
 

@@ -238,7 +238,7 @@ int main(void) {
     {
         WpMatchConfig c7 = sim_config_7v7();
         /* a) blue knocks it over the touchline -> OUR throw-in: control jumps to the taker, ball in his hands at the
-         *    line, blue held 4 m off; S throws it to a team-mate */
+         *    line (over his head), blue held 2 m off; S throws it to a team-mate */
         sim_init(&s, &c7);
         int blue = 2 * s.n_per_side - 2;
         s.ball.pos = fv2_make(FX(3.0), (s.pitch.width / 2) - FX(1.5)); s.ball.vel = fv2_make(0, FX(4.0)); s.ball.owner = -1;
@@ -257,7 +257,7 @@ int main(void) {
                s.restart_team, taker, s.seat_player[0], s.ball.held, tod(closest_blue));
         CHECK(s.restart_kind == WP_RS_THROW && s.restart_team == 0 && taker >= 0 && s.players[taker].team == 0);
         CHECK(s.seat_player[0] == taker && s.ball.held && s.ball.owner == taker);
-        CHECKF(closest_blue >= T_RESTART_DIST - FX(0.1), "blue %.1f m from the throw", tod(closest_blue));
+        CHECKF(closest_blue >= T_THROWIN_DIST - FX(0.1), "blue %.1f m from the throw", tod(closest_blue));   /* Law 15: 2 m */
         {   /* aim the throw at the nearest team-mate (8-way keys, like a human) */
             int best = -1; fx bd = 0;
             for (int j = 1; j < s.n_per_side; j++) {

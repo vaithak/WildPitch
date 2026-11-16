@@ -82,7 +82,8 @@ enum {
  * The avatar reads the same fields (foot, windup) so the visible strike lands on the contact tick. */
 enum { WP_KICK_PASS = 0, WP_KICK_SHOT, WP_KICK_CHIP, WP_KICK_HEADER, WP_KICK_THROUGH, WP_KICK_LOB,
        WP_KICK_THROW,        /* keeper's throw / roll out from the hands (and throw-ins) */
-       WP_KICK_PUNT };       /* keeper's kick from the hands, long and high */
+       WP_KICK_PUNT,         /* keeper's kick from the hands, long and high */
+       WP_KICK_ROLL };       /* keeper's underarm roll along the ground (short distribution, CP0.3e) */
 typedef struct {
     fx       power;              /* horizontal ball speed at contact, m/s */
     fx       vz;                 /* vertical ball speed at contact, m/s */

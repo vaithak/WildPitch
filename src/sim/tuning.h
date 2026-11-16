@@ -31,7 +31,10 @@
 /* ---- match flow ---- */
 #define T_GOAL_PAUSE_TICKS 120        /* celebration before kickoff reset */
 #define T_OUT_PAUSE_TICKS  45         /* pause before a throw-in / corner / goal kick is set (players reposition) */
-#define T_RESTART_DIST     FX(4.0)    /* opponents keep this far from a set piece until it's played */
+#define T_RESTART_DIST     FX(4.0)    /* opponents keep this far from a set piece until it's played (fallback) */
+#define T_THROWIN_DIST     FX(2.0)    /* Law 15: opponents 2 m from the thrower (CP0.3e) */
+#define T_CORNER_DIST_FRAC FX(0.0871) /* corners: 9.15 m on a 105 m pitch, scaled to ours (7.0 m on 80 m) */
+#define T_GOALAREA_FRAC    FX(0.0524) /* goal area depth = 5.5 / 105 of the length (goal kicks from its line) */
 /* advertising boards around the pitch (owner request, D-033): players can't cross them, a low ball rebounds */
 #define T_BOARD_SIDE       FX(3.0)    /* boards this far outside the touchlines ... */
 #define T_BOARD_END        FX(4.5)    /* ... and behind the goal lines (room for the nets) */
@@ -158,7 +161,9 @@
 #define T_PASS_MAX_DIST    FX(32.0)   /* ... and beyond this not picked at all */
 #define T_PASS_RUNNER_MS   FX(2.0)    /* receiver moving away from the passer faster than this = a runner */
 #define T_SPRINT_SPILL     FX(0.12)   /* extra first-touch spill when receiving at a sprint */
-#define T_PASS_TAP_TICKS   12         /* J released within this (200 ms) = tap pass; held longer = through ball */
+#define T_PASS_TAP_TICKS   20         /* S released within this (333 ms) = tap pass; held longer = through ball (CP0.3e: was 12) */
+#define T_THROUGH_MIN_K    FX(1.10)   /* a through ball is struck at least this x a tap to the same man (CP0.3e) */
+#define T_THROUGH_DEEP_S   FX(1.2)    /* full meter: the meeting point this much further along his run (s) */
 #define T_THROUGH_STRIDE   FX(0.8)    /* through ball meets the runner this far ahead of his feet */
 #define T_THROUGH_MAX      FX(24.0)   /* hardest through ball (futsal kicks ~24 m/s) */
 #define T_THROUGH_MARGIN_X FX(3.0)    /* meeting point stays this far inside the goal line ... */
@@ -243,6 +248,10 @@
 #define T_KEEPER_HOLD_MAX  360        /* a keeper may hold the ball in his hands this long (6 s), then it's released */
 #define T_AI_KEEPER_HOLD   50         /* the AI keeper looks up for this long before distributing */
 #define T_THROW_SPEED      FX(11.0)   /* keeper's throw with nobody targeted */
+#define T_THROWIN_ARRIVE_Z FX(0.9)    /* a throw-in drops into the receiver at this height */
+#define T_ROLL_MAX         FX(18.0)   /* keeper distribution (CP0.3e): roll it along the ground up to this far ... */
+#define T_THROW_MAX        FX(32.0)   /* ... throw it overarm up to this far, punt beyond */
+#define T_ROLL_SPEED       FX(10.0)   /* untargeted roll */
 #define T_PUNT_SPEED       FX(21.0)   /* keeper's punt from the hands ... */
 #define T_PUNT_VZ          FX(8.0)    /* ... and its loft */
 #define T_KEEPER_RUSH_V    FX(8.0)    /* he only comes out for loose balls slower than this (never to cut out a shot) */

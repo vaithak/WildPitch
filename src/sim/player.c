@@ -220,30 +220,50 @@ static fv2 through_solve(const SimState *s, int r, fx h, fx pace, fv2 *meet, fx 
     }
     fv2 tap_meet; fx tap_t; uint8_t tap_plan;
     fx tap_v0 = fv2_len(pass_solve(s, r, pace, &tap_meet, &tap_t, &tap_plan));
+    /* CP0.3e (owner: "the meter's power should always be more than a normal pass"): every candidate meeting point
+     * P(t) on his run is met IN STRIDE (the ball gets there exactly when he does - solved per t), and is only allowed
+     * if that ball is struck at least T_THROUGH_MIN_K x a tap to him and arrives at a controllable pace (va band).
+     * Of the allowed window [t_a, t_b] the hold picks the depth: h = 0 the earliest/firmest, h = 1 the deepest. */
+    fx v_min = fx_mul(tap_v0, T_THROUGH_MIN_K);
     for (int attempt = 0; attempt < 3; attempt++) {
         fx s_plan = attempt == 2 ? fx_max(FX(5.0), fx_mul(sp, FX(0.75))) : sp;
         fx va_lo = fx_max(FX(5.0), s_plan - FX(1.5)), va_hi = fx_max(fx_min(fx_mul(s_plan, FX(1.5)), FX(12.0)), va_lo);
-        fx va = attempt == 0 ? va_hi - fx_mul(h, va_hi - va_lo) : va_hi;
-        fx R_va = ball_roll_distance(va), T_va = ball_roll_time(va);
+        int ka = -1, kb = -1;
+        fv2 Pk[81]; fx vk[81] = {0};
         for (int k = 1; k <= 80; k++) {
             fx t = FX(0.05) * k;
             fx run = fx_max(fx_mul(s_plan, t - delay), 0);
             fv2 P = fv2_add(q->pos, fv2_scale(u, run + T_THROUGH_STRIDE));
             if (fx_abs(P.x) > hl - T_THROUGH_MARGIN_X || fx_abs(P.y) > hw - T_THROUGH_MARGIN_Y) break;
             fx d = fv2_len(fv2_sub(P, b));
-            fx v0 = ball_roll_speed_for(d + R_va);
-            if (v0 > T_THROUGH_MAX) continue;
-            if (ball_roll_time(v0) - T_va > t) continue;   /* ball not there in time yet */
-            *meet = fv2_sub(P, fv2_scale(u, T_THROUGH_STRIDE));
-            *t_meet = t;
+            /* launch speed covering d in exactly t: travel time falls as v0 rises - bisect */
+            fx lo = ball_roll_speed_for(d), hi = T_THROUGH_MAX;
+            if (lo >= hi) continue;
+            for (int it = 0; it < 18; it++) {
+                fx mid = (lo + hi) / 2;
+                fx tt = ball_roll_time(mid) - ball_roll_time(ball_roll_speed_for(ball_roll_distance(mid) - d));
+                if (tt > t) lo = mid; else hi = mid;
+            }
+            fx v0 = hi, va = ball_roll_speed_for(ball_roll_distance(v0) - d);
+            if (v0 > T_THROUGH_MAX || v0 < v_min || va < va_lo || va > va_hi) continue;
+            if (ka < 0) ka = k;
+            kb = k;
+            Pk[k] = P; vk[k] = v0;
+        }
+        if (ka > 0) {
+            int k = ka + (int)(fx_mul(FX_INT(kb - ka), h) / FX_ONE);
+            while (k > ka && vk[k] == 0) k--;            /* a gap in the window: the nearest allowed point */
+            if (vk[k] == 0) k = ka;
+            *meet = fv2_sub(Pk[k], fv2_scale(u, T_THROUGH_STRIDE));
+            *t_meet = FX(0.05) * k;
             *plan = attempt < 2 ? WP_PLAN_STRIDE : WP_PLAN_RUN;
-            return fv2_scale(fv2_norm(fv2_sub(P, b)), fx_max(v0, tap_v0));
+            return fv2_scale(fv2_norm(fv2_sub(Pk[k], b)), vk[k]);
         }
     }
     /* short room: lead pass clamped inside the margins, runner eases to collect it */
     fv2 aim = clamp_box(s, tap_meet, T_THROUGH_MARGIN_X, T_THROUGH_MARGIN_Y);
     fx d = fv2_len(fv2_sub(aim, b)), f;
-    fx v0 = launch_for(d, pass_arrive(d, pace), T_THROUGH_MAX, &f);
+    fx v0 = fx_max(launch_for(d, pass_arrive(d, pace), T_THROUGH_MAX, &f), fx_mul(tap_v0, T_THROUGH_MIN_K));
     *meet = aim;
     *t_meet = f;
     *plan = WP_PLAN_RUN;
@@ -287,10 +307,24 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     int r = (int)p->kick.to - 1;
     fv2 meet = r >= 0 ? s->players[r].pos : b->pos;
     uint8_t plan = WP_PLAN_CLOSEST;
-    if (p->kick.kind == WP_KICK_THROW) {                  /* thrown / rolled out: like a pass, from the hands */
+    if (p->kick.kind == WP_KICK_THROW && p->role == WP_ROLE_KEEPER && from_hands) {   /* keeper's overarm throw */
+        b->vel = lob_velocity(s, r, p->kick.dir, &vz);
+    }
+    else if (p->kick.kind == WP_KICK_THROW) {             /* throw-in: from over the head, dropping into him */
         if (r >= 0) b->vel = pass_solve(s, r, pace, &meet, &t_meet, &plan);
         else b->vel = fv2_from_angle(p->kick.dir, T_THROW_SPEED);
         vz = FX(1.0);
+        fx hv = fv2_len(b->vel);
+        if (r >= 0 && hv > FX(1.0)) {                     /* arc it so it arrives at ~0.9 m (controllable, CP0.3e) */
+            fx t = fx_clamp(fx_div(fv2_len(fv2_sub(meet, b->pos)), hv), FX(0.2), FX(2.0));
+            vz = fx_div(T_THROWIN_ARRIVE_Z - b->z + fx_mul(fx_mul(T_GRAVITY, t), t) / 2, t);
+        }
+    }
+    else if (p->kick.kind == WP_KICK_ROLL) {              /* keeper's underarm roll: along the grass */
+        b->z = FX(0.1);
+        if (r >= 0) b->vel = pass_solve(s, r, pace, &meet, &t_meet, &plan);
+        else b->vel = fv2_from_angle(p->kick.dir, T_ROLL_SPEED);
+        vz = 0;
     }
     else if (p->kick.kind == WP_KICK_PUNT) b->vel = fv2_from_angle(p->kick.dir, T_PUNT_SPEED);
     else if (p->kick.kind == WP_KICK_LOB) b->vel = lob_velocity(s, r, p->kick.dir, &vz);
@@ -307,7 +341,10 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
             fx d_max = fx_max(d_tap, fx_min(ray_exit_dist(b->pos, u, hl, hw), ball_roll_distance(T_THROUGH_FREE_MAX)));
             d = fx_lerp(d_tap, d_max, p->kick.power);
         }
-        b->vel = fv2_scale(u, ball_roll_speed_for(d));
+        fx v = ball_roll_speed_for(d);
+        if (p->kick.kind == WP_KICK_THROUGH)                      /* the meter is always firmer than a tap (CP0.3e) */
+            v = fx_max(v, fx_mul(ball_roll_speed_for(d_tap), T_THROUGH_MIN_K));
+        b->vel = fv2_scale(u, v);
     }
     else if (p->kick.kind == WP_KICK_SHOT || p->kick.kind == WP_KICK_CHIP) {
         /* shots keep only the part of the run ALONG the strike (extra pace); the sideways part would drag an
@@ -335,13 +372,19 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     fv2 aim = stick_dir(in, &has);
     if (s->phase != WP_PHASE_PLAY) { p->kick_charge = 0; p->charge_kind = 0xFF; return; }
 
-    /* keeper with the ball in his hands: S throw (to the ringed mate), A throw it high, D/W punt */
+    /* ball in the hands. Throw-in: S / A throw it. Keeper (CP0.3e, like real keepers): S rolls it to the ringed
+     * mate when he's close, throws it overarm when he's further; A throws it overarm; D/W punt it */
     if (s->ball.held && s->ball.owner == i) {
         if (p->action == WP_ACT_NONE && (pressed & (WP_BTN_PASS | WP_BTN_LOB | WP_BTN_SHOOT | WP_BTN_CHIP))) {
             WpKick k;
-            uint8_t kind = (pressed & WP_BTN_PASS) ? WP_KICK_THROW : (pressed & WP_BTN_LOB) ? WP_KICK_LOB : WP_KICK_PUNT;
-            if (kind == WP_KICK_PUNT && s->restart_kind == WP_RS_THROW) return;   /* a throw-in is thrown */
+            int throwin = s->restart_kind == WP_RS_THROW;
+            uint8_t kind = (pressed & (WP_BTN_PASS | WP_BTN_LOB)) ? WP_KICK_THROW : WP_KICK_PUNT;
+            if (kind == WP_KICK_PUNT && throwin) return;  /* a throw-in is thrown */
+            if (throwin && (pressed & WP_BTN_LOB)) kind = WP_KICK_LOB;   /* the long throw (as before) */
             make_kick(s, i, kind, 0, aim, has, &k);
+            if (!throwin && (pressed & WP_BTN_PASS) && k.to &&
+                fv2_len(fv2_sub(s->players[k.to - 1].pos, p->pos)) <= T_ROLL_MAX)
+                k.kind = WP_KICK_ROLL;                    /* short: roll it along the ground */
             sim_player_kick(s, i, &k);
         }
         p->kick_charge = 0; p->charge_kind = 0xFF;

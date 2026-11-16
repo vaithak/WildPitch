@@ -26,7 +26,8 @@ void restart_out(SimState *s, int touchline, fx x_or_y, int goal_side) {
         } else {
             s->restart_kind = WP_RS_GOALKICK;
             s->restart_team = (uint8_t)defending;
-            s->restart_spot = fv2_make(goal_side > 0 ? hl - T_GOALKICK_DEPTH : -hl + T_GOALKICK_DEPTH, 0);
+            fx ga = fx_mul(s->pitch.length, T_GOALAREA_FRAC), py = s->pitch.goal_width / 2;   /* Law 16 (CP0.3e) */
+            s->restart_spot = fv2_make(goal_side > 0 ? hl - ga : -hl + ga, x_or_y > 0 ? py : -py);
         }
     }
     s->restart_taker = -1;
@@ -92,7 +93,21 @@ void restart_step(SimState *s) {
             if (team_dir(s, q->team) > 0 && q->pos.x > -FX(0.2)) q->pos.x = -FX(0.2);
             if (team_dir(s, q->team) < 0 && q->pos.x < FX(0.2)) q->pos.x = FX(0.2);
         }
-    fx keep = ko ? kickoff_r(s) : T_RESTART_DIST;
+    fx keep = ko ? kickoff_r(s) : s->restart_kind == WP_RS_THROW ? T_THROWIN_DIST
+            : s->restart_kind == WP_RS_CORNER ? fx_mul(s->pitch.length, T_CORNER_DIST_FRAC) : T_RESTART_DIST;
+    if (s->restart_kind == WP_RS_GOALKICK) {             /* Law 16: opponents outside the penalty area until it's played */
+        fx hl = s->pitch.length / 2, depth = fx_mul(s->pitch.length, FX(0.15)), hw = fx_mul(s->pitch.width, FX(0.24));
+        int sg = team_dir(s, s->restart_team);           /* the kicking team defends -sg */
+        for (int j = other * s->n_per_side; j < (other + 1) * s->n_per_side; j++) {
+            WpPlayer *q = &s->players[j];
+            if (!in_own_box(s, s->restart_team, q->pos)) continue;
+            fx ex = -hl + depth + FX(0.5);               /* box edge, in the kicking team's frame */
+            fx toy = (q->pos.y > 0 ? hw : -hw) + (q->pos.y > 0 ? FX(0.5) : -FX(0.5));
+            fx outx = fx_abs((-hl + depth) - q->pos.x * sg), outy = fx_abs(toy - q->pos.y);
+            if (outx <= outy) q->pos.x = ex * sg;        /* nearest way out */
+            else q->pos.y = toy;
+        }
+    }
     for (int j = other * s->n_per_side; j < (other + 1) * s->n_per_side; j++) {
         WpPlayer *q = &s->players[j];
         fv2 d = fv2_sub(q->pos, b->pos);

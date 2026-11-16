@@ -537,7 +537,7 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
             const WpPlayer *q = &s->players[j];
             if (j == i) continue;
             fx d = dist(q->pos, b->pos);
-            if (d < FX(5.0) || d > FX(22.0)) continue;
+            if (d < FX(5.0) || d > T_THROW_MAX) continue;
             fx open = nearest_opp(&x, q->pos), lane = fx_min(pass_lane_clear(s, x.team, b->pos, q->pos), FX(4.0));
             fx sc = open + fx_mul(lane, FX(1.5)) + fx_mul((q->pos.x - b->pos.x) * x.sg, FX(0.1));
             if (open < FX(4.0) || lane < FX(2.0)) continue;
@@ -545,9 +545,10 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         }
         WpKick k = {0};
         k.foot = 1;
-        if (best >= 0) {                                 /* throw it to a free man */
+        if (best >= 0) {                                 /* a free man: roll it (short) or throw it overarm (CP0.3e) */
             fv2 d = fv2_sub(s->players[best].pos, b->pos);
-            k.kind = WP_KICK_THROW; k.dir = fx_atan2(d.y, d.x); k.to = (uint8_t)(best + 1);
+            k.kind = fv2_len(d) <= T_ROLL_MAX ? WP_KICK_ROLL : WP_KICK_THROW;
+            k.dir = fx_atan2(d.y, d.x); k.to = (uint8_t)(best + 1);
             k.power = T_THROW_SPEED; k.windup = T_KICK_WINDUP_CHIP;
         } else {                                         /* nobody free: punt it toward the furthest-forward mate */
             int fwd = -1; fx fx_best = 0;
@@ -558,6 +559,16 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
         }
         sim_player_kick(s, i, &k);
         return;
+    }
+    {   /* throw-in / goal kick for us: spread out to receive it (CP0.3e) */
+        fv2 at;
+        if (!owner && setpiece_spot(s, i, &at)) {
+            p->ai_act = AI_SHAPE;
+            p->ai_goal = at;
+            fx d = dist(at, p->pos);
+            team_steer_speed(s, p, at, fx_min(fx_mul(d, FX(2.0)), player_top_speed(s, i, d > FX(10.0))), out);
+            return;
+        }
     }
     /* kickoff: the team not kicking off holds its shape until the ball is first touched */
     if (s->restart_kind == WP_RS_KICKOFF && p->team != s->restart_team) {
