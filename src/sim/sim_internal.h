@@ -144,7 +144,7 @@ static inline void ball_to_hands(SimState *s, int i) {
     b->z = FX(1.0); b->vz = 0; b->vel = p->vel; b->spin = 0;
     if (p->role != WP_ROLE_KEEPER && s->restart_kind == WP_RS_THROW) {   /* a throw-in: both hands, over his head */
         b->pos = fv2_add(p->pos, fv2_from_angle(p->facing, FX(0.2)));   /* just inside the line (he stands outside) */
-        b->z = FX(2.15);
+        b->z = FX(2.0);                               /* between the raised hands of an average player */
     }
 }
 

@@ -293,7 +293,8 @@ static void boards(SimState *s) {
 
 void ball_step(SimState *s) {
     WpBall *b = &s->ball;
-    if (b->held) return;                                  /* in a keeper's hands: carried by control_owner, no physics */
+    if (b->held && b->owner >= 0) return;                 /* in a keeper's / thrower's hands: carried, no physics */
+    b->held = 0;                                          /* nobody holds it any more: it drops (never frozen) */
     fx move = fx_mul(ball_speed3(b), WP_DT);
     int n = 1 + (int)(move / T_SUBSTEP_MAX_MOVE);
     if (n > 12) n = 12;

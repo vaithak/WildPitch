@@ -147,6 +147,93 @@ typedef struct {             /* floats only: blended field-by-field */
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 static float smooth01(float t) { t = clampf(t, 0, 1); return t * t * (3 - 2 * t); }
 
+/* keeper cradle: forearms forward under the ball the sim holds 0.25 m in front at waist height (z 1.0) */
+#define CRADLE_SH  0.15f
+#define CRADLE_ELB 1.05f
+#define CRADLE_AB  (-0.12f)
+
+/* lerp toward v by k (keyframe chaining: x = key(x, v1, k1); x = key(x, v2, k2) ...) */
+static float key(float x, float v, float k) { return x + (v - x) * k; }
+
+/* Strikes that start from the hands (D-012 timing: release on the sim's contact tick tc = kick_windup).
+ * Fills the action pose `a` (pre-filled with the base pose) and returns its blend weight.
+ *  - THROW, outfield (a throw-in): both arms whip forward over the head, feet stay planted.
+ *  - THROW, keeper: overarm javelin/bowling action with the kick_foot-side arm, step in with the other foot.
+ *  - ROLL, keeper: crouched underarm bowl along the grass, front knee bent.
+ *  - PUNT, keeper: arms drop the ball forward, the leg swings up through it at knee/waist height (drop-kick).
+ * Arm angles are world-frame (0 = down, pi = up, > pi = behind the head) and kept on the positive side so the
+ * per-float blend in/out takes the short way round. */
+static float from_hands_pose(const WpAvatarPose *P, Pose *a, float t) {
+    float tc = P->kick_windup > 0.01f ? P->kick_windup : 0.1f;
+    int arm = P->kick_foot ? 1 : 0, off = 1 - arm;          /* index 1 = right side */
+    float cock = smooth01(t / fmaxf(tc * 0.45f, 0.03f));      /* draw back */
+    float rel = smooth01((t - tc * 0.45f) / fmaxf(tc * 0.55f, 0.03f));   /* drive to the release */
+    float fol = smooth01((t - tc) / 0.16f);                   /* follow-through */
+    float w = smooth01(t / 0.04f) * (1 - smooth01((t - (tc + 0.16f)) / 0.12f));   /* out before the 26-tick action ends */
+    if (P->kick_kind == WP_KICK_THROW && !P->keeper) {        /* throw-in */
+        for (int s = 0; s < 2; s++) {
+            float sh = 3.10f, el = 0.30f;
+            sh = key(sh, 3.28f, cock); el = key(el, 0.70f, cock);   /* ball drops further behind the head */
+            sh = key(sh, 2.35f, rel);  el = key(el, 0.15f, rel);    /* released just in front of the forehead */
+            sh = key(sh, 1.25f, fol);  el = key(el, 0.25f, fol);
+            a->sh[s] = sh; a->elb[s] = el; a->ab[s] = key(-0.20f, -0.08f, fol);
+            a->hip[s] = 0.02f; a->leg_out[s] = 0.03f;               /* both feet stay on the ground */
+            a->knee[s] = 0.06f + 0.22f * cock * (1 - fol) + 0.10f * fol;
+        }
+        a->lean = key(key(-0.12f, -0.26f, cock), 0.36f, rel * 0.6f + fol * 0.4f);
+        a->nod = key(0.10f, -0.05f, rel);
+        a->crouch = 0;
+        return w;
+    }
+    if (P->kick_kind == WP_KICK_THROW) {                      /* keeper overarm throw */
+        float sh = CRADLE_SH, el = CRADLE_ELB;
+        sh = key(sh, 3.95f, cock); el = key(el, 0.85f, cock);       /* ball cocked behind the shoulder */
+        sh = key(sh, 2.55f, rel);  el = key(el, 0.10f, rel);        /* arm straightens over the top */
+        sh = key(sh, 0.85f, fol);  el = key(el, 0.30f, fol);        /* and comes down across the body */
+        a->sh[arm] = sh; a->elb[arm] = el; a->ab[arm] = key(0.30f, 0.12f, rel);
+        a->sh[off] = key(1.45f, 0.55f, fol); a->elb[off] = 0.25f; a->ab[off] = key(0.25f, 0.55f, fol);   /* aims */
+        float step = smooth01(t / fmaxf(tc, 0.05f));
+        a->hip[off] = key(0.10f, 0.48f, step); a->knee[off] = 0.30f; a->leg_out[off] = 0.06f;
+        a->hip[arm] = key(0.0f, -0.38f, step); a->knee[arm] = 0.22f; a->leg_out[arm] = 0.08f;
+        a->lean = key(key(0.04f, -0.16f, cock), 0.34f, rel * 0.5f + fol * 0.5f);
+        a->crouch = 0.05f * step;
+        return w;
+    }
+    if (P->kick_kind == WP_KICK_ROLL) {                       /* keeper underarm roll */
+        float down = smooth01(t / fmaxf(tc * 0.6f, 0.05f));
+        float sh = CRADLE_SH, el = CRADLE_ELB;
+        sh = key(sh, -1.10f, cock); el = key(el, 0.10f, cock);      /* swings back past the hip */
+        sh = key(sh, 0.12f, rel);                                   /* skims the grass in front of the front foot */
+        sh = key(sh, 1.15f, fol);  el = key(el, 0.15f, fol);        /* and follows the ball out */
+        a->sh[arm] = sh; a->elb[arm] = el; a->ab[arm] = 0.08f;
+        a->sh[off] = key(CRADLE_SH, 0.45f, down); a->elb[off] = 0.45f; a->ab[off] = 0.55f;   /* hand toward the knee */
+        a->hip[off] = key(0.10f, 1.30f, down); a->knee[off] = key(0.30f, 2.20f, down); a->leg_out[off] = 0.08f;
+        a->hip[arm] = key(0.0f, -0.05f, down); a->knee[arm] = key(0.20f, 1.85f, down); a->leg_out[arm] = 0.10f;
+        a->lean = key(0.10f, 0.95f, down) - 0.15f * fol;   /* low on the bent front knee, back knee near the grass */
+        a->nod = 0.15f * down;
+        return w;
+    }
+    /* punt: arms push the ball out and let it drop, kicking leg swings up through it, slight lean back */
+    int kl = arm, sl = off;
+    float back = smooth01(t / fmaxf(tc - 0.07f, 0.03f));
+    float s1 = smooth01((t - (tc - 0.07f)) / 0.07f), s2 = smooth01((t - tc) / 0.12f);
+    float hip = -0.55f * back;
+    hip = key(hip, 1.15f, s1); hip = key(hip, 1.85f, s2);
+    float knee = 0.2f + 1.1f * back;
+    knee = key(knee, 0.20f, s1); knee = key(knee, 0.08f, s2);
+    a->hip[kl] = hip; a->knee[kl] = knee; a->leg_out[kl] = 0.02f;
+    a->hip[sl] = 0.10f; a->knee[sl] = key(0.30f, 0.12f, s2); a->leg_out[sl] = 0.06f;
+    float drop = smooth01(t / fmaxf(tc * 0.6f, 0.03f));      /* hands push forward and part */
+    for (int s = 0; s < 2; s++) {
+        a->sh[s] = key(CRADLE_SH, 0.65f, drop); a->elb[s] = key(CRADLE_ELB, 0.30f, drop); a->ab[s] = key(CRADLE_AB, 0.15f, drop);
+    }
+    a->sh[sl] = key(a->sh[sl], 0.85f, s1); a->ab[sl] = key(a->ab[sl], 1.05f, s1);   /* balance arm out */
+    a->sh[kl] = key(a->sh[kl], -0.35f, s1); a->ab[kl] = key(a->ab[kl], 0.55f, s1);
+    a->lean = key(0.10f, -0.22f, s1);
+    a->crouch = 0;
+    return w;
+}
+
 static void build_pose(const WpAvatarPose *P, Pose *o) {
     float amp = clampf(P->speed / 7.0f, 0, 1);
     float run = smooth01(P->speed / 1.2f);           /* 0 idle .. 1 moving */
@@ -162,7 +249,7 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
     o->lean = 0.04f + 0.012f * sinf(P->time * 2.1f) * (1 - run) + run * (0.06f + 0.22f * amp);
     o->nod = 0; o->crouch = 0; o->roll = 0;
 
-    if (P->keeper && P->action == WP_ACT_NONE && P->speed < 1.5f) {      /* ready stance */
+    if (P->keeper && P->action == WP_ACT_NONE && P->speed < 1.5f && !P->holding) {      /* ready stance */
         for (int s = 0; s < 2; s++) {
             o->hip[s] = 0.45f; o->knee[s] = 0.75f; o->leg_out[s] = 0.16f;
             o->sh[s] = 0.75f; o->elb[s] = 0.7f; o->ab[s] = 0.45f;
@@ -183,6 +270,22 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         o->ab[0] += (0.7f - o->ab[0]) * c;
         o->lean += (0.12f - o->lean) * c;
     }
+    /* Ball in the hands (applied to the base pose, also during a kick's wind-up: the sim keeps the ball held
+     * until release, so the throw/roll/punt blends in from here instead of popping to arms-down). */
+    if (P->throwin_hold) {
+        /* throw-in: both hands over and slightly behind the head (ball ~2.15 m, 0.08 m behind him), body upright
+         * with a slight back arch, feet together and parallel. Legs only while standing (he may shuffle). */
+        float still = 1.0f - run;
+        for (int s = 0; s < 2; s++) {
+            o->sh[s] = 3.10f; o->elb[s] = 0.30f; o->ab[s] = -0.20f;
+            o->hip[s] += (0.0f - o->hip[s]) * still;
+            o->knee[s] += (0.06f - o->knee[s]) * still;
+            o->leg_out[s] += (0.01f - o->leg_out[s]) * still;
+        }
+        o->lean = -0.12f; o->nod = 0.10f;
+    } else if (P->holding) {                              /* keeper: forearms up, cradling it at the waist */
+        for (int s = 0; s < 2; s++) { o->sh[s] = CRADLE_SH; o->elb[s] = CRADLE_ELB; o->ab[s] = CRADLE_AB; }
+    }
     if (P->action == WP_ACT_NONE) return;
     /* Action poses are computed separately and blended over the locomotion pose with a weight that ramps in
      * (~0.04 s) and out before the sim clears the action, so nothing pops. */
@@ -190,6 +293,10 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
     float t = P->action_t, w = 0;
     switch (P->action) {
     case WP_ACT_KICK: {
+        if (P->kick_kind == WP_KICK_THROW || P->kick_kind == WP_KICK_ROLL || P->kick_kind == WP_KICK_PUNT) {
+            w = from_hands_pose(P, &a, t);               /* thrown / rolled / punted: no ground-pass leg swing */
+            break;
+        }
         /* keyframes relative to contact time tc: backswing -> contact (foot at the ball) -> follow-through.
          * Kicking leg = kick_foot (leg index 1 is the right leg). */
         float tc = P->kick_windup > 0.01f ? P->kick_windup : 0.1f;
@@ -215,12 +322,6 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         w = smooth01(t / 0.04f) * (1 - smooth01((t - (tc + 0.18f)) / 0.12f));
         break;
     }
-    case WP_ACT_NONE:
-        if (P->holding) {                                 /* ball in the hands: forearms up, cradling it */
-            for (int s = 0; s < 2; s++) { a.sh[s] = 1.0f; a.elb[s] = 1.2f; a.ab[s] = 0.15f; }
-            w = 1.0f;
-        }
-        break;
     case WP_ACT_KEEPER_DIVE: {   /* sideways dive: stretched, arms overhead, rolled down onto his side, then up */
         float side = P->kick_foot ? -1.0f : 1.0f;      /* sim: foot 1 = dive toward +y; the pose rolls toward its left */
         for (int s = 0; s < 2; s++) {
