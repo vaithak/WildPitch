@@ -104,9 +104,12 @@ int main(void) {
         }
         printf("%-6s steady: touches every %d..%d ticks, max speed change %.3f m/s/tick, max ball gap %.2f m\n",
                tag, min_gap_ticks, max_gap_ticks, tod(max_dv), tod(max_lead));
-        CHECKF(max_gap_ticks <= 26 && min_gap_ticks >= 10, "%s cadence %d..%d ticks", tag, min_gap_ticks, max_gap_ticks);
-        CHECKF(max_dv < FX(0.05), "%s speed not smooth: %.3f m/s per tick", tag, tod(max_dv));
-        CHECKF(max_lead < FX(0.95), "%s ball gap %.2f too close to reach", tag, tod(max_lead));
+        /* CP0.3e (owner): a sprint knocks the ball on beyond foot reach and he runs onto it - touches are sparser,
+         * the stride only checks AT the touch (accel-limited dip, <= T_ACCEL/60), and the ball stays well inside
+         * the 2.2 m loss distance. Jogging keeps the close, smooth dribble. */
+        CHECKF(max_gap_ticks <= (sprint ? 44 : 26) && min_gap_ticks >= 10, "%s cadence %d..%d ticks", tag, min_gap_ticks, max_gap_ticks);
+        CHECKF(max_dv < (sprint ? FX(0.31) : FX(0.05)), "%s speed not smooth: %.3f m/s per tick", tag, tod(max_dv));
+        CHECKF(max_lead < (sprint ? FX(1.7) : FX(0.95)), "%s ball gap %.2f", tag, tod(max_lead));
         int worst_cut = 0, worst_rev = 0, lost = 0;
         for (int run = 40; run <= 180; run += 7) {
             for (int kind = 0; kind < 3; kind++) {   /* 90 cut, 45 cut, reversal */
@@ -127,7 +130,7 @@ int main(void) {
         }
         printf("%-6s after 40..180-tick run-ups: lost %d, worst cut %d ticks, worst reversal %d ticks\n", tag, lost, worst_cut, worst_rev);
         CHECKF(lost == 0, "%s lost the ball %d times after long run-ups", tag, lost);
-        CHECKF(worst_cut <= (sprint ? 20 : 12), "%s worst cut %d ticks", tag, worst_cut);
+        CHECKF(worst_cut <= (sprint ? 40 : 12), "%s worst cut %d ticks", tag, worst_cut);   /* sprint: reach the ball first (CP0.3e) */
         CHECKF(worst_rev <= (sprint ? 40 : 24), "%s worst reversal %d ticks", tag, worst_rev);
     }
 
@@ -191,7 +194,8 @@ int main(void) {
                 fx d0 = ball_dist(&s);
                 run_seat(&s, NOIN, 1);
                 fx d = ball_dist(&s), br = fv2_len(pv) - fv2_len(s.ball.vel);
-                if (d0 > T_TOUCH_REACH && br > FX(0.2) && br > far_brake) far_brake = br;
+                /* beyond reach both before AND after the tick (a sprinter closes 13 cm a tick) */
+                if (d0 > T_TOUCH_REACH + FX(0.1) && d > T_TOUCH_REACH + FX(0.1) && br > FX(0.2) && br > far_brake) far_brake = br;
                 if (fv2_len(s.players[ME].vel) < FX(0.1) && d0 - d > fx_mul(reel, WP_DT)) reel = fx_div(d0 - d, WP_DT);
                 if (d < mind) mind = d;
                 pv = s.ball.vel;

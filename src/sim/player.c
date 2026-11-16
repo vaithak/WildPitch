@@ -436,7 +436,11 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     fx top = player_top_speed(s, i, (in->buttons & WP_BTN_SPRINT) != 0);
     /* dribbling slows you while the ball is at your feet; ramps off smoothly (no flicker at the reach edge)
      * when you're running onto a ball that got away */
-    if (s->ball.owner == i) {
+    if (s->ball.owner == i && (in->buttons & WP_BTN_SPRINT)) {
+        /* sprinting with it (CP0.3e, owner): the ball is knocked further ahead and he only checks his stride for
+         * the touch itself; between touches he runs at full sprint */
+        if (p->touch_cooldown > T_TOUCH_GAP_SPRINT - T_TOUCH_SLOW_TICKS) top = fx_mul(top, T_DRIBBLE_SPEED_MUL);
+    } else if (s->ball.owner == i) {
         fx gapd = fv2_len(fv2_sub(s->ball.pos, p->pos));
         fx k = fx_clamp(fx_div(gapd - T_TOUCH_REACH, FX(0.6)), 0, FX_ONE);   /* 0 at reach .. 1 at reach+0.6 */
         top = fx_mul(top, fx_lerp(T_DRIBBLE_SPEED_MUL, FX_ONE, k));

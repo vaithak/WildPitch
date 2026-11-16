@@ -113,9 +113,10 @@
 /* Dribbling = rhythmic touches (D-014): while the ball is in reach, touch every GAP ticks; each touch is sized so
  * the ball sits at LEAD ahead of the feet when the next touch is due. */
 #define T_TOUCH_LEAD_JOG   FX(0.45)
-#define T_TOUCH_LEAD_SPRINT FX(0.75)  /* must stay well inside T_TOUCH_REACH */
+#define T_TOUCH_LEAD_SPRINT FX(1.30)  /* CP0.3e: a sprint knocks it on, beyond foot reach - he runs onto it */
 #define T_TOUCH_GAP_WALK   16         /* ticks between dribble touches (0.27 s) */
-#define T_TOUCH_GAP_SPRINT 20         /* 0.33 s */
+#define T_TOUCH_GAP_SPRINT 28         /* 0.47 s (CP0.3e: was 20) */
+#define T_TOUCH_SLOW_TICKS 8          /* sprinting with the ball: slowed only this long around each touch */
 #define T_TOUCH_REACH      FX(1.0)    /* a dribble touch needs the ball within foot reach */
 #define T_TOUCH_MIN_GAP    4          /* fastest re-touch when changing direction (ticks) */
 #define T_STOP_SPOT        FX(0.4)    /* releasing the stick: the ball is trapped this far out from the player */

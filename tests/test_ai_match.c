@@ -113,7 +113,8 @@ static int run_format(int seven, int matches) {
     printf("AI vs AI %s, %d x 3 min: goals %ld-%ld (%.2f/min), shots %ld-%ld, passes %ld (%.0f%% arrive), tackles %ld-%ld, "
            "possession %.0f%%-%.0f%%, stuck %ld\n", seven ? "7v7" : "5v5", matches, goals[0], goals[1], (double)G / mins, shots[0], shots[1], P, 100.0 * (double)D / (double)(P ? P : 1),
            tackles[0], tackles[1], 100.0 * (double)poss[0] / (double)(poss[0] + poss[1]), 100.0 * (double)poss[1] / (double)(poss[0] + poss[1]), stuck);
-    CHECKF((double)G / mins > 0.25 && (double)G / mins < 2.0, "goal rate %.2f/min", (double)G / mins);
+    /* sanity band, not a target: 36 min samples carry +-~3 goals of Poisson noise (5v5 ~0.25-0.4/min in CP0.3e) */
+    CHECKF((double)G / mins > 0.15 && (double)G / mins < 2.0, "goal rate %.2f/min", (double)G / mins);
     CHECKF((double)S / mins > 0.7, "shot rate %.2f/min", (double)S / mins);   /* restarts take time (D-029) */
     CHECKF(D * 100 > P * 50, "only %ld/%ld passes arrive", D, P);
     CHECKF(stuck == 0, "%ld stuck players", stuck);
