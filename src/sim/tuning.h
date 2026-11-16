@@ -198,6 +198,16 @@
 #define T_TACKLE_REACH     FX(0.8)    /* the ball must be this close to the tackling foot at contact */
 #define T_TACKLE_BLOCK_V   FX(1.5)    /* a won tackle sends the ball back toward the tackler this fast (+60% his speed) */
 #define T_TACKLE_STUN      24         /* the tackled player can't touch the ball again for this long */
+#define T_SLIDE_START      FX(3.0)    /* sliding tackle (D-043): their carrier this close ... */
+#define T_SLIDE_SPEED      FX(8.5)    /* ... the slide starts at least this fast ... */
+#define T_SLIDE_DECEL      FX(9.0)    /* ... and grinds to a halt (m/s^2) */
+#define T_SLIDE_FOOT       FX(0.85)   /* leading foot ahead of the body */
+#define T_SLIDE_REACH      FX(0.75)   /* ball this close to the foot = won */
+#define T_SLIDE_FOUL_REACH FX(0.55)   /* a man this close to the foot before the ball = foul */
+#define T_SLIDE_FIRST      4          /* the foot is live from this tick ... */
+#define T_SLIDE_WIN        28         /* ... to this one */
+#define T_SLIDE_TICKS      70         /* whole slide incl. getting up (1.17 s): committed */
+#define T_SLIDE_KNOCK      FX(5.0)    /* a won slide knocks the ball on this fast */
 #define T_TACKLE_TICKS     30         /* whole tackle action (recovery included) */
 #define T_PLAYER_GAP       FX(0.6)    /* two players' bodies never overlap closer than this */
 

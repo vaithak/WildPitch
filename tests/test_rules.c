@@ -172,5 +172,30 @@ int main(void) {
     s.ball.owner = 3;
     offside_on_kick(&s, 3);
     CHECK(s.offside_mask == 0);
+    /* 7. sliding tackle (D-043): the lob key with their carrier close by */
+    for (int c = 0; c < 3; c++) {
+        scene(0);
+        s.flags = 0;
+        for (int j = 0; j < 2 * n; j++) if (j != 1 && j != blue_st) s.players[j].pos = fv2_make(FX_INT(j * 4 - 28), FX(18.0));
+        s.seat_player[0] = 1;
+        WpPlayer *q = &s.players[blue_st];
+        q->pos = fv2_make(-FX(5.0), 0); q->vel = fv2_make(-FX(5.0), 0);    /* running at our goal */
+        s.ball.owner = (int8_t)blue_st; s.ball.pos = fv2_make(-FX(5.5), 0);
+        if (c == 0) s.players[1].pos = fv2_make(-FX(6.2), -FX(2.0));      /* from the side, at the ball */
+        if (c == 1) s.players[1].pos = fv2_make(-FX(3.4), 0);              /* from behind */
+        if (c == 2) s.players[1].pos = fv2_make(-FX(5.0), -FX(6.0));       /* too far */
+        WpInput in; memset(&in, 0, sizeof in);
+        in.seat[0].buttons = WP_BTN_LOB;
+        sim_step(&s, &in);
+        int sliding = s.players[1].action == WP_ACT_SLIDE;
+        memset(&in, 0, sizeof in);
+        uint16_t e = 0;
+        for (int t = 0; t < 40; t++) { sim_step(&s, &in); e |= s.events; }
+        printf("slide %s: sliding %d, won %d, foul %d (restart %d)\n", c == 0 ? "from the side" : c == 1 ? "from behind" : "out of range",
+               sliding, (e & WP_EV_TACKLE) != 0, (e & WP_EV_FOUL) != 0, s.restart_kind);
+        if (c == 0) CHECK(sliding && (e & WP_EV_TACKLE) && !(e & WP_EV_FOUL));
+        if (c == 1) CHECK(sliding && (e & WP_EV_FOUL));
+        if (c == 2) CHECK(!sliding);
+    }
     return TEST_DONE();
 }

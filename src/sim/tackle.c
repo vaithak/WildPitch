@@ -73,3 +73,71 @@ void tackle_step(SimState *s, int i) {
     b->no_hands = 0;
     s->events |= WP_EV_TOUCH;
 }
+
+/* ---- sliding tackle (D-043, owner request; the LOB key like EA FC / eFootball's lob/cross button) ----
+ * A fast lunge along the grass that decelerates; for T_SLIDE_WIN ticks the leading foot (T_SLIDE_FOOT ahead, low)
+ * can knock the ball away (it goes on along the slide, the carrier is stunned). Reaching the man before the ball,
+ * or going through a running man from behind, is a foul. Then he's on the ground until the action ends. */
+int slide_wanted(const SimState *s, int i) {
+    const WpBall *b = &s->ball;
+    const WpPlayer *p = &s->players[i];
+    if (b->owner < 0 || b->held || s->players[b->owner].team == p->team || p->z > 0 || p->touch_cooldown) return 0;
+    return fv2_len(fv2_sub(b->pos, p->pos)) <= T_SLIDE_START;
+}
+
+void slide_start(SimState *s, int i) {
+    WpPlayer *p = &s->players[i];
+    fv2 to = fv2_norm(fv2_sub(s->ball.pos, p->pos));
+    p->action = WP_ACT_SLIDE;
+    p->action_timer = 0;
+    p->kick.done = 0;
+    p->kick_charge = 0;
+    p->charge_kind = 0xFF;
+    p->facing = fx_atan2(to.y, to.x);
+    p->vel = fv2_scale(to, fx_max(fv2_len(p->vel), T_SLIDE_SPEED));
+}
+
+void slide_step(SimState *s, int i) {
+    WpPlayer *p = &s->players[i];
+    WpBall *b = &s->ball;
+    if (p->action != WP_ACT_SLIDE || p->kick.done || s->phase != WP_PHASE_PLAY) return;
+    if (p->action_timer < T_SLIDE_FIRST) return;
+    if (p->action_timer > T_SLIDE_WIN) { p->kick.done = 1; return; }
+    fv2 dir = fv2_from_angle(p->facing, FX_ONE);
+    fv2 foot = fv2_add(p->pos, fv2_scale(dir, T_SLIDE_FOOT));
+    fx reach = fx_mul(T_SLIDE_REACH, FX_ONE + fx_mul(T_STAT_TACKLE, stat_k(s, i, WP_STAT_TACKLING)));
+    int ball_hit = b->z <= WP_BAND_FEET_MAX && fv2_len(fv2_sub(b->pos, foot)) <= reach;
+    /* the man before the ball? */
+    if (s->rules & WP_RULE_FOULS) {
+        int o0 = (1 - p->team) * s->n_per_side;
+        for (int j = o0; j < o0 + s->n_per_side; j++) {
+            const WpPlayer *q = &s->players[j];
+            if (q->role == WP_ROLE_KEEPER && q->z > 0) continue;
+            fx dq = fv2_len(fv2_sub(q->pos, foot));
+            int behind = 0;
+            fx qs = fv2_len(q->vel);
+            if (qs > T_FOUL_BEHIND_V)
+                behind = fv2_dot(fv2_scale(q->vel, fx_div(FX_ONE, qs)), fv2_norm(fv2_sub(q->pos, p->pos))) > T_FOUL_BEHIND_COS;
+            if ((dq < T_SLIDE_FOUL_REACH && !ball_hit) || (ball_hit && behind && dq < T_SLIDE_FOUL_REACH + FX(0.3))) {
+                p->kick.done = 1;
+                restart_foul(s, q->team, q->pos, 0);
+                return;
+            }
+        }
+    }
+    if (!ball_hit) return;
+    p->kick.done = 1;
+    int victim = b->owner;
+    if (victim >= 0 && victim != i) {
+        s->players[victim].touch_cooldown = T_TACKLE_STUN;
+        if (s->players[victim].team != p->team) s->events |= WP_EV_TACKLE;
+    }
+    b->vel = fv2_add(fv2_scale(dir, T_SLIDE_KNOCK), fv2_scale(p->vel, FX(0.3)));   /* knocked on along the slide */
+    b->vz = FX(0.5);
+    b->spin = 0;
+    b->owner = -1;
+    b->last_touch = (int8_t)i;
+    b->no_hands = 0;
+    p->touch_cooldown = T_SLIDE_TICKS;                    /* on the ground: can't play it again this slide */
+    s->events |= WP_EV_TOUCH;
+}

@@ -138,7 +138,7 @@ static const char *face(const WpGamepad *g, SDL_GamepadButton b) {
 
 void wp_gamepad_hint(const WpGamepad *g, char *buf, int cap) {
     if (!g->pad) { buf[0] = 0; return; }
-    snprintf(buf, (size_t)cap, "Pad: stick move  %s pass/tackle  %s shoot  %s lob  %s chip  RB/RT sprint  LB switch  "
+    snprintf(buf, (size_t)cap, "Pad: stick move  %s pass/tackle  %s shoot  %s lob/slide  %s chip  RB/RT sprint  LB switch  "
              "R3 zoom  L3 look  Back replay  Start menu",
              face(g, SDL_GAMEPAD_BUTTON_SOUTH), face(g, SDL_GAMEPAD_BUTTON_EAST), face(g, SDL_GAMEPAD_BUTTON_WEST),
              face(g, SDL_GAMEPAD_BUTTON_NORTH));

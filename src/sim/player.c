@@ -391,6 +391,11 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
         p->kick_charge = 0; p->charge_kind = 0xFF;
         return;
     }
+    /* sliding tackle (D-043): the lob key with their carrier close by */
+    if ((pressed & WP_BTN_LOB) && p->action == WP_ACT_NONE && s->ball.owner != i && slide_wanted(s, i)) {
+        slide_start(s, i);
+        return;
+    }
     /* contextual tackle: J pressed while an opponent has the ball close by */
     if ((pressed & WP_BTN_PASS) && p->action == WP_ACT_NONE && tackle_wanted(s, i)) {
         tackle_start(s, i);
@@ -459,6 +464,11 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     }
     if (p->action == WP_ACT_KEEPER_DIVE) {                /* flying, then down: slides to a stop */
         if (p->z == 0) p->vel = fv2_scale(p->vel, FX(0.85));
+        return;
+    }
+    if (p->action == WP_ACT_SLIDE) {                      /* sliding on the grass, then getting up: no control */
+        fx v = fv2_len(p->vel), dv = fx_mul(T_SLIDE_DECEL, WP_DT);
+        p->vel = v <= dv ? fv2_make(0, 0) : fv2_scale(p->vel, fx_div(v - dv, v));
         return;
     }
     if (p->action == WP_ACT_TACKLE) {                     /* lunging, then committed: can't turn or accelerate */
@@ -663,6 +673,7 @@ static void air_and_timers(WpPlayer *p) {
         p->action_timer++;
         int ends = p->action == WP_ACT_KICK ? p->action_timer >= T_KICK_TOTAL_TICKS
                  : p->action == WP_ACT_TACKLE ? p->action_timer >= T_TACKLE_TICKS
+                 : p->action == WP_ACT_SLIDE ? p->action_timer >= T_SLIDE_TICKS
                  : p->action == WP_ACT_KEEPER_DIVE ? p->action_timer >= T_DIVE_TICKS
                  : (p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) ? header_action_ends(p)
                  : p->action_timer > 30;
@@ -747,6 +758,7 @@ void players_step(SimState *s, const WpInput *in) {
         if (p->action == WP_ACT_KICK && !p->kick.done && p->action_timer + 1 >= p->kick.windup) contact(s, i, &pin[i]);
         header_step(s, i);
         tackle_step(s, i);
+        slide_step(s, i);
         keeper_step(s, i, in);
         air_and_timers(p);
     }

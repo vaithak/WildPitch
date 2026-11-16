@@ -572,7 +572,7 @@ int main(int argc, char **argv) {
                 wp_gamepad_hint(&g.pad, buf, (int)sizeof buf);
             } else {   /* hints show the player's actual keys */
                 const WpKeymap *k = &g.km;
-                snprintf(buf, sizeof buf, "%s/%s/%s/%s move  %s sprint  %s pass (hold: through; tackle)  %s lob  "
+                snprintf(buf, sizeof buf, "%s/%s/%s/%s move  %s sprint  %s pass (hold: through; tackle)  %s lob/slide  "
                          "%s shoot  %s chip  %s switch  %s zoom  %s look  %s replay  Esc menu",
                          wp_keymap_key_name(k, WP_KEY_UP), wp_keymap_key_name(k, WP_KEY_LEFT), wp_keymap_key_name(k, WP_KEY_DOWN),
                          wp_keymap_key_name(k, WP_KEY_RIGHT), wp_keymap_key_name(k, WP_KEY_SPRINT), wp_keymap_key_name(k, WP_KEY_PASS),

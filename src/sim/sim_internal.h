@@ -84,6 +84,9 @@ void seats_on_gain(SimState *s, int i, const WpInput *in);   /* a team-mate of a
 int  tackle_wanted(const SimState *s, int i);             /* an opponent has the ball within reach of a tackle */
 void tackle_start(SimState *s, int i);
 void tackle_step(SimState *s, int i);
+int  slide_wanted(const SimState *s, int i);   /* D-043 */
+void slide_start(SimState *s, int i);
+void slide_step(SimState *s, int i);
 /* restart.c (D-029) */
 void restart_out(SimState *s, int touchline, fx x_or_y, int goal_side);
 void restart_place(SimState *s, const WpInput *in);

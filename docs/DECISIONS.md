@@ -488,3 +488,12 @@ a man in an offside position, waits on the line (0.3 m onside) and times runs in
   WpInput of every tick (~42 KB static); R / Back starts it, R / Back toggles slow motion, any other key returns to
   the paused live match (never written). `--check-replay` (ctest) proves the replay hash equals the live run tick by
   tick - it fails if sim_step ever depends on anything outside SimState + WpInput.
+
+## D-043 — Sliding tackle on the lob key (2026-11-16, owner request)
+Owner: "add sliding tackle, think carefully with the advisor about which key". EA FC puts the slide on its lob/cross
+button (X/Square), eFootball on its lofted-pass/cross button (Circle); our LOB key (keyboard A, pad West/X) is also
+the only action key that's idle off the ball. Contextual: only with an opponent on the ball within 3 m (and not just
+after being tackled), so a lob press can't become a slide by accident. The slide: >= 8.5 m/s along the grass,
+decelerating at 9 m/s^2; the leading foot (0.85 m ahead) wins the ball within 0.75 m between ticks 4 and 28 and
+knocks it on; reaching a man before the ball, or through a running man from behind, is a foul (a penalty in the
+box); 1.17 s on the ground - committed. Human-only for now (AI slides = tuning AI fouls; later).
