@@ -3,10 +3,13 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3e — Real restarts, keeper distribution, through-ball meter, sprint dribble, receiving, press assist
-(D-038/D-039): ✅ done, waiting for the owner's playtest.**
-Next: owner feedback; then CP0.4 "A real match" (fouls, free kicks, offside). Watch: 5v5 AI scoring dipped
-(~0.25-0.4 goals/min; sprint knock-ons are more tackleable); the test floor is now a noise-aware 0.15/min.
+**CP0.4 — "A real match": 🚧 in progress.** (CP0.3e awaits the owner's playtest.)
+Plan: (1) fouls (a tackle that misses the ball but takes the man, or goes through him from behind) -> direct free
+kick (opponents 9.15 m scaled, AI wall + AI shot from range) / penalty in the box (spot 11/105, everyone out of the
+box and the D, keeper on his line); (2) offside (flagged at each pass, called when the flagged man plays it ->
+indirect free kick; AI runners hold the line, AI never passes to an offside man); (3) gamepad + instant replay
+(subagent: src/game/gamepad.c, replay.c, `--check-replay`); (4) HUD labels FOUL / FREE KICK / PENALTY / OFFSIDE;
+(5) shout button (press / drop back) if time allows. Tests + docs (D-040..).
 
 ### Playtest guide (CP0.3e)
 1. Throw-in: the taker holds it over his head; S throws it (two hands, feet planted), it drops into your mate;

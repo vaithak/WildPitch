@@ -171,3 +171,8 @@ Format:
   corners 9.15 m scaled; goal kicks from the goal-area line, opponents out of the box); keeper distribution
   roll / throw / punt; sprint dribble = longer knock-ons, slowdown only at the touch; through ball longer threshold +
   always firmer than a tap; receiver can't leave a slow incoming pass; chase cone also onto an opponent's ball.
+
+## 2026-11-16 — go-ahead for CP0.4
+- **Feedback (verbatim):** "continue with next checkpoint"
+- **Action:** CP0.4 "A real match": fouls -> free kicks / penalties, offside (sim, this session); gamepad (hotplug)
+  and instant replay (presentation, a parallel subagent); shout button if time allows.
