@@ -157,7 +157,10 @@ static void recv_update(SimState *s, int me, const WpSeatInput *si) {
      * that isn't toward the ball: the human wants to make a run (owner decision, CP0.2c) */
     int away = fv2_len(dg) > FX(0.5) ? fv2_dot(pref, fv2_norm(dg)) < -FX(0.5)
                                      : fv2_dot(pref, fv2_norm(to_ball)) < FX(0.3);
-    if (opinion && away) {
+    /* CP0.3e (owner: "the receiver moves away instead of first receiving the ball"): once the ball is about to reach
+     * him (ETA < T_RECV_LOCK_S) a held stick is his first-touch direction, never a takeover */
+    fx eta = fx_div(dball, fx_max(bspd, FX(1.0)));
+    if (opinion && away && eta > T_RECV_LOCK_S) {
         if (s->recv_away < 255) s->recv_away++;
     } else {
         s->recv_away = 0;
@@ -385,6 +388,35 @@ static fx share_weight(const SimState *s, int me, int lv) {
     return fx_clamp(FX_ONE - fx_div(mine.t - tb, CH_SHARE[lv]), 0, FX_ONE);
 }
 
+/* the chase cone against a carrier (CP0.3e, owner: "should also work for active player being controlled if we are
+ * generally moving in the direction of the ball"): a stick held roughly at an opponent with the ball, within
+ * T_CHASE_PRESS_MAX, is turned (same cone, same cap) toward where he can meet him - the carrier's position led by
+ * his velocity over the time it takes to get there. No share weight: pressing the carrier is the human's call. */
+static void chase_carrier(const SimState *s, int seat, WpSeatInput *io) {
+    int me = s->seat_player[seat], lv = s->assist_level[seat] - 1;
+    const WpPlayer *p = &s->players[me], *c = &s->players[s->ball.owner];
+    fv2 tb = fv2_sub(s->ball.pos, p->pos);
+    if (fv2_len(tb) > T_CHASE_PRESS_MAX || fv2_len(tb) < FX(0.3)) return;
+    fx v = player_top_speed(s, me, (io->buttons & WP_BTN_SPRINT) != 0);
+    fv2 aim = s->ball.pos;
+    for (int it = 0; it < 3; it++)                        /* lead him by my time to get there */
+        aim = fv2_add(s->ball.pos, fv2_scale(c->vel, fx_div(fv2_len(fv2_sub(aim, p->pos)), v)));
+    fv2 tm = fv2_sub(aim, p->pos);
+    if (fv2_len(tm) < FX(0.05)) return;
+    int mx = io->move_x, my = io->move_y;
+    fv2 st = fv2_norm(fv2_make(FX_INT(mx), FX_INT(my)));
+    fx cs = fx_max(fv2_dot(st, fv2_norm(tm)), fv2_dot(st, fv2_norm(tb)));
+    fx w = fx_clamp(fx_div(cs - CH_COSE[lv], CH_COSF[lv] - CH_COSE[lv]), 0, FX_ONE);
+    if (w == 0) return;
+    wp_angle a = fx_atan2(st.y, st.x);
+    int32_t dl = (int16_t)(uint16_t)(fx_atan2(tm.y, tm.x) - a);
+    int32_t cap = CH_ANG[lv], turn = dl > cap ? cap : dl < -cap ? -cap : dl;
+    a = (wp_angle)(a + (int32_t)(((int64_t)turn * w) >> 16));
+    fv2 d = fv2_from_angle(a, fv2_len(fv2_make(FX_INT(mx), FX_INT(my))));
+    io->move_x = (int8_t)fx_clamp(d.x / FX_ONE, -127, 127);
+    io->move_y = (int8_t)fx_clamp(d.y / FX_ONE, -127, 127);
+}
+
 /* Legs only: a stick held roughly at a loose ball is turned (at most F) toward where he can meet it. Exactly zero
  * beyond E, with the stick released, below T_CHASE_STICK_MIN, or when it isn't his ball - then the raw stick. */
 void seats_chase_assist(const SimState *s, int seat, WpSeatInput *io) {
@@ -392,9 +424,11 @@ void seats_chase_assist(const SimState *s, int seat, WpSeatInput *io) {
     if (me < 0 || s->assist_level[seat] == WP_ASSIST_OFF || s->phase != WP_PHASE_PLAY) return;
     const WpPlayer *p = &s->players[me];
     const WpBall *b = &s->ball;
-    if (b->owner >= 0 || b->held || p->action != WP_ACT_NONE || p->z > 0) return;
+    if (b->held || p->action != WP_ACT_NONE || p->z > 0) return;
+    if (b->owner >= 0 && s->players[b->owner].team == p->team) return;   /* ours: nothing to chase */
     int mx = io->move_x, my = io->move_y;
     if (mx * mx + my * my < T_CHASE_STICK_MIN * T_CHASE_STICK_MIN) return;
+    if (b->owner >= 0) { chase_carrier(s, seat, io); return; }   /* theirs: close him down (owner, CP0.3e) */
     if (s->pass_target >= 0 && s->pass_target != me && s->players[s->pass_target].team == p->team) return;
     int lv = s->assist_level[seat] - 1;
     fv2 st = fv2_norm(fv2_make(FX_INT(mx), FX_INT(my)));

@@ -25,6 +25,7 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
   team_plan.c           per-team roles each tick (D-030): ball-winner (hysteresis), cover, capped markers, rest
                         defence, near-support, runner -> SimState.plan[2]; read by brain.c
   formation.c           ball-dependent formation blocks in/out of possession, blended by poss_fade -> shape_spot()
+  setpiece.c            receiving spots for throw-ins and goal kicks (D-038)
   clock.c               match clock (D-036): halves at 9x, stoppage time, half time / change of ends, full time
   stats.c               player stats (D-034): generation per slot, stat_k(), player_top_speed(), stamina_step()
   tackle.c              standing tackles (J near an opponent's ball; AI when the ball is exposed)

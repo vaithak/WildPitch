@@ -434,3 +434,26 @@ setting Off / Low / Normal / High, default Normal.
   auto-switch by time** to the ball (YSoccer's 0.5x hysteresis), no longer blocked by a pass to the other team.
 - **Off = the pre-D-037 sim bit for bit** (verified: goldens unchanged with every seat Off, then Normal turned on).
   Per seat `SimState.assist_level` (hashed when any is on); the menu applies it on Restart match.
+
+## D-038 — Restarts like real matches; keeper distribution (2026-11-16, CP0.3e, owner feedback)
+- **Throw-in** (Law 15): taken from over the head (ball at 2.0 m between both hands, two-handed release, feet
+  planted; avatar poses), opponents 2 m away, the throw arced to drop into the receiver at ~0.9 m. **Corners:**
+  opponents 9.15 m scaled to the pitch (7.0 m on 80 m). **Goal kicks** (Law 16): from the goal-area line (5.5/105
+  of the length) in line with the post on the side it went out; every opponent outside the penalty area until it's
+  played. **Receiving shape** (`setpiece.c`): for throw-ins (down the line, inside, back, long) and goal kicks
+  (split wide of the box, wide and higher, a midfielder showing) the nearest team-mates take the spots.
+- **Keeper distribution:** roll along the ground up to 18 m, overarm throw up to 32 m, punt beyond (AI); human
+  keeper: S rolls to the ringed mate when he's within 18 m, else throws overarm; A throws overarm; D/W punt.
+  New kick kind `WP_KICK_ROLL`; poses: underarm roll, overarm throw, drop-kick punt; keeper cradle now shows.
+- A held ball with no holder drops (never frozen) - found by the golden's all-AI quarter.
+
+## D-039 — Through-ball meter, sprint dribble, receiving, carrier press (2026-11-16, CP0.3e, owner feedback)
+- **Through ball:** tap threshold 12 -> 20 ticks (0.33 s). Every through ball is met in stride (solved per
+  candidate point) AND struck >= 1.1 x a tap to the same man (untargeted too); the hold picks the depth inside the
+  window of points that satisfy both (physics: deeper in stride = softer, so "more meter = more power" is kept as
+  "every meter level is firmer than a pass").
+- **Sprint dribble:** a knock-on (lead 1.3 m, touch every 28 ticks); slowed only for 8 ticks at each touch, full
+  sprint between; turning while it's ahead = run onto it first, then the touch goes the new way.
+- **Receiving:** no takeover once the ball is < 0.6 s away - a held stick is the first-touch direction.
+- **Chase cone (D-037) on an opponent with the ball:** a stick held roughly at the carrier (<= 12 m) is turned
+  (same cone and cap) toward where you meet him; on an opponent's pass in flight it already applies.

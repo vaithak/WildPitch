@@ -291,6 +291,29 @@ int main(void) {
         printf("goal kick: kind %d team %d taker %d (keeper %d)\n", s.restart_kind, s.restart_team, s.restart_taker,
                s.restart_taker >= 0 && s.players[s.restart_taker].role == WP_ROLE_KEEPER);
         CHECK(s.restart_kind == WP_RS_GOALKICK && s.restart_team == 0 && s.restart_taker == 0);
+        /* CP0.3e: from the goal-area line, every opponent out of the box, our men spread out to receive */
+        fx ga = fx_mul(s.pitch.length, T_GOALAREA_FRAC), hl = s.pitch.length / 2;
+        for (int t = 0; t < 30; t++) step1(NOIN);
+        int in_box = 0, spread = 0;
+        for (int j = s.n_per_side; j < 2 * s.n_per_side; j++) in_box += in_own_box(&s, 0, s.players[j].pos);
+        for (int j = 1; j < s.n_per_side; j++) if (fx_abs(s.players[j].pos.y) > fx_mul(s.pitch.width, FX(0.24))) spread++;
+        printf("  goal kick at x %.1f (line %.1f), opponents in the box %d, our men wide of it %d\n", tod(s.ball.pos.x),
+               tod(-hl + ga), in_box, spread);
+        CHECK(fx_abs(s.ball.pos.x - (-hl + ga)) < FX(0.5));
+        CHECK(in_box == 0);
+        CHECK(spread >= 2);
+        /* corners: the defending team keeps 9.15 m (scaled) away until it's taken */
+        sim_init(&s, &c7);
+        s.ball.pos = fv2_make(-((s.pitch.length / 2) - FX(1.0)), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1;
+        s.ball.last_touch = 2;
+        for (int t = 0; t < 120 && !(s.restart_kind && s.restart_taker >= 0); t++) step1(NOIN);
+        fx near = FX(99.0);
+        for (int t = 0; t < 60 && s.restart_kind == WP_RS_CORNER; t++) {
+            step1(NOIN);
+            for (int j = 0; j < s.n_per_side; j++) { fx d = fv2_len(fv2_sub(s.players[j].pos, s.ball.pos)); if (d < near) near = d; }
+        }
+        printf("  corner: nearest defender %.1f m (rule %.1f)\n", tod(near), tod(fx_mul(s.pitch.length, T_CORNER_DIST_FRAC)));
+        CHECK(near >= fx_mul(s.pitch.length, T_CORNER_DIST_FRAC) - FX(0.1));
     }
     return TEST_DONE();
 }

@@ -154,5 +154,41 @@ int main(void) {
         run_seat(&s, (WpSeatInput){0, 127, 0}, 1);
         CHECK(s.latch_ticks[0] == 0);
     }
+    /* 9. an opponent on the ball (CP0.3e): a stick 25 deg off him is turned toward him, 70 deg off is untouched */
+    {
+        int opp = 2 * 5 - 1;                              /* 5v5 regression: their striker */
+        for (int c = 0; c < 2; c++) {
+            loose_ball_scene(fv2_make(FX(6.0), 0), fv2_make(0, 0), WP_ASSIST_NORMAL);
+            s.players[opp].pos = fv2_make(FX(6.3), 0); s.players[opp].vel = fv2_make(0, FX(3.0));
+            s.ball.owner = (int8_t)opp; s.ball.pos = fv2_make(FX(6.0), 0);
+            fv2 u = dir_deg(c ? -70 : 25);                 /* -70: away from where he is running */
+            WpSeatInput in = {c127(u.x), c127(u.y), 0}, out = in;
+            seats_chase_assist(&s, 0, &out);
+            int turned = out.move_x != in.move_x || out.move_y != in.move_y;
+            CHECKF(turned == (c == 0), "carrier press: stick %d deg turned %d", c ? -70 : 25, turned);
+        }
+    }
+    /* 10. a slow pass coming in, stick held away for the last part: he still receives it first (CP0.3e) */
+    {
+        int got = 0, n = 0;
+        for (int ang = 90; ang <= 180; ang += 45) {
+            setup_empty(&s, ME);
+            s.seat_player[0] = 3;
+            s.assist_level[0] = WP_ASSIST_NORMAL;
+            s.players[3].pos = fv2_make(-FX(6.0), 0);
+            s.players[ME].pos = fv2_make(FX(3.0), 0);
+            s.ball.pos = fv2_make(-FX(5.6), 0); s.ball.owner = 3; s.ball.last_touch = 3;
+            WpKick k = {0};
+            k.kind = WP_KICK_PASS; k.dir = 0; k.to = ME + 1; k.windup = T_KICK_WINDUP_PASS; k.foot = 1;
+            sim_player_kick(&s, 3, &k);
+            for (int t = 0; t < 12; t++) run_seat(&s, NOIN, 1);   /* struck, control handed to ME */
+            fv2 u = dir_deg(ang);
+            int r = -1;
+            for (int t = 0; t < 120 && r < 0; t++) { run_seat(&s, (WpSeatInput){c127(u.x), c127(u.y), 0}, 1); if (s.ball.owner >= 0 && s.ball.owner != 3) r = s.ball.owner; }
+            n++; got += r == ME;
+        }
+        printf("short pass, receiver's stick held away (90/135/180 deg): received %d/%d\n", got, n);
+        CHECK(got == n);
+    }
     return TEST_DONE();
 }

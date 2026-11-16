@@ -3,11 +3,23 @@
 _Last updated: 2026-11-15 by Claude session #1_
 
 ## Current checkpoint
-**CP0.3d — Match clock (D-036) + movement assist toward the ball (D-037): ✅ done, waiting for the owner's
-playtest.** (CP0.3b++ / CP0.3c also await playtest.) Research: `reports/Assisted movement toward the ball.md`.
-Next: owner feedback; then CP0.4 "A real match" (fouls, free kicks, offside). Follow-ups from the research: a
-cumulative "plays for me" guard (fraction of assisted ticks in a scripted match), the shared meet_choose height cap
-and bounces for the AI (own golden update), defenders' cone on opponents' passes (playtest question).
+**CP0.3e — Real restarts, keeper distribution, through-ball meter, sprint dribble, receiving, press assist
+(D-038/D-039): ✅ done, waiting for the owner's playtest.**
+Next: owner feedback; then CP0.4 "A real match" (fouls, free kicks, offside). Watch: 5v5 AI scoring dipped
+(~0.25-0.4 goals/min; sprint knock-ons are more tackleable); the test floor is now a noise-aware 0.15/min.
+
+### Playtest guide (CP0.3e)
+1. Throw-in: the taker holds it over his head; S throws it (two hands, feet planted), it drops into your mate;
+   opponents stay 2 m off; your team-mates spread out (down the line, inside, back, long).
+2. Corner: defenders stay 7 m (9.15 m scaled) away. Goal kick: from the goal-area line, opponents out of the box,
+   your men split wide to receive.
+3. Your keeper with the ball: S rolls it to a near mate / throws overarm to a far one; A overarm; D punt. Watch
+   the AI keeper do the same.
+4. Sprint with the ball (E): it's knocked further ahead, you stay fast between touches; turning sharply means
+   reaching the ball first.
+5. Through ball: hold S past ~1/3 s - the meter appears; even a short meter is firmer than a pass.
+6. Receive a slow pass while holding a direction away: he takes the ball first.
+7. Hold the stick roughly at an opponent on the ball: your man bends onto him (Esc > Movement assist to compare).
 
 ### Playtest guide (CP0.3d)
 1. Match clock: two 5-minute halves (90' at 9x); added minutes at 45'/90' (+N); half time: ends change, blue
