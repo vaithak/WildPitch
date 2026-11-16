@@ -74,6 +74,10 @@ static void draw_pitch(SDL_Renderer *r, const WpCamera *c, const WpPitch *p) {
     for (int sgn = -1; sgn <= 1; sgn += 2) {
         float gx = (float)sgn * hl, ix = gx - (float)sgn * bx;
         line3(r, c, gx, -bw, 0, ix, -bw, 0); line3(r, c, ix, -bw, 0, ix, bw, 0); line3(r, c, ix, bw, 0, gx, bw, 0);
+        /* goal area (5.5 m of 105 deep, the posts + 5.5 m of 68 wide): goal kicks are taken from its line (D-038) */
+        float gd = tof(p->length) * tof(T_GOALAREA_FRAC), gwh = tof(p->goal_width) * 0.5f + tof(p->width) * (5.5f / 68.0f);
+        float jx = gx - (float)sgn * gd;
+        line3(r, c, gx, -gwh, 0, jx, -gwh, 0); line3(r, c, jx, -gwh, 0, jx, gwh, 0); line3(r, c, jx, gwh, 0, gx, gwh, 0);
     }
 }
 
