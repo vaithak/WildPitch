@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-15 by Claude session #1_
+_Last updated: 2026-11-16 by Claude session #1 (CP0.5a stage 0)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -15,6 +15,26 @@ when the situation changes), a per-player contact plan that freezes ~5 ticks bef
 (buffered pass/shot > header > trap) so chains fall out; generalise header.c rather than add a parallel system;
 impulse contact model (head M~9.9 kg e~0.7; cushioned chest e~0.1-0.3 pops it up 30-60 deg, ~0.5-1.2 m ahead).
 Open: AI attack with offside (49 goals / 110 shots per 100 AI min); AI never slides.
+
+**CP0.5a stage 0 (report's staged plan, row 0): done, golden unchanged.** header.c / gain_apply literals moved to
+`tuning.h` (T_HEAD_Z, T_HEAD_FWD, T_HEAD_REACH_XY/Z, T_HEADER_WAIT_MAX, T_HEADER_PASS_K/BASE/MIN/VZ/NOBODY_D,
+T_FIRST_TOUCH_SPILL, T_GAIN_TOUCH_COOLDOWN; same values). `ball_flight_to(vh, vz, z0, z_end, &dist, &ticks)` in
+ball.c (ball_carry_distance now calls it; test_ball checks it against the integrator: <= 0.04 m, same tick).
+Aerial counters: `tests/aerial_metrics.h` (definitions frozen there, shared by tests) + `tools/playtest/aerial.c`.
+**Aerial baseline** (7v7, `WP_STATS=1`, 20 x 5 min AI vs AI, `aerial 20 5 1`):
+
+| Metric | Baseline (pre stage 1) |
+|---|---|
+| Goals / shots | 0.49 / 1.10 per min |
+| Lobs (feet, not from hands) | 1.11/min, completed 70% (78/111) |
+| Crosses (lobs from wide in the final third) | 0.49/min, completed 43% (21/49) |
+| Lob distance at the kick (completion) | <10 m 1 (0%), 10-15 m 8 (12%), 15-20 m 13 (54%), 20-25 m 69 (93%), 25-30 m 10 (30%), 30-40 m 10 (30%) |
+| First aerial contact, feet band (ball already down) | 67 gains, control success 94% |
+| First aerial contact, body band (0.55-1.45 m) | 73 gains + 3 body hits + 1 header, control success 91% (69/76) |
+| First aerial contact, head band (> 1.45 m) | 21 headers (no gains possible), keepers 0 |
+| Headers | 0.23/min: 6 shots, 17 passes completed 35% (6/17) |
+
+bench_sim 16.2 us/tick (1031x real time).
 
 ### Playtest guide (CP0.4)
 1. Mistime a tackle (S near their carrier) and take the man: FOUL - free kick to them (in your box: PENALTY). If

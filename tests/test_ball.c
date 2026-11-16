@@ -168,5 +168,43 @@ int main(void) {
     ev = run_seat(&s, NOIN, 30);
     CHECK(ev & WP_EV_BODY);
     CHECKF(s.ball.pos.x < FX(5.0), "ball tunnelled through body: x=%.2f", tod(s.ball.pos.x));
+
+    /* ball_flight_to (the lob solver's forward model) agrees with the real integrator: horizontal distance where the
+     * ball comes down through z_end within 0.3 m, the tick within 1 (7v7 pitch, nobody near the flight) */
+    {
+        static const struct { double vh, vz, z0, z_end; } c[] = {
+            {7.4, 7.45, 0, 1.0}, {12.2, 9.9, 0, 1.0}, {16.3, 12.4, 0, 1.0}, {20.3, 14.8, 0, 1.0}, {22.0, 16.0, 0, 0},
+            {14.0, 9.5, 0, 0}, {10.0, 1.0, 1.7, 0.9}, {9.0, 6.0, 1.0, 1.8}, {6.0, 2.0, 0.3, 1.0},
+        };
+        for (int k = 0; k < (int)(sizeof c / sizeof c[0]); k++) {
+            WpMatchConfig cfg = sim_config_7v7();
+            sim_init(&s, &cfg);
+            s.flags |= WP_SIMF_STATIC_OTHERS;
+            for (int i = 0; i < 2 * s.n_per_side; i++) s.players[i].pos = fv2_make(FX(-15.0) + i * FX(2.0), FX(80.0));
+            for (int sd = 0; sd < WP_MAX_SEATS; sd++) s.seat_player[sd] = -1;
+            fx vh = (fx)(c[k].vh * 65536), vz = (fx)(c[k].vz * 65536), z0 = (fx)(c[k].z0 * 65536), ze = (fx)(c[k].z_end * 65536);
+            fx pd; int pt;
+            int got = ball_flight_to(vh, vz, z0, ze, &pd, &pt);
+            launch(&s, -FX(36.0), FX(10.0), z0, vh, 0, vz);
+            fx px = s.ball.pos.x, pz = s.ball.z, pvz = s.ball.vz, rd = -1;
+            int rt = -1, above = z0 > ze;
+            for (int t = 1; t <= 600 && rt < 0; t++) {
+                run_seat(&s, NOIN, 1);
+                if (s.ball.z > ze) above = 1;
+                int bounced = pvz < 0 && s.ball.vz >= 0;            /* hit the grass during this tick */
+                if ((above && s.ball.vz < 0 && s.ball.z <= ze) || bounced) {
+                    fx f = bounced ? fx_div(pz, fx_max(fx_mul(-pvz, WP_DT), 1))    /* share of the tick before landing */
+                                   : fx_div(pz - ze, fx_max(pz - s.ball.z, 1));
+                    rd = px + fx_mul(s.ball.pos.x - px, fx_clamp(f, 0, FX_ONE)) + FX(36.0);
+                    rt = t;
+                }
+                px = s.ball.pos.x; pz = s.ball.z; pvz = s.ball.vz;
+            }
+            printf("flight_to vh %.1f vz %.1f z %.1f->%.1f: model %.2f m / %d ticks (%d), sim %.2f m / %d ticks\n",
+                   c[k].vh, c[k].vz, c[k].z0, c[k].z_end, tod(pd), pt, got, tod(rd), rt);
+            CHECKF(rt > 0 && fx_abs(rd - pd) <= FX(0.3) && pt - rt <= 1 && rt - pt <= 1,
+                   "flight_to case %d: model %.2f/%d sim %.2f/%d", k, tod(pd), pt, tod(rd), rt);
+        }
+    }
     return TEST_DONE();
 }

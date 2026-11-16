@@ -169,6 +169,8 @@
 #define T_PASS_MAX_DIST    FX(32.0)   /* ... and beyond this not picked at all */
 #define T_PASS_RUNNER_MS   FX(2.0)    /* receiver moving away from the passer faster than this = a runner */
 #define T_SPRINT_SPILL     FX(0.12)   /* extra first-touch spill when receiving at a sprint */
+#define T_FIRST_TOUCH_SPILL FX(0.45)  /* first touch keeps this share of the relative speed at T_CONTROL_MAX_REL */
+#define T_GAIN_TOUCH_COOLDOWN 6       /* ticks after gaining the ball before the next touch */
 #define T_PASS_TAP_TICKS   20         /* S released within this (333 ms) = tap pass; held longer = through ball (CP0.3e: was 12) */
 #define T_THROUGH_MIN_K    FX(1.10)   /* a through ball is struck at least this x a tap to the same man (CP0.3e) */
 #define T_THROUGH_DEEP_S   FX(1.2)    /* full meter: the meeting point this much further along his run (s) */
@@ -199,6 +201,16 @@
 #define T_HEADER_SHOT_MAX  FX(17.0)
 #define T_HEADER_SHOT_VZ   -FX(0.8)   /* nodded down */
 #define T_HEADER_PASS_MAX  FX(12.0)
+#define T_HEADER_PASS_MIN  FX(5.0)    /* header pass: speed = K * distance + BASE, clamped to [MIN, MAX] ... */
+#define T_HEADER_PASS_K    FX(0.7)
+#define T_HEADER_PASS_BASE FX(3.0)
+#define T_HEADER_PASS_VZ   FX(1.8)    /* ... cushioned up a little */
+#define T_HEADER_PASS_NOBODY_D FX(8.0) /* header pass with nobody to pick: as if to a mate this far */
+#define T_HEAD_Z           FX(1.70)   /* head centre above the feet (header.c) */
+#define T_HEAD_FWD         FX(0.12)   /* ... and ahead of the body centre */
+#define T_HEAD_REACH_XY    FX(0.45)   /* head contact: ball within this horizontally ... */
+#define T_HEAD_REACH_Z     FX(0.32)   /* ... and vertically of the head */
+#define T_HEADER_WAIT_MAX  70         /* ticks a header attempt waits for the ball */
 
 /* ---- tackles & bodies (CP0.3) ---- */
 #define T_TACKLE_START     FX(1.6)    /* J with an opponent on the ball this close = a standing tackle */

@@ -20,7 +20,8 @@ They are tools, not tests (not built by CMake); numbers they print are what the 
 CP0.3 harnesses (all take a format flag, 1 = 7v7): `shots.c` (live shot outcomes), `icpt.c` (live taps to the ringed
 mate: received / intercepted), `human.c` (dispossession standing/jogging/sprinting, kickoff race), `mirror.c`
 (mirror-symmetry divergence; swaps the team plan too - first different decision ~tick 240 = rounding drift),
-`aimatch.c [matches] [minutes] [seven]` (AI vs AI balance and rates), `passfail.c [7|5]` (AI pass outcomes by length / source), `goals.c [7|5]` (what scores: shot distance,
+`aimatch.c [matches] [minutes] [seven]` (AI vs AI balance and rates), `aerial.c [matches] [minutes] [seven]` (AI vs AI
+lob / cross completion, first aerial contact by height band, header passes; metrics in tests/aerial_metrics.h), `passfail.c [7|5]` (AI pass outcomes by length / source), `goals.c [7|5]` (what scores: shot distance,
 pressure at the shot, own goals; found the breakaway / perfect-aim problem of D-030/D-031).
 
 7v7 baselines (2026-11-15, before CP0.3b): shots 7-16 m: goal 19% / keeper 71% (catches weak, body-blocks firm);

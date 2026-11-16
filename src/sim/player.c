@@ -682,7 +682,7 @@ static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const
     fv2 rel = fv2_sub(b->vel, p->vel);
     fx rs = fv2_len(rel);
     /* first touch: kills most of the relative speed; harder balls spill further (visible cause) */
-    fx spill = fx_mul(fx_div(rs, T_CONTROL_MAX_REL), FX(0.45));
+    fx spill = fx_mul(fx_div(rs, T_CONTROL_MAX_REL), T_FIRST_TOUCH_SPILL);
     if (in->buttons & WP_BTN_SPRINT) spill += T_SPRINT_SPILL;     /* receiving at a sprint: heavier touch */
     if (dseg > T_CONTROL_REACH)                                       /* stretching for it */
         spill += fx_mul(T_STRETCH_SPILL, fx_div(dseg - T_CONTROL_REACH, T_CONTROL_STRETCH - T_CONTROL_REACH));
@@ -692,7 +692,7 @@ static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const
     b->spin = 0;
     b->owner = (int8_t)i;
     b->last_touch = (int8_t)i;
-    p->touch_cooldown = 6;
+    p->touch_cooldown = T_GAIN_TOUCH_COOLDOWN;
     s->events |= WP_EV_TOUCH;
     int hands = keeper_hands(s, i);
     b->no_hands = 0;                                      /* controlled: a new deliberate touch sets it again */

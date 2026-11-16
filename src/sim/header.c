@@ -4,12 +4,6 @@
  * Aim comes from the stick at the contact tick: PASS heads it to the best team-mate, SHOOT at goal (aim assist). */
 #include "sim/sim_internal.h"
 
-#define HEAD_Z        FX(1.70)   /* head centre above the feet */
-#define HEAD_FWD      FX(0.12)
-#define HEAD_REACH_XY FX(0.45)
-#define HEAD_REACH_Z  FX(0.32)
-#define WAIT_MAX      70         /* ticks a header attempt waits for the ball */
-
 /* When will the ball pass closest to (x,y) and how high will it be? (flight approx: no drag) */
 static void ball_approach(const SimState *s, fv2 at, fx *t_out, fx *z_out, fx *miss_out) {
     const WpBall *b = &s->ball;
@@ -29,7 +23,7 @@ int header_wanted(const SimState *s, int i, int *jump) {
     fx t, z, miss;
     ball_approach(s, p->pos, &t, &z, &miss);
     if (t > FX(1.2) || miss > FX(2.0) || z < WP_BAND_BODY_MAX - FX(0.15)) return 0;
-    *jump = z > HEAD_Z + FX(0.20);
+    *jump = z > T_HEAD_Z + FX(0.20);
     return 1;
 }
 
@@ -70,10 +64,10 @@ void header_step(SimState *s, int i) {
         }
         return;
     }
-    fv2 head = fv2_add(p->pos, fv2_from_angle(p->facing, HEAD_FWD));
+    fv2 head = fv2_add(p->pos, fv2_from_angle(p->facing, T_HEAD_FWD));
     /* missed: the ball has gone past (or someone has it) -> give up now, body collision back, free soon */
     fv2 to_head = fv2_sub(head, b->pos);
-    if (b->owner >= 0 || (fv2_dot(to_head, b->vel) < 0 && fv2_len(to_head) > HEAD_REACH_XY)) {
+    if (b->owner >= 0 || (fv2_dot(to_head, b->vel) < 0 && fv2_len(to_head) > T_HEAD_REACH_XY)) {
         p->kick.done = 1;
         if (p->action == WP_ACT_STAND_HEADER) p->kick.windup = (uint8_t)(p->action_timer + 1 > 255 ? 255 : p->action_timer + 1);
         return;
@@ -87,10 +81,10 @@ fx header_contact_dist(const SimState *s, int i) {
     if (p->kick.kind != WP_KICK_HEADER || p->kick.done || b->owner >= 0) return -1;
     if (p->action != WP_ACT_JUMP_HEADER && p->action != WP_ACT_STAND_HEADER) return -1;
     if (p->action == WP_ACT_JUMP_HEADER && !p->kick.windup) return -1;
-    fv2 head = fv2_add(p->pos, fv2_from_angle(p->facing, HEAD_FWD));
-    fx hz = p->z + HEAD_Z;
+    fv2 head = fv2_add(p->pos, fv2_from_angle(p->facing, T_HEAD_FWD));
+    fx hz = p->z + T_HEAD_Z;
     fx d = fv2_len(fv2_sub(b->pos, head));
-    if (fx_abs(b->z - hz) > HEAD_REACH_Z || d > HEAD_REACH_XY) return -1;
+    if (fx_abs(b->z - hz) > T_HEAD_REACH_Z || d > T_HEAD_REACH_XY) return -1;
     return d + fx_abs(b->z - hz);
 }
 
@@ -110,14 +104,14 @@ void header_contact(SimState *s, int i, const WpSeatInput *in) {
         b->vz = T_HEADER_SHOT_VZ;
     } else {                                  /* header pass: cushioned toward the best team-mate */
         to = pass_pick(s, i, dir);
-        fx d = FX(8.0);
+        fx d = T_HEADER_PASS_NOBODY_D;
         if (to >= 0) {
             fv2 dd = fv2_sub(s->players[to].pos, b->pos);
             dir = fx_atan2(dd.y, dd.x);
             d = fv2_len(dd);
         }
-        b->vel = fv2_from_angle(dir, fx_clamp(fx_mul(d, FX(0.7)) + FX(3.0), FX(5.0), T_HEADER_PASS_MAX));
-        b->vz = FX(1.8);
+        b->vel = fv2_from_angle(dir, fx_clamp(fx_mul(d, T_HEADER_PASS_K) + T_HEADER_PASS_BASE, T_HEADER_PASS_MIN, T_HEADER_PASS_MAX));
+        b->vz = T_HEADER_PASS_VZ;
     }
     b->spin = 0;
     b->owner = -1;
@@ -140,7 +134,7 @@ void header_assist_move(const SimState *s, int i, WpSeatInput *io) {
     if (p->action != WP_ACT_JUMP_HEADER && p->action != WP_ACT_STAND_HEADER) return;
     fx t, z, miss;
     ball_approach(s, p->pos, &t, &z, &miss);
-    fv2 meet = fv2_sub(fv2_add(s->ball.pos, fv2_scale(s->ball.vel, t)), fv2_from_angle(p->facing, HEAD_FWD));
+    fv2 meet = fv2_sub(fv2_add(s->ball.pos, fv2_scale(s->ball.vel, t)), fv2_from_angle(p->facing, T_HEAD_FWD));
     uint16_t buttons = io->buttons;
     team_steer(p, meet, FX(0.08), FX(0.8), io);
     io->buttons = buttons;
@@ -150,8 +144,8 @@ void header_assist_move(const SimState *s, int i, WpSeatInput *io) {
 int header_action_ends(const WpPlayer *p) {
     if (p->action == WP_ACT_JUMP_HEADER) {
         int took_off = p->kick.kind != WP_KICK_HEADER || p->kick.windup;
-        return (took_off && p->z == 0 && p->vz == 0 && p->action_timer > 4) || p->action_timer > WAIT_MAX + 45;
+        return (took_off && p->z == 0 && p->vz == 0 && p->action_timer > 4) || p->action_timer > T_HEADER_WAIT_MAX + 45;
     }
     if (p->kick.kind == WP_KICK_HEADER && p->kick.done) return p->action_timer > (uint16_t)p->kick.windup + 12;
-    return p->action_timer > WAIT_MAX;
+    return p->action_timer > T_HEADER_WAIT_MAX;
 }

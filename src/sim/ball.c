@@ -244,9 +244,13 @@ fx ball_roll_speed_after(fx v0, fx d) {
     return left > 0 ? ball_roll_speed_for(left) : 0;
 }
 
-/* where a ball launched at (vh, vz) from the grass first lands (mirrors integrate()'s air branch + substeps) */
-fx ball_carry_distance(fx vh, fx vz) {
-    fx x = 0, z = 0;
+/* Flight of a ball launched at (vh, vz) from height z0 (no spin): mirrors integrate()'s air branch + substeps.
+ * Stops when the ball comes DOWN through z_end (z <= z_end while falling) or hits the grass: *dist = horizontal
+ * distance covered, *ticks = sim ticks until then (the crossing happens during that tick). Returns 1 if it came
+ * down through z_end, 0 if it never rose above it (then: where it hit the grass). */
+int ball_flight_to(fx vh, fx vz, fx z0, fx z_end, fx *dist, int *ticks) {
+    fx x = 0, z = z0;
+    int above = z0 > z_end;
     for (int t = 0; t < 600; t++) {
         fx sp = fv2_len(fv2_make(vh, vz));
         int n = 1 + (int)(fx_mul(sp, WP_DT) / T_SUBSTEP_MAX_MOVE);
@@ -259,9 +263,23 @@ fx ball_carry_distance(fx vh, fx vz) {
             vz -= fx_mul(vz, kd) + fx_mul(T_GRAVITY, dt);
             x += fx_mul(vh, dt);
             z += fx_mul(vz, dt);
-            if (z <= 0) return x;
+            if (z > z_end) above = 1;
+            if (z <= 0 || (above && vz < 0 && z <= z_end)) {
+                *dist = x;
+                *ticks = t + 1;
+                return above;
+            }
         }
     }
+    *dist = x;
+    *ticks = 600;
+    return 0;
+}
+
+/* where a ball launched at (vh, vz) from the grass first lands */
+fx ball_carry_distance(fx vh, fx vz) {
+    fx x; int t;
+    ball_flight_to(vh, vz, 0, 0, &x, &t);
     return x;
 }
 
