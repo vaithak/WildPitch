@@ -141,12 +141,17 @@
 #define T_SW_K             30         /* ratio offset (ticks): (t_c + K) vs (t_me + K) - GRF's +500 ms */
 #define T_SW_NEXT_NUM      4          /* oracle hysteresis: a challenger replaces sw_next when (t_c+K)*5 < (t_inc+K)*4 */
 #define T_SW_NEXT_DEN      5
+#define T_SW_NEXT_HOLD     36         /* ... and only after the incumbent has been shown this long (ticks) */
 #define T_SW_EV_NUM        {0, 1, 7}  /* event window: switch when (t_c+K)*DEN < (t_me+K)*NUM */
 #define T_SW_EV_DEN        {1, 2, 10}
 #define T_SW_OV_NUM        {0, 1, 1}  /* otherwise only this override (Events: 3x quicker) */
 #define T_SW_OV_DEN        {1, 3, 2}
 #define T_SW_INTENT_X      {1, 4, 3}  /* stick held at the ball: either rule needs 1/x */
 #define T_SW_INTENT_COS    FX(0.643)  /* ... "at the ball" = within 50 deg of it (or of where it is in 0.5 s) */
+#define T_SW_SOON_STEP     10         /* ... "in 0.5 s" = this 50 ms step of the cached path */
+#define T_SW_HOT_NUM       4          /* the indicator turns solid within 1.25x (5/4) of an unprompted switch */
+#define T_SW_HOT_DEN       5
+#define T_SW_BLEND_MIN_V   FX(0.5)    /* post-switch blend only for a man moving at least this fast (m/s) */
 #define T_SW_DWELL         {24, 24, 18}   /* every switch: no unprompted switch for this long (ticks) */
 #define T_SW_BACK          {60, 60, 60}   /* return lock: not back to the man just left (nor him as AI winner) */
 #define T_SW_EVENT_WIN     {9, 9, 12}     /* ticks the defensive ratio applies after the ball goes loose */

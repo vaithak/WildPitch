@@ -120,7 +120,7 @@ From the ball-physics research (`reports/Football game ball physics.md`, steps R
   (R4 skid-to-roll/topspin is optional later).
 - `ball_roll_speed_for(d)` (inverse roll model) exists for CP0.2 weighted passes.
 
-## D-017 — Passing & switching model (2026-11-15, CP0.2a) — *receive/assist parts superseded by D-020*
+## D-017 — Passing & switching model (2026-11-15, CP0.2a) — *receive/assist parts superseded by D-020; switching amended by D-050*
 - **Tap pass = targeted ground pass:** receiver = best team-mate within 55° of the stick (angle + distance score;
   keeper only within 20°). Aimed and weighted at the CONTACT tick from where ball and receiver are (0.25 s lead), so
   the passer's run never spoils it: launch = inverse roll model so it arrives at 5.5 m/s (measured ~6.0). No receiver
@@ -157,7 +157,7 @@ permanent line on the title screen footer and in the credits. Never on the in-ma
 - **Assisted receive meet point:** cheap 50 ms ball prediction; ground/lofted passes → the reachable point CLOSEST to
   the receiver (step across, let it come: arrives ~6 m/s); through balls → where it slows to ~3.5 m/s (run onto it).
 
-## D-020 — Passes solve the meeting point; the receiver is steered, never abandoned (2026-11-15, CP0.2c)
+## D-020 — Passes solve the meeting point; the receiver is steered, never abandoned (2026-11-15, CP0.2c) — *deflection switch amended by D-050*
 Owner: "something off about the through ball power and passing/through ball reception" + "while a ball is being
 received, and the moving key is pressed, player moves ahead without reception". Research + headless playtest:
 `reports/Through ball and pass reception.md`. **Amends D-017 (receive/switch) and D-019 (through ball).**
@@ -299,7 +299,7 @@ for bit (verified against the old goldens with the field unhashed). The game app
 OPPOSITION; our AI team-mates stay NORMAL. Esc menu: Difficulty < Easy | Normal | Hard > (saved to `settings.cfg`,
 separate from `controls.cfg`), applied by "Restart match". EASY vs HARD AI (7v7): goals 15–21, possession 44–56%.
 
-## D-029 — Keeper's hands, throw-ins, corners, goal kicks, defender auto-switch (2026-11-15, owner request)
+## D-029 — Keeper's hands, throw-ins, corners, goal kicks, defender auto-switch (2026-11-15, owner request) — *defender switch amended by D-050*
 - **Hands:** a keeper who catches/gathers the ball inside his own box holds it (`WpBall.held`): chest height, no
   ball physics, can't be tackled, can't leave the box, 6 s limit (then released). Distribution: S throw (to the
   ringed mate), A high throw, D/W punt; the AI keeper looks up ~0.8 s then throws to a free man or punts. Outside
@@ -417,7 +417,7 @@ time thing" ("extra time" clarified = stoppage time).
   (refactor verified bit-identical before the clock was switched on).
 - HUD: `27:15   1ST HALF`, `45:00 (+3)` once announced, `45+1:12 (+3)` in stoppage; HALF TIME / FULL TIME banners.
 
-## D-037 — Movement assist toward the ball (2026-11-15, owner request + research)
+## D-037 — Movement assist toward the ball (2026-11-15, owner request + research) — *cone amended by D-049, switching by D-050*
 Research: `reports/Assisted movement toward the ball.md` (EA FC / eFootball settings, SWOS port, YSoccer and Google
 Research Football source, assist literature, WildPitch audit). Owner decisions (AskUserQuestion): AI team-mates'
 passes get the receive assist even with the stick released; a released stick never chases a loose ball; an Esc-menu
@@ -660,8 +660,8 @@ with the 3x override; Q + a held direction picks the man that way (ball-relative
   0.2 s ahead, react 0.15 s + turn (0.30 s x (1-cos)/2 toward THAT point) + acceleration (0.22 s x (1 - speed along it
   / top)) at sprint speed, squared compares with an optimistic pre-check (a root only for steps that pass it). None
   in 4 s: his time to the path's end (>= 241; no 9 s cliff). Their carrier: a press point led 0.3 s and 1.5 m toward
-  our goal centre, +0.5 s if he's the wrong side. GRF hysteresis (t_c + 30)·5 < (t_inc + 30)·4. Refreshed every 3
-  ticks (and on a press).
+  our goal centre, +0.5 s if he's the wrong side. GRF hysteresis (t_c + 30)·5 < (t_inc + 30)·4, and the man shown
+  stays at least 36 ticks (T_SW_NEXT_HOLD) unless he can no longer be picked. Refreshed every 3 ticks (and on a press).
 - **Forced** (fire at once, set the dwell): our pass struck (hand-off), gaining the ball (AI mate / keeper / restart
   taker), a deflection (best ETA if quicker than him), the keeper handing back (best ETA), kick-offs.
 - **Unprompted** (Events / Assisted only), all of: dwell over (every switch: 24 / 18 ticks; manual: 90 = the 1.5 s
@@ -675,7 +675,8 @@ with the 3x override; Q + a held direction picks the man that way (ball-relative
   Deviations from the report: events-only defensive ratio except their carrier (the report held it for their whole
   possession incl. passes in flight - measured: one switch every dwell while their pass travelled); event ratio 1/2
   (report 3/5); Assisted return lock 60 (report 45: 24 ping-pongs in 15 min).
-- **Button:** a press goes to exactly the man the indicator shows (`sw_q`): with a direction held, the team-mate within
+- **Button:** a press goes to exactly the man the indicator shows (`sw_q`, recomputed every tick so it follows the
+  stick at once): with a direction held, the team-mate within
   45 deg of it seen from the ball, minimising d·(2 - cos) (nobody that way: the oracle's man - never a dead press);
   no direction: sw_next (or the previous one if it changed < 6 ticks ago). Presses within 40 ticks of the last cycle
   through men not yet visited (bit mask incl. the start; resets when all are visited). No hold-to-aim mode.
@@ -688,5 +689,10 @@ with the 3x override; Q + a held direction picks the man that way (ball-relative
   the winner when engaging (close / moving at it) and within 1.2x + 0.1 s of the quickest AI man by switch_eta (was:
   only when the fastest). No-op for a team without a non-LEGACY seat (AI vs AI byte-identical).
 - **Measured** (`tools/playtest/switchrate.c`, 7v7, assist Normal, 3 seeds x 5 min): unprompted switches/min stick
-  released 34.2 -> 15.3, stick held at the ball 17.3 -> 0.47; A->B->A within 60 ticks (both unprompted) 19 / 10 -> 0 /
-  0. Manual: 0 unprompted. Assisted: 25.9 / 1.9, A->B->A 0. Tests: `tests/test_switching.c`.
+  released 34.2 -> 12.7, stick held at the ball 17.3 -> 0.47; A->B->A within 60 ticks (both unprompted) 19 / 10 -> 0 /
+  0. Manual: 0 unprompted. Assisted: 22.7 / 1.9, A->B->A 0. Indicator while drawn: oracle changes ~31-37/min (report's
+  starting target 20: every switch moves it), A->B->A within 30 ticks 0. Tests: `tests/test_switching.c`.
+- **Known (not fixed):** a passive seat man within 4 m of a still loose ball is the team's ball-winner (D-030 "fastest
+  and engaging"), and the team that last had the ball picks no winner for a loose ball - so a human who never moves
+  can freeze play beside a still ball (pre-D-050 too; the 1.2x bonus is gated on engaging). The harness's released
+  script walks onto such a ball.

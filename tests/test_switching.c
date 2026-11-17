@@ -53,11 +53,14 @@ static int match(int held, uint8_t mode, int minutes, int *aba, int *dwell_break
     sim_init(&s, &cfg);
     sim_kickoff_setpiece(&s);
     int own = 0, n_un = 0;
+    WpSeatInput last_in = {0, 0, 0};
     long last_t = -1000, prev_t = -1000;
     int last_from = -1, last_to = -1, last_r = 0;
     for (long t = 0; t < 3600L * minutes; t++) {
         WpSeatInput in = script(held, &own);
         int tap = manual_taps && t % 97 == 50 && s.ball.owner != s.seat_player[0];
+        if (tap) { in.move_x = last_in.move_x; in.move_y = last_in.move_y; }   /* the stick the indicator was drawn for */
+        last_in = in;
         int want = s.sw_q[0];
         if (tap) in.buttons |= WP_BTN_SWITCH;
         int before = s.seat_player[0];
@@ -158,6 +161,36 @@ int main(void) {
         int shown = s.sw_q[0];
         step((WpSeatInput){0, 0, WP_BTN_SWITCH});
         CHECKF(s.seat_player[0] == shown && shown == 4, "plain Q went to %d, indicator %d", s.seat_player[0], shown);
+        /* the direction arrives with the press, the chevron still on the oracle's man: the direction wins */
+        scene(3, fv2_make(0, 0), fv2_make(FX(2.0), 0));
+        s.players[4].pos = fv2_make(FX(4.0), FX(1.0));
+        s.players[5].pos = fv2_make(FX(2.5), FX(14.0));
+        step((WpSeatInput){0, 0, 0});
+        step((WpSeatInput){0, 0, 0});
+        int was = s.sw_q[0];
+        step((WpSeatInput){0, 127, WP_BTN_SWITCH});
+        CHECKF(was == 4 && s.seat_player[0] == 5, "Q + up with the chevron on %d went to %d", was, s.seat_player[0]);
+    }
+    /* 4b. a deflection of our pass (Events): control goes at once to the team-mate quickest to the loose ball */
+    {
+        scene(3, fv2_make(-FX(6.0), 0), fv2_make(-FX(5.6), 0));
+        s.players[4].pos = fv2_make(FX(22.0), 0);         /* the receiver, far */
+        s.players[5].pos = fv2_make(FX(5.0), -FX(5.0));   /* where their man will knock it */
+        s.players[10].pos = fv2_make(FX(2.0), FX(0.3));   /* their man in the lane */
+        s.ball.owner = 3; s.ball.last_touch = 3;
+        WpKick kk = {0};
+        kk.kind = WP_KICK_PASS; kk.dir = 0; kk.to = 4 + 1; kk.windup = T_KICK_WINDUP_PASS; kk.foot = 1;
+        sim_player_kick(&s, 3, &kk);
+        int got = -1, t_hand = -1, t_defl = -1, reason = 0;
+        for (int t = 0; t < 90 && got < 0; t++) {
+            int before = s.seat_player[0];
+            if (s.ball.last_touch == 10 && t_defl < 0) t_defl = t;
+            step((WpSeatInput){0, 0, 0});
+            if (s.seat_player[0] != before && s.sw_reason[0] == WP_SW_PASS) t_hand = t;
+            if (s.seat_player[0] != before && s.sw_reason[0] == WP_SW_DEFLECT) { got = s.seat_player[0]; reason = t; }
+        }
+        printf("deflection: hand-off at tick %d, knocked by their man at %d, control to %d at %d\n", t_hand, t_defl, got, reason);
+        CHECK(t_hand >= 0 && got >= 0 && got != 4 && reason - t_defl <= 6);
     }
     /* 5. stick intent: hopelessly placed man, mate right by a still loose ball. Released: the override switches;
      *    held at the ball: he keeps his man (4x needed); holding SHOOT (a buffered press): no switch either */

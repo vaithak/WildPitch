@@ -117,7 +117,9 @@ int switch_best(const SimState *s, int k) {
 
 /* the man a press goes to: Q + a direction = the team-mate that way seen from the ball; repeated presses skip the
  * men this cycle visited; otherwise the oracle (or the one it showed a moment ago) */
-static int press_target(const SimState *s, int k, const WpSeatInput *si, const uint16_t *eta) {
+static int press_target(const SimState *s, int k, const WpSeatInput *si, const uint16_t *eta_or_null) {
+    uint16_t own[WP_MAX_PER_SIDE];
+    const uint16_t *eta = eta_or_null;
     int me = s->seat_player[k], base = s->players[me].team * s->n_per_side;
     int cycling = s->sw_cycle[k] < T_SW_CYCLE_WIN;
     uint16_t visited = cycling ? s->sw_visited[k] : 0;
@@ -142,6 +144,10 @@ static int press_target(const SimState *s, int k, const WpSeatInput *si, const u
             best = s->sw_next[k];
             if (s->sw_next_age[k] < T_SW_RTC && s->sw_next_old[k] >= 0 && eligible(s, k, s->sw_next_old[k]))
                 best = s->sw_next_old[k];
+        }
+        if (best < 0 && !eta) {                           /* between oracle refreshes: score them now */
+            for (int j = base; j < base + s->n_per_side; j++) own[j - base] = eligible(s, k, j) ? switch_eta(s, j) : 0xFFFF;
+            eta = own;
         }
         if (best < 0)                                     /* nobody that way / cycling: best ETA not yet visited */
             for (int j = base; j < base + s->n_per_side; j++)
@@ -170,7 +176,6 @@ void switch_seat(SimState *s, int k, const WpSeatInput *si) {
     if (s->phase != WP_PHASE_PLAY) { s->sw_q[k] = -1; return; }
     /* the oracle: every T_PLAN_EVERY ticks (like the team plan) and on a press */
     int pressed = (si->buttons & WP_BTN_SWITCH) && !(s->prev_buttons[k] & WP_BTN_SWITCH);
-    int shown = s->sw_q[k];                           /* what the indicator shows (<= 3 ticks old) */
     int fresh = s->tick % T_PLAN_EVERY == 0 || pressed;
     int base = p->team * s->n_per_side;
     uint16_t eta[WP_MAX_PER_SIDE];
@@ -184,20 +189,21 @@ void switch_seat(SimState *s, int k, const WpSeatInput *si) {
         int inc = s->sw_next[k];
         if (inc >= 0 && (!eligible(s, k, inc))) inc = -1;
         if (inc >= 0 && best >= 0 && best != inc &&
-            !(((int32_t)eta[best - base] + T_SW_K) * T_SW_NEXT_DEN < ((int32_t)eta[inc - base] + T_SW_K) * T_SW_NEXT_NUM))
+            (s->sw_next_age[k] < T_SW_NEXT_HOLD ||     /* the indicator holds a moment before it moves */
+             !(((int32_t)eta[best - base] + T_SW_K) * T_SW_NEXT_DEN < ((int32_t)eta[inc - base] + T_SW_K) * T_SW_NEXT_NUM)))
             best = inc;
         if (best != s->sw_next[k]) { s->sw_next_old[k] = s->sw_next[k]; s->sw_next[k] = (int8_t)best; s->sw_next_age[k] = 0; }
-        s->sw_q[k] = (int8_t)press_target(s, k, si, eta);
         s->sw_hot[k] = 0;
     }
+    s->sw_q[k] = (int8_t)press_target(s, k, si, fresh ? eta : 0);   /* every tick: follows the stick at once */
     int acting = (p->action == WP_ACT_KICK || p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER) &&
                  !p->kick.done;
     if (b->owner == me || acting) return;
     /* the button */
-    if (pressed) {                                    /* exactly the man shown, if he still can be */
-        int to = shown >= 0 && eligible(s, k, shown) ? shown : s->sw_q[k];
-        if (to < 0) return;
+    if (pressed) {
         int dir = si->move_x * si->move_x + si->move_y * si->move_y >= T_CHASE_STICK_MIN * T_CHASE_STICK_MIN;
+        int to = s->sw_q[k];                          /* the man the indicator shows for this stick */
+        if (to < 0) return;
         uint16_t vis = s->sw_cycle[k] < T_SW_CYCLE_WIN ? s->sw_visited[k] : (uint16_t)(1u << (me - base));
         if (s->pass_target == me) s->pass_stick[0] = s->pass_stick[1] = -128;
         seats_switch_to(s, k, to, T_SWITCH_LOCK_MANUAL, si, 0, dir ? WP_SW_MANUAL_DIR : WP_SW_MANUAL);
@@ -223,14 +229,14 @@ void switch_seat(SimState *s, int k, const WpSeatInput *si) {
         const fv2 *at;
         const uint8_t *high;
         int n = meet_path(s, &at, &high);
-        fv2 soon = b->owner >= 0 ? b->pos : at[n / 8];
+        fv2 soon = b->owner >= 0 ? b->pos : at[T_SW_SOON_STEP < n ? T_SW_SOON_STEP : n - 1];
         fv2 tb = fv2_sub(b->pos, p->pos), ts = fv2_sub(soon, p->pos);
         fx c = fv2_len2_wide(tb) > (int64_t)FX(0.1) * FX(0.1) ? fv2_dot(st, fv2_norm(tb)) : FX_ONE;
         if (fv2_len2_wide(ts) > (int64_t)FX(0.1) * FX(0.1)) c = fx_max(c, fv2_dot(st, fv2_norm(ts)));
         if (c >= T_SW_INTENT_COS) { num = 1; den = INTENT_X[mi]; }
     }
     int32_t a = (int32_t)eta[cand - base] + T_SW_K, m = (int32_t)eta[me - base] + T_SW_K;
-    s->sw_hot[k] = (uint8_t)(s->sw_event[k] || a * den * 4 < m * num * 5);
+    s->sw_hot[k] = (uint8_t)(s->sw_event[k] || a * den * T_SW_HOT_NUM < m * num * T_SW_HOT_DEN);
     if (s->switch_cool[k]) return;                        /* the dwell */
     if (a * den < m * num) seats_switch_to(s, k, cand, DWELL[mi], si, 1, defend ? WP_SW_EVENT : WP_SW_OVERRIDE);
 }
@@ -273,7 +279,7 @@ void switch_blend(const SimState *s, int seat, WpSeatInput *io) {
     int mx = io->move_x, my = io->move_y;
     if (!mx && !my) return;
     const WpPlayer *p = &s->players[me];
-    if (fv2_len2_wide(p->vel) < (int64_t)FX(0.5) * FX(0.5)) return;
+    if (fv2_len2_wide(p->vel) < (int64_t)T_SW_BLEND_MIN_V * T_SW_BLEND_MIN_V) return;
     fx w = fx_div(FX_INT(r), FX_INT(BLEND[mode_ix(s, seat)])) / 2;
     wp_angle a = fx_atan2(FX_INT(my), FX_INT(mx));
     int32_t dl = ang_diff(fx_atan2(p->vel.y, p->vel.x), a);

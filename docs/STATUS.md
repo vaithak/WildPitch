@@ -108,7 +108,7 @@ header-pass bisection + its per-mate retarget and meet_choose in the buffer's et
   late meeting points (long lofts), aerial balls steered to his contact-plan point, our pass to another mate only if
   he is quicker than the receiver. Contract unchanged (neutral stick, <= F turn, no sprint, Off = raw).
 
-- **Part 2 (switching redesign, D-050), done, 7v7 golden updated on purpose (`83c4eca063ec2c62`; 5v5 LEGACY
+- **Part 2 (switching redesign, D-050), done, 7v7 golden updated on purpose (`8954bf043b6bc076`; 5v5 LEGACY
   unchanged):** new `src/sim/switching.c`; per-seat `switch_mode` (LEGACY for tests / regression format; the game:
   Esc > Auto switching Manual / Events / Assisted, default Events, saved in settings.cfg, applies on Restart).
   One intercept-ETA oracle (sw_next, hysteresis), forced hand-overs as before, unprompted switches only through event
@@ -120,15 +120,19 @@ header-pass bisection + its per-mate retarget and meet_choose in the buffer's et
 
   | Script | unprompted / min before -> after | A->B->A in 60 ticks (both unprompted) | all switches / min |
   |---|---|---|---|
-  | R stick released | 34.2 -> 15.3 (45%) | 19 -> 0 | 45.7 -> 30.1 |
+  | R stick released | 34.2 -> 12.7 (37%) | 19 -> 0 | 45.7 -> 25.9 |
   | H stick held toward the ball | 17.3 -> 0.47 (3%) | 10 -> 0 | 31.1 -> 19.1 |
   | Manual (after) | 0 / 0 | 0 / 0 | 13.1 / 16.7 |
-  | Assisted (after) | 25.9 / 1.9 | 0 / 0 | 40.5 / 21.2 |
+  | Assisted (after) | 22.7 / 1.9 | 0 / 0 | 38.1 / 21.2 |
+
+  The chevron (while drawn): the oracle's man changes ~31-37/min (it must move after every switch), never A->B->A
+  within 30 ticks (it holds >= 36 ticks).
 
   Before, most unprompted switches happened while their pass travelled (D-029's distance spot moving at pass speed).
   After, the remaining released-stick ones are the defensive switch onto the best man against their carrier.
   AI vs AI byte-identical (no seats). Cost: bench_sim (5v5 LEGACY) 10.5 us/tick unchanged; the 7v7 seat harness
-  2.36 -> 2.47 s for the same 45 minutes (+5%).
+  2.36 -> 2.50 s for the same 45 minutes of scripted play (+6%, one run; the play differs).
+  Known: a seat man who never moves, within 4 m of a still loose ball, can freeze play (D-030 winner rule; also before).
 
 ### Playtest guide (CP0.5b part 2, switching)
 1. Esc > Auto switching: Events (default). Defend: a dim yellow "V" over a team-mate shows who Q gives you; it turns

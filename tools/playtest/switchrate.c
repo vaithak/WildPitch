@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
     int seeds = argc > 1 ? atoi(argv[1]) : 3, minutes = argc > 2 ? atoi(argv[2]) : 5;
     static SimState s;
     for (int held = 0; held < 2; held++) {
-        long sim_reason[16] = {0};
+        long sim_reason[16] = {0}, nx_changes = 0, nx_aba = 0, q_changes = 0;
         long cnt[R_N] = {0}, aba_un = 0, aba_any = 0, ticks = 0, aba_un_gain = 0, ctx[4] = {0};
         for (int seed = 1; seed <= seeds; seed++) {
             WpMatchConfig cfg = sim_config_7v7();
@@ -68,6 +68,7 @@ int main(int argc, char **argv) {
             sim_kickoff_setpiece(&s);
             WpInput in; memset(&in, 0, sizeof in);
             int own = 0;
+            int nx_prev = -1, nx_prev2 = -1, q_prev = -1; long nx_t = -1000;
             /* history of switches: (tick, from, to, reason) - the last two are enough for A->B->A */
             long h_tick[2] = {-1000, -1000}; int h_from[2] = {-1, -1}, h_to[2] = {-1, -1}, h_r[2] = {0, 0};
             for (long t = 0; t < 60L * 60 * minutes; t++) {
@@ -79,6 +80,21 @@ int main(int argc, char **argv) {
                          : ptgt0 >= 0 ? (ours0 ? 2 : 1) : 3;
                 sim_step(&s, &in);
                 ticks++;
+#ifdef WP_HAVE_SWITCH_MODE
+                int o = s.ball.owner, shown = s.phase == WP_PHASE_PLAY && s.seat_player[0] == before &&
+                    !(o >= 0 && s.players[o].team == 0) && !(s.pass_target >= 0 && s.players[s.pass_from].team == 0);
+                if (shown) {                          /* the indicator, while it is drawn (render.c's rule) */
+                    int nx = s.sw_next[0];
+                    if (nx != nx_prev && nx >= 0 && nx_prev >= 0) {
+                        nx_changes++;
+                        if (nx == nx_prev2 && t - nx_t <= 30) { nx_aba++; if (getenv("WP_NX_TRACE")) printf("nx ABA t%ld %d->%d->%d (prev change t%ld) age %d seat %d owner %d ptgt %d\n", t, nx_prev2, nx_prev, nx, nx_t, s.sw_next_age[0], s.seat_player[0], s.ball.owner, s.pass_target); }
+                        nx_prev2 = nx_prev; nx_t = t;
+                    }
+                    if (nx >= 0) nx_prev = nx;
+                    if (s.sw_q[0] != q_prev && s.sw_q[0] >= 0 && q_prev >= 0) q_changes++;
+                    if (s.sw_q[0] >= 0) q_prev = s.sw_q[0];
+                } else { nx_prev = nx_prev2 = q_prev = -1; }
+#endif
                 int now = s.seat_player[0];
                 if (now == before || before < 0 || now < 0) continue;
                 int r;
@@ -119,6 +135,8 @@ int main(int argc, char **argv) {
                sim_reason[WP_SW_PASS], sim_reason[WP_SW_GAIN], sim_reason[WP_SW_DEFLECT], sim_reason[WP_SW_KEEPER],
                sim_reason[WP_SW_RESTART], sim_reason[WP_SW_MANUAL], sim_reason[WP_SW_MANUAL_DIR], sim_reason[WP_SW_EVENT],
                sim_reason[WP_SW_OVERRIDE]);
+        printf("\n    indicator: oracle (sw_next) changes %.1f/min, A->B->A within 30 ticks %ld; Q target (sw_q) changes %.1f/min",
+               nx_changes / mins, nx_aba, q_changes / mins);
 #endif
         printf("\n    A->B->A within 60 ticks: unprompted both %ld, unprompted then gain %ld, any non-pass %ld\n",
                aba_un, aba_un_gain, aba_any);
