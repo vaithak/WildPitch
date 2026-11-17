@@ -108,6 +108,17 @@ header-pass bisection + its per-mate retarget and meet_choose in the buffer's et
   late meeting points (long lofts), aerial balls steered to his contact-plan point, our pass to another mate only if
   he is quicker than the receiver. Contract unchanged (neutral stick, <= F turn, no sprint, Off = raw).
 
+- **Part 2 (switching redesign, D-050) stage 0 - baseline:** `tools/playtest/switchrate.c` (7v7, assist Normal, seat 0
+  scripted, 3 seeds x 5 min; reasons inferred from the state: restart / pass hand-off / gain / deflect / keeper /
+  unprompted). Before D-050:
+
+  | Script | switches/min | unprompted/min | unprompted while THEIR PASS travels | A->B->A in 60 ticks (both unprompted) |
+  |---|---|---|---|---|
+  | R stick released | 18.5 | 14.9 | 172 of 223 | 18 |
+  | H stick held toward the ball | 29.0 | 15.9 | 196 of 239 | 11 |
+
+  The flicker is mostly D-029's distance rule chasing a spot that moves at pass speed while their pass travels.
+
 ### Playtest guide (CP0.5b part 1, chase assist near the ball)
 1. A loose ball 5-10 m away with a team-mate closer to it: hold roughly toward it (even the neighbouring arrow
    key) - your man now bends onto it (before: only if he was the quickest).

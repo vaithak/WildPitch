@@ -153,17 +153,17 @@ int main(void) {
         printf("keyboard 8-way, ball %d m: gained OFF %d/%d, NORMAL %d/%d\n", d, got[0], n, got[1], n);
         CHECKF(got[1] == n, "ball %d m: normal gained %d/%d", d, got[1], n);
     }
-    /* 5. not his ball: a team-mate much nearer it -> exactly the raw stick */
+    /* 5. not his ball: far from it (beyond T_CHASE_NEAR_R, D-049) and a team-mate much nearer it -> the raw stick.
+     * (Until D-049 this ran ME 6 m from the ball for 40 ticks - but the seat auto-switched to the mate on the first
+     * tick, so it compared two men standing still; near the ball the cone now applies on purpose: test 11.) */
     {
-        WpSeatInput in = {127, 0, 0};
-        for (int lv = 0; lv < 2; lv++) {
-            loose_ball_scene(fv2_make(FX(6.0), FX(1.5)), fv2_make(0, 0), lv ? WP_ASSIST_NORMAL : WP_ASSIST_OFF);
-            s.players[3].pos = fv2_make(FX(6.3), FX(2.2));   /* a mate standing on it */
-            run(in, 40, lv ? pb : pa);
+        loose_ball_scene(fv2_make(FX(16.0), FX(1.5)), fv2_make(0, 0), WP_ASSIST_NORMAL);
+        s.players[3].pos = fv2_make(FX(16.3), FX(2.2));   /* a mate standing on it */
+        for (int deg = -20; deg <= 20; deg += 10) {
+            WpSeatInput in = stick_off(s.ball.pos, deg), out = in;
+            seats_chase_assist(&s, 0, &out);
+            CHECKF(out.move_x == in.move_x && out.move_y == in.move_y, "pulled onto a team-mate's far ball (%d deg)", deg);
         }
-        int same = 1;
-        for (int t = 0; t < 40; t++) same &= pa[t].x == pb[t].x && pa[t].y == pb[t].y;
-        CHECKF(same, "pulled onto a team-mate's ball");
     }
     /* 6. never sprints for him: the assisted legs keep the human's buttons */
     {
