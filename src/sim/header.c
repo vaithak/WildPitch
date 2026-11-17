@@ -156,7 +156,9 @@ void header_contact(SimState *s, int i, const WpSeatInput *in) {
     fv2 wh, P = b->pos;
     fx wz, t = FX(1.0);
     if (p->kick.foot == 1) {                  /* header at goal: aim assist, firm and downward */
-        dir = kick_aim_assist(s, i, dir, aim, has);
+        int human = 0;
+        for (int k = 0; k < WP_MAX_SEATS; k++) human |= s->seat_player[k] == i;
+        if (human) dir = kick_aim_assist(s, i, dir, aim, has);   /* (the AI aims where it chose, D-051) */
         wh = fv2_from_angle(dir, fx_min(T_HEADER_SHOT + fx_mul(in_speed, FX(0.25)), T_HEADER_SHOT_MAX));
         wz = T_HEADER_SHOT_VZ;
     } else {                                  /* header pass (lofted: kick.foot 2): solved onto the mate's run */

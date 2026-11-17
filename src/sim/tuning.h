@@ -393,6 +393,9 @@
 #define T_AIR_HEADPASS_MIN FX(3.0)    /* header passes to team-mates this far ... */
 #define T_AIR_HEADPASS_MAX FX(14.0)   /* ... up to this (the head's budget does the rest, D-048) */
 #define T_AIR_HALFVOLLEY_MAX FX(20.0) /* half-volley passes up to this */
+#define T_AIR_CLEAR_D      FX(25.0)   /* a clearance header goes this far upfield ... */
+#define T_AIR_CLEAR_WIDE   FX(0.8)    /* ... toward this share of the half-width on its side */
+#define T_AIR_VOLLEY_CLEAN FX(13.0)   /* volley error / difficulty: pace over the instep's v_clean (T_ST_INSTEP) */
 #define T_AIR_FAR_CORNER   FX(0.3)    /* a header at goal aims at the near corner if that cuts G_ERR by more than this */
 #define T_AIR_COMMIT       FX(1.0)    /* utility bonus for keeping the previous aerial choice ... */
 #define T_AIR_LATCH        FX(50.0)   /* ... on our own ball a header, once chosen, is kept */

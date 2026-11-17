@@ -358,7 +358,7 @@ void contact_strike(SimState *s, int i, const WpSeatInput *in, uint8_t kind, uin
     int band = band_of(z);
     if (kind == WP_KICK_SHOT) {                           /* volley: the foot law, error grows with height and pace */
         fx h = fx_clamp(fx_div(FX_INT(gauge), FX_INT(T_CHARGE_MAX_TICKS)), T_VOLLEY_MIN_H, FX_ONE);
-        dir = kick_aim_assist(s, i, dir, aim, has);
+        if (seat >= 0) dir = kick_aim_assist(s, i, dir, aim, has);   /* (the AI aims where it chose, D-051) */
         fv2 w = fv2_from_angle(dir, FX_ONE);
         fx sp = fx_min(T_SHOT_MAX, fx_mul(T_VOLLEY_K, fx_lerp(T_SHOT_MIN, T_SHOT_MAX, h)) +
                                    fx_mul(T_VOLLEY_IN_K, fx_max(-fv2_dot(rh, w), 0)));

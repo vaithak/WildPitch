@@ -76,7 +76,7 @@ static fx err_feature(const SimState *s, const WpPlayer *p, const WpBall *bt, fv
         sig = fx_mul(FX_INT(DEG_TO_ANG(T_HEADER_ERR_DEG)), fx_mul(FX_ONE + fx_div(FX_INT(phi), FX_INT(DEG_TO_ANG(90))), FX_ONE + over));
         if (phi > DEG_TO_ANG(90)) sig *= 3;
     } else {
-        fx vc = FX(13.0), over = fx_div(fx_max(rs - vc, 0), vc);      /* (the instep's v_clean, as contact_strike) */
+        fx vc = T_AIR_VOLLEY_CLEAN, over = fx_div(fx_max(rs - vc, 0), vc);   /* (as contact_strike) */
         sig = fx_mul(FX_INT(DEG_TO_ANG(T_VOLLEY_ERR_DEG) * (bt->z > T_CB_LOW ? 3 : 2)), FX_ONE + over);
     }
     /* spread at the goal: tan(sig) ~ sig (rad) = sig / 65536 x 2 pi */
@@ -161,7 +161,7 @@ int aerial_choose(const SimState *s, int i, AirChoice *out) {
             k->f[G_ERR] = herr;
             k->f[G_CONTEST] = cta;
         }
-        if (A.x * sg < 0 && (k = add(c, &n, AA_HEAD_CLEAR, -1, fv2_make(A.x + FX_INT(25 * sg), A.y >= 0 ? fx_mul(hw, FX(0.8)) : -fx_mul(hw, FX(0.8)))))) {
+        if (A.x * sg < 0 && (k = add(c, &n, AA_HEAD_CLEAR, -1, fv2_make(A.x + T_AIR_CLEAR_D * sg, A.y >= 0 ? fx_mul(hw, T_AIR_CLEAR_WIDE) : -fx_mul(hw, T_AIR_CLEAR_WIDE))))) {
             k->f[G_CONTEST] = cta;
             k->f[G_DANGER] = danger_a;
         }
@@ -216,7 +216,7 @@ int aerial_choose(const SimState *s, int i, AirChoice *out) {
             k->f[G_ERR] = err_feature(s, p, bt, V, k->aim, 0);
             k->f[G_CONTEST] = contest(tv, t_opp);
             k->f[G_PRESS] = contact_pressure(s, team, V);
-            k->f[G_DIFF] = bt ? fx_div(fx_max(fv2_len(fv2_make(fv2_len(bt->vel), bt->vz)) - FX(13.0), 0), FX(13.0)) : FX_ONE;
+            k->f[G_DIFF] = bt ? fx_div(fx_max(fv2_len(fv2_make(fv2_len(bt->vel), bt->vz)) - T_AIR_VOLLEY_CLEAN, 0), T_AIR_VOLLEY_CLEAN) : FX_ONE;
         }
     }
     int best = -1, latch = ours;

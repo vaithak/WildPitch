@@ -152,29 +152,31 @@ the stance poses with their ball (bottom right of the close-up rows). No lob gho
 4. `--gallery` shows each stance with its ball.
 Questions: do the stances read at match zoom? Too much lunge (the body steps to reach a wide ball)?
 
-**CP0.5a stage 4 (D-051): done, goldens updated on purpose** (5v5 `0b3798dfd8207c8c`, 7v7 `df26b28a9aa471c9`).
+**CP0.5a stage 4 (D-051): done, goldens updated on purpose** (5v5 `1c1bb280e057dcd5`, 7v7 `df26b28a9aa471c9`).
 The AI plays aerial balls through the same contacts a human gets: new `src/sim/aerial_ai.c` chooses head shot / header
 pass / clearance header / volley / half-volley / lay-off / control (candidates x features x weights) for the receiver
 and each team's ball-winner; a contested receiver attacks it with his head, a free one controls it. The AI's header
 shots now get the human header error (D-048 law); it compensates by aiming with the law (no flicks at goal, the
-corner with the smaller turn, inside the post by the spread). Driven crosses (1.8 m) were built and measured but are
-OFF (`T_CROSS_DRIVEN 0`): the marker 0.5 m in front heads every one of them (scripted duels 0/72 vs 58/72 lofted).
-Numbers (7v7, WP_STATS=1, rules on; baseline = HEAD before stage 4; 80 x 5 min, 20 in brackets):
+corner with the smaller turn, inside the post by the spread, no aim-assist re-pick). Driven crosses (1.8 m) were
+built and measured but are OFF (`T_CROSS_DRIVEN 0`): the marker 0.5 m in front heads every one (scripted duels 0/72
+vs 58/72 lofted); in matches they were level (0.43 goals/min, 47% crosses vs 0.41 / 51%).
+Numbers (7v7, WP_STATS=1, rules on; baseline = HEAD before stage 4; `aerial` 80 x 5 min on seeds 1-80 / 81-160):
 
 | Metric | Baseline | Stage 4 |
 |---|---|---|
-| Goals / min | 0.47 [0.44] | 0.41 (-12%) [0.47] |
-| Cross completion | 48% [52%] | 51% [55%] |
-| Header shots per cross | 0.39 [0.38] | 0.49 [0.55] |
-| Aerial turnovers / min (new counter) | 0.37 [0.37] | 0.39 [0.37] |
-| Lob completion | 71% [71%] | 69% [73%] |
-| Header shots -> goals | 75 -> 50 (no AI error) | 101 -> 39 |
+| Goals / min | 0.47 / 0.50 (0.48) | 0.43 / 0.46 (0.44, -8%) |
+| Cross completion | 48% / 53% (50.4%) | 47% / 48% (47.3%) - below baseline, ~1 sigma |
+| Header shots per cross | 0.39 / 0.41 | 0.42 / 0.43 |
+| Aerial turnovers / min (new counter) | 0.37 / 0.45 | 0.36 / 0.45 |
+| Lob completion | 71% / 73% | 67% / 70% |
+| Header shots -> goals | 75 -> 50 / 84 -> 61 (no AI error) | 86 -> 39 / 84 -> 39 |
 | Scripted cross duels (`tools/playtest/duel.c`) | 70/72 | 58/72 |
-| aimatch 20x5: goals, passes | 18+26, 74/76% | 20+27, 76/78% |
+| aimatch 20x5: goals, passes | 18+26, 74/76% | 18+28, 74/76% |
 
-bench_sim 10.57 -> 10.58 us/tick. New counters in `tests/aerial_metrics.h` (aerial turnovers, header goals, first-time
-air strikes; header shots now count sub-kind 1 only - same numbers as before, no AI lofted headers existed).
-Known: AI first-time foot strikes (volleys / lay-offs) are candidates but almost never chosen (~0-3 per 400 min).
+bench_sim 10.57 -> ~10.6-10.9 us/tick. New counters in `tests/aerial_metrics.h` (aerial turnovers, header goals,
+first-time air strikes; header shots now count sub-kind 1 only). Known: AI first-time foot strikes (volleys /
+lay-offs) are candidates but almost never chosen (~0-4 per 400 min); cross completion is 3 points under the baseline
+(the defender now attacks the ball: an owner call, see D-051).
 
 ### Playtest guide (CP0.5a stage 4, AI in the air)
 1. Watch AI crosses into the box: the striker waits where the cross is played and attacks it with his head when his

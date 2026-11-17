@@ -717,7 +717,9 @@ Report row 4 ("AI intents through the planner, driven crosses, AI stance choice"
 - **Error is the law:** the AI's header shots now get the D-048 header error like a human's (removed the AI
   exemption). ERR feature = the spread that law (or the volley law) gives at the goal / half the goal; a turn
   >= 135 deg (a flick) can't be aimed at goal (no candidate); the corner with the smaller turn if it cuts ERR by 0.3;
-  the aim is pulled inside the post by the spread. No dice beyond the existing draws.
+  the aim is pulled inside the post by the spread. The AI's header shots and volleys skip `kick_aim_assist` (it
+  re-picked the corner from the aim's y sign and undid the choice: 16 of 94 header shots were still flicks, 1 goal;
+  after: 7 of 86). Humans keep the assist. No dice beyond the existing draws.
 - **Movement:** attack point = for our ball the reachable ring point in the head band (1.6-2.35 m) nearest to him,
   for theirs the earliest; our ball to him waits where it was played to (pass_meet) and heads it once it is within 3 m
   (the header then steps him under its path and times the jump; jump from the ring's height); their ball: a defender
@@ -730,13 +732,17 @@ Report row 4 ("AI intents through the planner, driven crosses, AI stance choice"
   58/72 to the attackers, driven 0/72 - a ball that stays at head height for its whole descent is met by the marker
   0.5 m in front. 80 matches: driven 0.43 goals/min, crosses 47%, header shots/cross 0.43 vs lofted 0.41 / 51% / 0.49.
   The stage-1 2.3 m column stays (D-046) until a cross that clears the near man exists.
-- **Measured** (7v7, WP_STATS=1, rules on; 80 x 5 min `aerial`, baseline = HEAD before stage 4): goals 0.47 -> 0.41/min
-  (-12%, inside +-15%), crosses completed 48% -> 51%, header shots per cross 0.39 -> 0.49, aerial turnovers 0.37 ->
-  0.39/min, lobs 71% -> 69%, header goals 50 of 75 shots -> 39 of 101, header passes completed 40% -> 41%, AI
-  first-time foot strikes ~0 (candidates exist, rarely the best). aimatch 20x5: goals 18+26 -> 20+27, passes 74/76% ->
-  76/78%. Duels: 70/72 -> 58/72. bench_sim 10.57 -> 10.58 us/tick. Defender read window (80 matches, one code state before
-  the last aim fixes): 24 / 36 / 48 ticks -> crosses 47 / 47 / 45%, duels lost in matches 16 / 21 / 38, goals 0.41 /
-  0.40 / 0.41; 36 kept (shorter mostly switches the defender off - an owner call on how good defenders should be).
+- **Measured** (7v7, WP_STATS=1, rules on; `aerial` 80 x 5 min on seeds 1-80 and again on 81-160 (`WP_SEED0=80`);
+  baseline = HEAD before stage 4): goals 0.47 / 0.50 -> 0.43 / 0.46 per min (160 matches: 0.48 -> 0.44, -8%, inside
+  +-15%); crosses completed 48% / 53% -> 47% / 48% (50.4% -> 47.3%: below the baseline by 3 points, ~1 sigma of the
+  difference - NOT the >= the report asked for); header shots per cross 0.39 / 0.41 -> 0.42 / 0.43; aerial turnovers
+  0.37 / 0.45 -> 0.36 / 0.45 per min; lobs 71% / 73% -> 67% / 70%; header shots -> goals 75 -> 50 and 84 -> 61 (no AI
+  error) -> 86 -> 39 and 84 -> 39; AI first-time foot strikes ~0-4 per 400 min (candidates exist, rarely the best).
+  aimatch 20x5: goals 18+26 -> 18+28, passes 74/76% -> 74/76%. Scripted duels: 70/72 -> 58/72 (both sides cost: the
+  defender attacking the ball ~-12, the new receiver ~-7). bench_sim 10.57 -> ~10.6-10.9 us/tick. Defender read
+  window (80 matches, an earlier code state): 24 / 36 / 48 ticks -> crosses 47 / 47 / 45%, duels lost in matches 16 /
+  21 / 38, goals 0.41 / 0.40 / 0.41; 36 kept (shorter mostly switches the defender off - an owner call on how good
+  defenders should be). Header passes completed 40% -> 41-43% (now incl. lofted clearance headers: not like for like).
 
 ## D-052 — Aerial contact poses: fitted stance families timed on the sim's contact (2026-11-17, CP0.5a stage 5)
 Report row 5 (presentation only; the owner chose no lob ghost ring). New `src/game/avatar_stance.c`,

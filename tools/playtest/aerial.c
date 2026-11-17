@@ -1,7 +1,8 @@
 /* aerial.c - AI vs AI aerial counters (CP0.5a): lob / cross completion, first aerial contact by height band and its
  * control success, header passes, headers per minute. Definitions: tests/aerial_metrics.h (shared with the tests).
  * Same match setup as aimatch.c (harness-only start nudges). Read-only: the golden hash is untouched.
- * usage: aerial [matches=20] [minutes=5] [seven=1]      (WP_STATS / WP_RULES as in aimatch.c)
+ * usage: aerial [matches=20] [minutes=5] [seven=1]      (WP_STATS / WP_RULES as in aimatch.c; WP_SEED0=N starts the
+ *        seeds at N + 1 instead of 1, for a second independent sample)
  * build: cc -std=c17 -O2 -Isrc -Itests -Itools/playtest tools/playtest/aerial.c build/libwp_sim.a -lm -o /tmp/aerial */
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +18,8 @@ int main(int argc, char **argv) {
         WpMatchConfig cfg = seven ? sim_config_7v7() : sim_default_config();
         if (getenv("WP_STATS")) cfg.stats_mode = (uint8_t)atoi(getenv("WP_STATS"));
         if (getenv("WP_RULES")) cfg.rules = (uint8_t)atoi(getenv("WP_RULES"));
-        cfg.seed = (uint64_t)(m + 1);
+        int m0 = getenv("WP_SEED0") ? atoi(getenv("WP_SEED0")) : 0;
+        cfg.seed = (uint64_t)(m0 + m + 1);
         sim_init(&s, &cfg);
         for (int k = 0; k < WP_MAX_SEATS; k++) s.seat_player[k] = -1;
         s.kickoff_team = (uint8_t)(m & 1);
