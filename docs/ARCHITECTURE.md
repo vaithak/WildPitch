@@ -67,6 +67,7 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   mixer.h/.c            software mixer (voices, buses, crowd loops, glides, limiter); no device needed
   audio.h/.c            SDL audio stream + callback around the mixer; silent no-op without a device
   audio_check.c         --check-audio: sounds + mixer checks (ctest `audio`)
+  pacer.h/.c            frame cap (D-056): vsync interval for 60 / 30 fps + deadline pacer fallback; CPU-time probe
   juice.h/.c            visual effects (CP0.6): fast-ball ribbon, net bulge / ripple, dust puffs, goal flash + banner
   sfx.h/.c              sim state + WP_EV_* (per tick, live and replay) -> sounds; crowd danger per frame
   ball_draw.h/.c        the ball: visual orientation rolled from drawn motion, 12 panels, speed blur/streak, shadow
@@ -90,7 +91,7 @@ tests/                  headless tests (test_*.c auto-registered with ctest), be
   sim_test_helpers.h    setup_empty(), run_seat()
   scripted_match.h      deterministic input script shared by determinism test + bench
   golden/determinism.txt  golden final-state hash of the scripted 10-min match
-tools/                  fetch_deps.sh, check_determinism.sh, gen_trig_table.py
+tools/                  fetch_deps.sh, check_determinism.sh, gen_trig_table.py, perf_measure.py (docs/PERF.md)
 third_party/SDL         SDL 3.4.8 source (git-ignored; fetched by tools/fetch_deps.sh), built static
 docs/                   STATUS, ROADMAP, DECISIONS, PLAYTEST_FEEDBACK, ARCHITECTURE, DESIGN
 ```
@@ -149,7 +150,8 @@ contact on tick `windup` (owner's ball gathered to the foot during wind-up) → 
 - CP0.1 full game loop (`--autoplay`): ~5% of one core. `bench_sim`: ~22,700× real time (0.73 µs/tick).
 - `bench_sim` (CP0.0, dev desktop): ~2.3 M ticks/s (~38,000× real time) for the AI-less 5v5 skeleton.
   Meaningless for training headroom until AI exists; keep ≥ 500× real time for Phase 1 training.
-- Frame loop sleeps in vsync; fallback `SDL_DelayNS` if vsync unavailable.
+- Frame loop sleeps in vsync; the deadline pacer (pacer.c) caps it when vsync is missing or ignored. Battery mode
+  = 30 fps. Measurements: docs/PERF.md.
 
 ## Planned modules (not yet written)
 `sim/ball.c` (physics split out), `sim/ai_instinct.c` (utility AI), `sim/rules.c` (out of play, fouls, clock),

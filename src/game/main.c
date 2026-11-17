@@ -40,6 +40,7 @@
 #include "game/audio.h"
 #include "game/sfx.h"
 #include "game/kits.h"
+#include "game/pacer.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen (40 m pitch) */
 /* bigger pitches show a bit more (7v7 55 m: x1.19) so the wide view still reads the game */
@@ -68,6 +69,9 @@ typedef struct {
     WpSettings    set;             /* settings.cfg (menus edit it in place) */
     WpAudio       audio;           /* the device + mixer (no-op without a device, D-055) */
     WpSfx         sfx;             /* sim events -> sounds */
+    WpPacer       pacer;           /* frame cap: 60, or 30 in battery mode (D-056) */
+    bool          force_battery;   /* --battery */
+    bool          vsync;
 } Game;
 
 /* the sounds follow the camera: pan by the ball's x against the view's centre and half width */
@@ -313,18 +317,32 @@ static int check_kick_pose(void) {
     return bad;
 }
 
+/* frame rate (D-056): vsync at the interval that gives ~60 (or ~30 in battery mode) fps on this display; the pacer
+ * sleeps to the deadline when vsync is missing or ignored */
 static void apply_vsync(Game *g) {
-    SDL_DisplayID d = SDL_GetDisplayForWindow(g->win);
-    const SDL_DisplayMode *m = SDL_GetCurrentDisplayMode(d);
-    int interval = 1;
-    if (m && m->refresh_rate > 75.0f) interval = (int)(m->refresh_rate / 60.0f + 0.5f);  /* ~60 fps cap */
-    if (!SDL_SetRenderVSync(g->ren, interval)) SDL_SetRenderVSync(g->ren, 1);
+    int fps = (g->set.battery || g->force_battery) ? 30 : 60;
+    int interval = wp_pacer_vsync_interval(g->win, fps);
+    bool exact = !getenv("WP_NO_VSYNC") && SDL_SetRenderVSync(g->ren, interval);   /* env: test the pacer alone */
+    if (!exact) SDL_SetRenderVSync(g->ren, getenv("WP_NO_VSYNC") ? 0 : 1);
+    int vs = 0;
+    g->vsync = SDL_GetRenderVSync(g->ren, &vs) && vs != 0;
+    wp_pacer_set(&g->pacer, fps, g->vsync && exact);
+}
+
+static Uint32 SDLCALL perf_timer(void *ud, SDL_TimerID id, Uint32 interval) {
+    (void)ud; (void)id; (void)interval;
+    SDL_Event q;
+    SDL_zero(q);
+    q.type = SDL_EVENT_QUIT;
+    SDL_PushEvent(&q);
+    return 0;
 }
 
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, replay_shot = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false, force_audio = false;
+    bool gallery = false, demo = false, replay_shot = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false, force_audio = false, force_battery = false;
+    int perf_secs = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
@@ -345,6 +363,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--check-audio")) return wp_check_audio();
         else if (!strcmp(argv[i], "--check-settings")) return wp_check_settings();
         else if (!strcmp(argv[i], "--audio")) force_audio = true;
+        else if (!strcmp(argv[i], "--battery")) force_battery = true;
+        else if (!strcmp(argv[i], "--perf-seconds") && i + 1 < argc) perf_secs = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--replay-shot")) replay_shot = true;
         else if (!strcmp(argv[i], "--menu")) menu_shot = true;
         else if (!strcmp(argv[i], "--5v5")) five = true;             /* the old 5-a-side format (40 x 25 m) */      /* with --screenshot: capture the Controls screen */
@@ -360,13 +380,14 @@ int main(int argc, char **argv) {
         fprintf(stderr, "window failed: %s\n", SDL_GetError());
         return 1;
     }
-    apply_vsync(&g);
     wp_gamepad_init(&g.pad);
     wp_keymap_defaults(&g.km);
     bool harness = shot_path || autoplay || demo || gallery;
     if (!harness) wp_keymap_load(&g.km);                  /* the player's saved controls */
     if (harness) wp_settings_defaults(&g.set); else wp_settings_load(&g.set);
     g.menu.set = &g.set;
+    g.force_battery = force_battery;
+    apply_vsync(&g);
     if (board_sheet && shot_path) {                      /* visual check of the advertising-board faces (D-033) */
         int w, h;
         WpStadium st = {0};
@@ -389,8 +410,6 @@ int main(int argc, char **argv) {
     }
     /* the owner's dedication (D-018): on a normal launch only, never in harness/capture modes */
     if ((force_card || !(shot_path || gallery || demo || autoplay)) && !wp_dedication_run(g.ren)) { SDL_Quit(); return 0; }
-    int vs = 0;
-    bool vsync = SDL_GetRenderVSync(g.ren, &vs) && vs != 0;
 
     /* the match format: 7-a-side by default (owner, CP0.3a); harness modes keep the 5v5 their scripts were made for */
     WpMatchConfig cfg = (autoplay || demo || gallery) ? sim_default_config() : five ? sim_config_5v5() : sim_config_7v7();
@@ -422,6 +441,8 @@ int main(int argc, char **argv) {
     int frames = 0;
     long total_frames = 0;
     Uint64 start_ns = SDL_GetTicksNS();
+    double cpu0 = wp_cpu_seconds();
+    if (perf_secs > 0) SDL_AddTimer((Uint32)perf_secs * 1000u, perf_timer, NULL);   /* measurement run: quit after N s */
     bool running = true, menu_dirty = true;
     bool was_paused = false;
     if (menu_shot) { wp_menu_open(&g.menu); if (!getenv("WP_MENU_MAIN")) { g.menu.screen = WP_MENU_CONTROLS; g.menu.sel = WP_KEY_PASS; } else g.menu.sel = 1; }
@@ -467,6 +488,7 @@ int main(int argc, char **argv) {
                 if (res == WP_MENU_QUIT) running = false;
                 if (res == WP_MENU_CHANGED) {                 /* volumes apply at once (with a sample to hear them) */
                     wp_audio_apply(&g.audio, &g.set, true);
+                    apply_vsync(&g);                          /* the frame-rate row */
                     wp_audio_play(&g.audio, WP_SND_KICK_SHOT, 0.8f, 0, 1, 0);
                 }
                 if (res == WP_MENU_RESTART) {                 /* new match, same format, chosen difficulty */
@@ -688,7 +710,7 @@ int main(int argc, char **argv) {
                 const WpBall *b = &vc->ball;
                 float bs = sqrtf((float)b->vel.x * (float)b->vel.x + (float)b->vel.y * (float)b->vel.y) / 65536.0f;
                 snprintf(buf, sizeof buf, "tick %u  sim %.3f ms  vsync %s  frame %.1f ms", vc->tick, g.sim_ms_avg,
-                         vsync ? "on" : "off", (double)dts * 1000.0);
+                         g.vsync ? "on" : "off", (double)dts * 1000.0);
                 SDL_RenderDebugText(g.ren, 12, 28, buf);
                 snprintf(buf, sizeof buf, "ball %.1f m/s  h %.2f m  vz %.1f  spin %.1f  owner %d  phase %d  events %04x",
                          (double)bs, (double)b->z / 65536.0, (double)b->vz / 65536.0, (double)b->spin / 65536.0,
@@ -709,7 +731,7 @@ int main(int argc, char **argv) {
         }
         SDL_RenderPresent(g.ren);
         total_frames++;
-        if (!vsync) SDL_DelayNS(tick_ns / 2);   /* fallback: never spin */
+        if (!shot_path) wp_pacer_frame(&g.pacer);   /* cap (battery: 30 fps); never spin without vsync */
         if (gallery && !shot_path) {            /* static sheet: wait for input instead of redrawing */
             SDL_WaitEvent(NULL);
         }
@@ -718,8 +740,12 @@ int main(int argc, char **argv) {
         double secs = (double)(SDL_GetTicksNS() - start_ns) / 1e9;
         const SDL_DisplayMode *m = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(g.win));
         if (!shot_path && secs > 1.0)
-            printf("avg %.1f fps over %.1f s (display %.0f Hz, vsync %s)\n", (double)total_frames / secs, secs,
-                   m ? (double)m->refresh_rate : 0.0, vsync ? "on" : "off");
+            printf("avg %.1f fps over %.1f s (display %.0f Hz, vsync %s, cap %d%s)\n", (double)total_frames / secs, secs,
+                   m ? (double)m->refresh_rate : 0.0, g.vsync ? "on" : "off", g.pacer.fps, g.pacer.active ? ", pacer sleeping" : "");
+        double cpu1 = wp_cpu_seconds();
+        if (perf_secs > 0 && cpu0 >= 0 && cpu1 >= 0)
+            printf("perf: cpu %.1f%% of one core over %.1f s (renderer %s, audio %s)\n", 100.0 * (cpu1 - cpu0) / secs, secs,
+                   SDL_GetRendererName(g.ren), g.audio.ok ? SDL_GetCurrentAudioDriver() : "off");
     }
     wp_audio_close(&g.audio);
     wp_gamepad_close(&g.pad);

@@ -829,3 +829,14 @@ a per-sound level and faded at the ends.
 - Checks: `--check-audio` (ctest `audio`): every sound non-silent, <= full scale, sane length, |DC| < 0.01, ends at
   zero / seamless loop; worst-case mix <= 0.95; pan; mute; voice stealing. End-to-end via SDL's disk driver.
 - Settings moved to `settings.c` (one struct, line-based key = value; old three-key files still load).
+
+## D-056 — Battery mode and frame pacing (2026-11-17, CP0.6)
+"Runs cool" (CLAUDE.md) gets a user-facing switch: **Frame rate: 60 / 30 (battery)** in the Esc menu and on the
+title Settings screen, saved as `frame_rate = 60|30` in settings.cfg. Only drawing slows down: the sim keeps its fixed
+60 Hz step (two ticks per frame at 30 fps), so feel, replays and determinism are unaffected; sounds are triggered per
+tick (D-055) so none are lost. Pacing = vsync at `round(refresh / fps)` when the driver accepts the interval, plus
+a deadline pacer (`src/game/pacer.c`) that is on when vsync is missing / the interval was refused, and turns itself
+on if vsync is not actually pacing (two 1-second windows over 1.2x the target; the first frames after a window maps
+can run unpaced, so one window isn't enough). The pacer sleeps with `SDL_DelayPrecise` to the next deadline and
+never catches up after a stall. Menus (pause, title, controls) block in `SDL_WaitEvent` and redraw only on input.
+Measured in docs/PERF.md (`--perf-seconds N`, `tools/perf_measure.py`): 6.1% -> 3.8% of one core.

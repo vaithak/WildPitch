@@ -27,7 +27,13 @@ checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
   goal flashes the screen once and a band in the scorer's kit colour sweeps in with a popping "G O A L !" and the
   score. Trail / puffs clear on teleports and replay jumps. Checked in screenshots (Modern + Retro) on the
   `--autoplay` goal (frames 140-185).
-- Part 3 battery mode + PERF.md, part 4 title screen + quick match: next.
+- **Part 3 - runs cool (D-056): done.** Esc menu row **Frame rate: 60 / 30 (battery)** (saved; applies at once):
+  vsync at the interval that gives ~30 fps, plus a deadline pacer (`pacer.c`) that switches itself on when vsync is
+  off or ignored (2 s over 1.2x the target) - the old no-vsync fallback slept half a tick and could run uncapped.
+  The dedication card no longer spins without vsync. `--perf-seconds N` / `--battery` / `WP_NO_VSYNC=1` for
+  measuring; `tools/perf_measure.py`. Numbers in **docs/PERF.md**: match 6.1% of one core at 60 fps, 3.8% at 30;
+  pause menu 0 redraws and 0.0% CPU over 60 s; package power below the method's noise (±1.5 W desktop background).
+- Part 4 title screen + quick match: next.
 
 ### Playtest guide (CP0.6 part 1, audio) - listen for
 1. Launch normally: a short whistle at kick-off, a soft crowd murmur under everything.
@@ -47,6 +53,10 @@ checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
 3. Slide tackle (A without the ball near an opponent's ball): dust behind him. Keeper dives and jump landings: a puff.
 4. Goal: one white flash, then a band in the scorer's colour sweeps in with "G O A L !" and the score.
 5. Tell me: too much / too little? Anything distracting in Retro style (P)?
+
+### Playtest guide (CP0.6 part 3, battery mode)
+1. Esc > Frame rate: 30 (battery). The game should keep the same speed (the sim is still 60 Hz), just less smooth.
+   F3 shows the frame time (~33 ms). Back to 60 to compare. On battery, is the fan quieter / the laptop cooler?
 
 ### History (CP0.4 - CP0.5b, kept for reference)
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks

@@ -8,8 +8,8 @@
 /* the pause menu's rows: actions, or a settings row (WpSetRow) */
 enum { ROW_RESUME = -1, ROW_RESTART = -2, ROW_TITLE = -3, ROW_CONTROLS = -4, ROW_QUIT = -5 };
 static const int ROWS[] = {ROW_RESUME, WP_SET_DIFFICULTY, WP_SET_ASSIST, WP_SET_SWITCHING, WP_SET_VOL_MASTER,
-                           WP_SET_VOL_FX, WP_SET_VOL_CROWD, ROW_RESTART, ROW_CONTROLS, ROW_QUIT};
-enum { N_ROWS = (int)(sizeof ROWS / sizeof ROWS[0]), SEL_CONTROLS = 8 };
+                           WP_SET_VOL_FX, WP_SET_VOL_CROWD, WP_SET_FPS, ROW_RESTART, ROW_CONTROLS, ROW_QUIT};
+enum { N_ROWS = (int)(sizeof ROWS / sizeof ROWS[0]), SEL_CONTROLS = 9 };
 
 void wp_menu_open(WpMenu *m) {
     WpSettings *s = m->set;

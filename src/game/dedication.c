@@ -53,7 +53,10 @@ bool wp_dedication_run(SDL_Renderer *r) {
         if (t >= WP_DEDICATION_SECONDS) return true;
         int w, h;
         SDL_GetRenderOutputSize(r, &w, &h);
+        Uint64 f0 = SDL_GetTicksNS();
         wp_dedication_draw(r, w, h, t);
-        SDL_RenderPresent(r);                /* vsync paces this; never spins */
+        SDL_RenderPresent(r);                /* vsync paces this ... */
+        Uint64 took = SDL_GetTicksNS() - f0;
+        if (took < 12 * SDL_NS_PER_MS) SDL_DelayNS(16 * SDL_NS_PER_MS - took);   /* ... and without vsync: never spin */
     }
 }
