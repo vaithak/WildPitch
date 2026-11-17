@@ -13,8 +13,7 @@ static void reflect(fx *vx, fx *vy, fv2 n, fx rest) {
 }
 
 /* ---- forces + integration for one substep ---- */
-static void integrate(SimState *s, fx dt) {
-    WpBall *b = &s->ball;
+static void integrate(WpBall *b, uint16_t *events, fx dt) {
     int airborne = b->z > 0 || b->vz > 0;
     fx hs = fv2_len(b->vel);
     if (airborne) {
@@ -37,7 +36,7 @@ static void integrate(SimState *s, fx dt) {
     if (b->z <= 0 && airborne) {
         b->z = 0;
         fx vin = -b->vz;                                  /* impact speed */
-        if (vin > FX(1.5)) s->events |= WP_EV_BOUNCE;
+        if (vin > FX(1.5)) *events |= WP_EV_BOUNCE;
         b->vz = fx_mul(vin, T_BOUNCE_REST) - T_BOUNCE_LIN;
         if (b->vz < T_BOUNCE_CUT) b->vz = 0;
         /* impact friction: continuous in vin (no threshold cliff), harder landings lose more, capped (grip) */
@@ -102,7 +101,9 @@ static void collide_bodies(SimState *s) {
         if (dist >= r || dist == 0) continue;
         fv2 rel = fv2_sub(b->vel, p->vel);
         if (s->phase == WP_PHASE_PLAY && b->owner < 0 && player_can_control(s, i) && p->touch_cooldown == 0 &&
-            b->z <= WP_BAND_BODY_MAX && fv2_len(rel) <= T_CONTROL_MAX_REL && p->action == WP_ACT_NONE)
+            p->action == WP_ACT_NONE && p->z == 0 &&
+            (keeper_hands(s, i) ? b->z <= WP_BAND_BODY_MAX && fv2_len(rel) <= T_CONTROL_MAX_REL
+                                : contact_stance(s, i, b) != 0))   /* he takes it (D-047: by stance) */
             continue;
         fv2 n = fv2_scale(d, fx_div(FX_ONE, dist));
         reflect(&rel.x, &rel.y, n, T_BODY_REST);
@@ -293,10 +294,9 @@ fx ball_lob_speed_for(fx d, fx vz) {
 }
 
 /* the advertising boards (D-033): a ball below their top rebounds softly back toward the pitch */
-static void boards(SimState *s) {
-    WpBall *b = &s->ball;
+static void boards(const WpPitch *pt, WpBall *b) {
     if (b->z >= T_BOARD_H) return;
-    fx bx = s->pitch.length / 2 + T_BOARD_END - T_BALL_R, by = s->pitch.width / 2 + T_BOARD_SIDE - T_BALL_R;
+    fx bx = pt->length / 2 + T_BOARD_END - T_BALL_R, by = pt->width / 2 + T_BOARD_SIDE - T_BALL_R;
     if (fx_abs(b->pos.x) > bx && fx_mul(b->vel.x, b->pos.x) > 0) {
         b->pos.x = b->pos.x > 0 ? bx : -bx;
         b->vel.x = -fx_mul(b->vel.x, T_BOARD_REST);
@@ -320,10 +320,24 @@ void ball_step(SimState *s) {
     for (int k = 0; k < n; k++) {
         fv2 prev = b->pos;
         fx prev_z = b->z;
-        integrate(s, dt);
+        integrate(b, &s->events, dt);
         collide_frame(s);
         collide_bodies(s);
         lines_and_net(s, prev, prev_z, dt);
-        boards(s);
+        boards(&s->pitch, b);
+    }
+}
+
+/* one tick of a ball nobody touches (prediction, contact.c): exactly ball_step's air / bounce / roll / boards, without
+ * the goal frame, bodies and lines - while none of those is hit, the prediction equals the real ball bit for bit */
+void ball_predict_tick(const WpPitch *pt, WpBall *b) {
+    uint16_t ev = 0;
+    fx move = fx_mul(ball_speed3(b), WP_DT);
+    int n = 1 + (int)(move / T_SUBSTEP_MAX_MOVE);
+    if (n > 12) n = 12;
+    fx dt = WP_DT / n;
+    for (int k = 0; k < n; k++) {
+        integrate(b, &ev, dt);
+        boards(pt, b);
     }
 }

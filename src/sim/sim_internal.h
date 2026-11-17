@@ -44,6 +44,7 @@ fx ball_roll_speed_after(fx v0, fx d);       /* speed after rolling d from v0 (0
 fx ball_lob_speed_for(fx d, fx vz);          /* horizontal launch speed so a ball launched with vz lands at d */
 fx ball_carry_distance(fx vh, fx vz);        /* forward model: where (horizontally) it first lands */
 int ball_flight_to(fx vh, fx vz, fx z0, fx z_end, fx *dist, int *ticks);   /* ... from z0 down through z_end */
+void ball_predict_tick(const WpPitch *pt, WpBall *b);   /* one tick of an untouched ball (no frame/bodies/lines) */
 
 /* player.c helpers shared with header.c */
 /* pass_pick.c */
@@ -180,4 +181,6 @@ static inline int player_can_control(const SimState *s, int i) {
     for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == i) return 1;
     return 0;
 }
+#include "sim/contact_internal.h"
+
 #endif

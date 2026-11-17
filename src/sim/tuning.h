@@ -222,6 +222,44 @@
 #define T_HEAD_REACH_Z     FX(0.32)   /* ... and vertically of the head */
 #define T_HEADER_WAIT_MAX  70         /* ticks a header attempt waits for the ball */
 
+/* ---- aerial contact (D-047, contact.c): bands, stances, planner ---- */
+#define T_CB_GROUND        FX(0.25)   /* ball-centre z at contact: GROUND <= this: trap (the old first touch) */
+#define T_CB_LOW           FX(0.55)   /* LOW: instep cushion */
+#define T_CB_MID           FX(1.0)    /* MID: thigh */
+#define T_CB_CHEST         FX(1.5)    /* CHEST: chest (CONTROL wins the 1.45-1.5 overlap with HEAD) */
+#define T_CB_HEAD          FX(2.05)   /* HEAD: standing header; header-control only for a slow ball */
+#define T_CB_JUMP          FX(2.6)    /* JUMP: jumping header */
+/* stance rows: h_pop, d_ready, e_firm, v_clean, setup ticks, nominal normal elevation (deg; chest: descending /
+ * driven), reach, planner base difficulty. Clean touch: the ball pops h_pop and drops d_ready ahead (plus his run) at
+ * T_CONTACT_READY_Z. Base difficulty: the planner lets a ball drop to the chest / thigh rather than head it down. */
+#define T_ST_TRAP          { FX(0.0),  FX(0.30), FX(0.50), FX(16.0), 12, 0,  FX(1.0), FX(0.0) }
+#define T_ST_INSTEP        { FX(0.05), FX(0.35), FX(0.50), FX(13.0), 12, 70, FX(0.9), FX(0.10) }
+#define T_ST_THIGH         { FX(0.12), FX(0.50), FX(0.55), FX(15.0), 18, 60, FX(0.6), FX(0.05) }
+#define T_ST_CHEST         { FX(0.10), FX(0.60), FX(0.55), FX(17.0), 24, 35, FX(0.45), FX(0.0) }
+#define T_ST_HEADCTL       { FX(0.10), FX(0.45), FX(0.70), FX(11.0), 15, 45, FX(0.45), FX(0.5) }
+#define T_ST_CHEST_DRIVEN_DEG 5       /* chest normal for a driven ball (vz > -T_ST_DRIVEN_VZ) */
+#define T_ST_DRIVEN_VZ     FX(2.0)
+#define T_CONTACT_NOCTRL_K FX(1.6)    /* above this x v_clean: no control, the body deflects it (head: above v_clean) */
+#define T_CONTACT_READY_Z  FX(0.30)   /* the cushioned ball is "ready" (at the feet) when it drops to this */
+#define T_CONTACT_SETUP_K  FX(0.6)    /* touch quality q = (1 - over - 0.6 setup deficit - 0.3 pressure - stretch) */
+#define T_CONTACT_PRESS_K  FX(0.3)    /*   x (1 + 0.25 k_control), clamped 0..1 */
+#define T_CONTACT_STAT_K   FX(0.25)
+#define T_CONTACT_PRESS_NEAR FX(1.5)  /* pressure 1 with an opponent this close, 0 beyond FAR */
+#define T_CONTACT_PRESS_FAR FX(4.0)
+#define T_CONTACT_ERR_DEG  6          /* "readable" error: exit angle +- this x (1 - q) (one RNG draw, only if q < 1) */
+#define T_CONTACT_STICK_MEM 12        /* the stick held this recently still aims the cushion */
+#define T_SETTLE_Z         FX(2.1)    /* a settling ball (aerial control) stays his up to this height ... */
+#define T_SETTLE_EXTRA     6          /* ... for its fall time plus this many ticks */
+#define T_CONTACT_RING     180        /* ball prediction horizon (ticks) */
+#define T_CONTACT_COMMIT   5          /* the plan freezes this many ticks before contact */
+#define T_CONTACT_WINDOW   20         /* later candidates (the ball dropping to a better band) up to this after the first */
+#define T_CONTACT_REACT    FX(0.15)   /* planner reach: 0.8125 x his sprint speed after this reaction time ... */
+#define T_CONTACT_PLAN_REACH FX(0.6)  /* ... plus this */
+#define T_CONTACT_W_DIFF   FX(4.0)    /* candidate score = -W_DIFF difficulty - W_TIME (t - t_first)/30 - W_PRESS p */
+#define T_CONTACT_W_TIME   FX(1.0)
+#define T_CONTACT_W_PRESS  FX(2.0)
+#define T_CONTACT_WAIT_D   FX(0.45)   /* waiting for the planned (lower) band: only while the ball is this far off */
+
 /* ---- tackles & bodies (CP0.3) ---- */
 #define T_TACKLE_START     FX(1.6)    /* J with an opponent on the ball this close = a standing tackle */
 #define T_TACKLE_WINDUP    6          /* ticks from the lunge to the foot arriving */

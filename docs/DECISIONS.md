@@ -557,3 +557,34 @@ the aim with a receiver snap), no landing ghost ring, meter range 12 m .. min(45
 - **Avatar:** the lob strike poses kick_power01 = h (taps / AI: 0.5 as before).
 - Precedence unchanged: slide (D-043) wins the LOB press edge with their carrier within 3 m; ball in the hands is a
   throw. Tests: `tests/test_lob.c`.
+
+## D-047 — Aerial control by stance: prediction ring, contact plans, graded touches (2026-11-17, CP0.5a stage 2)
+Report "Action selection" / "Per-stance contact physics" (CONTROL intent only). New `src/sim/contact.c`
+(+ `contact_internal.h`):
+- **Bands at the planned contact** (tuning.h `T_CB_*`): GROUND <= 0.25 m trap (the old first touch, unchanged), LOW
+  0.25-0.55 instep cushion, MID 0.55-1.0 thigh, CHEST 1.0-1.5 chest, HEAD 1.5-2.05 header-control only for a slow
+  ball (3-D relative speed <= its v_clean 11 m/s; owner: "a slow head-high ball = cushion it, a fast one deflects"),
+  JUMP 2.05-2.6 (headers, unchanged).
+- **Prediction ring:** 180 ticks of the untouched ball from ball.c's own integrator (`ball_predict_tick`; integrate()
+  / boards() now take a `WpBall*`), kept in a static cache keyed on the complete ball state + pitch. A hit is the
+  suffix of the same sequence topped up to the full horizon = exactly a fresh fill, so replays, snapshots and several
+  sims stay deterministic. Only while the loose ball is in the air. Derived data: not in SimState.
+- **Plan per player** (`WpPlayer.plan`, hashed: kind, band, flags, contact tick, first-planned tick, point, z) for the
+  pass's receiver, seat players and each team's ball-winner: candidates = reachable ring ticks (0.8125 x sprint after
+  0.15 s, + 0.6 m), score -4 difficulty - dt/30 - 2 pressure, difficulty = stance base (head-control 0.5: let it
+  drop to the chest) + speed over v_clean + 0.6 setup deficit; frozen 5 ticks before contact. A planner may let an
+  early contact go by (`contact_waiting`) only while the ball is > 0.45 m off and still coming.
+- **One predicate** (`contact_stance`) for the first touch (gain_check), the body (collide_bodies exemption; keepers'
+  hands keep the old rule) and possession while settling. Above 1.6 x v_clean (head: v_clean) the body deflects it.
+- **Touch = outcome + residual:** clean ball pops h_pop and drops d_ready along the exit (stick, stick within 12
+  ticks, or facing) by the time it is down to 0.30 m, plus his run; residual (1-q) e_firm x the 3-D relative velocity
+  mirrored about the stance normal; then +-6 deg x (1-q) (one RNG draw, only when q < 1: "Readable", owner).
+  q = (1 - over - 0.6 setup deficit - 0.3 pressure - stretch)(1 + 0.25 k_control), over from the 3-D speed.
+  Stance rows (h_pop, d_ready, e_firm, v_clean, setup, normal, reach, base): instep .05/.35/.5/13/12/70/.9/.1, thigh
+  .12/.5/.55/15/18/60/.6/.05, chest .1/.6/.55/17/24/35 (5 driven)/.45/0, head-control .1/.45/.7/11/15/45/.45/.5
+  (reaches and head d_ready trimmed from the report so the drop is 0.3-1.0 m from the feet).
+- **settle_ticks** (hashed): after an aerial control touch he owns the dropping ball up to 2.1 m for its fall time.
+- **Movement:** the human's receive assist runs to the plan's point in time. The AI keeps its own receive / chase
+  targets until stage 4 (moving AI receivers to the control point made them head crosses away: lob completion 59%);
+  its touches use the stance model.
+- Avatar stance poses deferred to stage 5. bench_sim 15.6 -> 16.8 us/tick (+8%).

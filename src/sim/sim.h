@@ -97,6 +97,21 @@ typedef struct {
                                     a targeted pass is aimed and weighted at the contact tick */
 } WpKick;
 
+/* Aerial contact (D-047, contact.c): the body part follows the ball's height at the PLANNED contact tick. */
+enum { WP_CB_GROUND = 0, WP_CB_LOW, WP_CB_MID, WP_CB_CHEST, WP_CB_HEAD, WP_CB_JUMP, WP_CB_NONE };   /* contact bands */
+enum { WP_CK_NONE = 0, WP_CK_TRAP, WP_CK_INSTEP, WP_CK_THIGH, WP_CK_CHEST, WP_CK_HEADCTL, WP_CK_N };   /* contact kinds */
+typedef struct {
+    uint8_t  kind;               /* WP_CK_* planned (NONE = no plan) */
+    uint8_t  band;               /* WP_CB_* of the ball at the contact */
+    uint8_t  flags;              /* WP_PLANF_* */
+    uint8_t  pad_;
+    uint16_t tick;               /* contact tick (low 16 bits of SimState.tick) */
+    uint16_t since;              /* first tick he planned for this ball (setup time) */
+    fv2      at;                 /* ball position at the contact (where his body goes) */
+    fx       z;                  /* ball height there */
+} WpPlan;
+enum { WP_PLANF_COMMITTED = 1 };
+
 typedef struct {
     fv2 pos, vel;
     fx  z, vz;                   /* feet height above grass (jumping), vertical speed */
@@ -117,6 +132,8 @@ typedef struct {
     uint8_t  ai_wait;            /* ticks until the next decision */
     uint8_t  ai_hold;            /* ticks he has had the ball (AI carriers don't act on the first touch) */
     fv2      ai_goal;            /* where he is going */
+    WpPlan   plan;               /* aerial contact plan (D-047) */
+    uint8_t  settle_ticks;       /* after an aerial control touch: he keeps it while it drops (up to T_SETTLE_Z) */
 } WpPlayer;
 
 enum { WP_ROLE_KEEPER = 0, WP_ROLE_OUTFIELD = 1 };

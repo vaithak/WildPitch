@@ -86,7 +86,7 @@ int main(void) {
                 for (int a = 0; a < 8; a++) {
                     scene(&s, pitch, 0);
                     fx hl = s.pitch.length / 2, hw = s.pitch.width / 2;
-                    give_ball(&s, fv2_make(fx_mul(hl, FX(0.3)) * px, fx_mul(hw, FX(0.55)) * py));
+                    give_ball(&s, fv2_make(fx_mul(hl, FX(0.3)) * px, fx_mul(hw, FX(0.45)) * py));
                     fv2 d = fv2_from_angle((wp_angle)(a * 8192), FX_ONE);
                     WpSeatInput st = {stick(d.x), stick(d.y), WP_BTN_LOB};
                     for (int t = 0; t < T_CHARGE_MAX_TICKS + 2; t++) step_in(&s, st, NOIN);
@@ -110,7 +110,8 @@ int main(void) {
     }
 
     /* 3. lobs to a moving team-mate (seat 1 runs a straight line, assist off: he keeps running): the ball comes down
-     *    within 1.0 m of the solved point P at z <= 1.6 m, and he is near P then (the prediction q + v t_c) */
+     *    within 1.0 m of the solved point P at z <= 1.6 m (or he takes it there, higher: D-047), and he is near P then
+     *    (the prediction q + v t_c) */
     {
         int n = 0, ok = 0, mate_ok = 0;
         for (int c = 0; c < 48; c++) {
@@ -140,6 +141,10 @@ int main(void) {
                     P = s.pass_meet;
                 }
                 if (kicked == 1 && s.ball.z <= FX(1.6) && s.ball.vz < 0) {
+                    fx d = fv2_len(fv2_sub(s.ball.pos, P));
+                    if (d < best) { best = d; mate_d = fv2_len(fv2_sub(s.players[MATE].pos, P)); }
+                }
+                if (kicked == 1 && s.ball.owner == MATE) {          /* taken before it got that low (D-047: chest / head) */
                     fx d = fv2_len(fv2_sub(s.ball.pos, P));
                     if (d < best) { best = d; mate_d = fv2_len(fv2_sub(s.players[MATE].pos, P)); }
                 }
@@ -244,6 +249,8 @@ int main(void) {
         }
         aerial_print(&a);
         CHECKF(a.lobs >= 60 && a.lobs_done * 100 >= a.lobs * 69, "AI lob completion %ld/%ld below the baseline", a.lobs_done, a.lobs);
+        /* D-047: AI lobs <= 30 m whose first contact is our control attempt are controlled >= 80% (graded touches) */
+        CHECKF(a.lobrx_try >= 30 && a.lobrx_ok * 100 >= a.lobrx_try * 80, "AI lob receptions controlled %ld/%ld", a.lobrx_ok, a.lobrx_try);
     }
     return TEST_DONE();
 }

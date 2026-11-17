@@ -132,7 +132,13 @@ static void recv_update(SimState *s, int me, const WpSeatInput *si) {
                        : fv2_make(0, 0);
     int32_t left = (int32_t)(int16_t)(uint16_t)(s->pass_meet_tick - (uint16_t)s->tick);   /* ticks to the plan */
     fv2 goal; fx speed;
-    if (!opinion && s->pass_plan != WP_PLAN_CLOSEST && left > 3) {
+    fv2 pat;
+    int pleft = (int16_t)(uint16_t)(p->plan.tick - (uint16_t)s->tick);
+    if (!opinion && contact_plan_at(p, &pat) && pleft > 0) {   /* an aerial ball: to the planned contact (D-047) */
+        goal = pat;
+        speed = fx_min(fx_div(fv2_len(fv2_sub(goal, p->pos)), FX_INT(pleft) / WP_TICK_HZ), player_top_speed(s, (int)(p - s->players), 1));
+        s->recv_gone = 0;
+    } else if (!opinion && s->pass_plan != WP_PLAN_CLOSEST && left > 3) {
         goal = s->pass_meet;                          /* run THROUGH the plan, arriving just in time */
         speed = fx_div(fv2_len(fv2_sub(goal, p->pos)), FX_INT(left) / WP_TICK_HZ);
         speed = fx_clamp(speed, s->pass_plan == WP_PLAN_STRIDE ? FX(4.5) : 0, player_top_speed(s, (int)(p - s->players), 1));

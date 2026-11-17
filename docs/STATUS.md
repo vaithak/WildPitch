@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-16 by Claude session #1 (CP0.5a stage 1)_
+_Last updated: 2026-11-17 by Claude session #1 (CP0.5a stage 2)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -61,6 +61,34 @@ lobs 70% (79/113), crosses 47% (27/57), headers 0.43/min (19 shots, 24 passes 38
 (<= 30 m, first contact a gain/body hit by the kicker's team, controlled) 51/52; 80 matches: goals 0.49/min, lobs 70%
 (315/447), crosses 49%, headers 0.43/min (82 shots, 91 passes 32%), receptions 218/219. `aimatch 20 5 1`: goals 16+28,
 passes 75%/77%, tackles 135/148, outs 0.8/min. bench_sim 15.6 us/tick (median of 5).
+
+**CP0.5a stage 2 (D-047): done, goldens updated on purpose** (5v5 `6f21d636d56b9644`, 7v7 `8925d4ceea2ff5c7`).
+Aerial balls are controlled by the body part their height asks for at the planned contact (instep / thigh / chest /
+head-control for slow balls), with a graded first touch (faster = heavier, unprepared or pressed = heavier) and the
+ball settling at his feet. New `src/sim/contact.c`, `tests/test_contact.c`. Numbers (baseline -> stage 2):
+
+| Metric | Stage 1 (20 / 80 matches) | Stage 2 (20 / 80) |
+|---|---|---|
+| Lob completion | 70% / 70% | 69% / 74% |
+| Cross completion | 47% / 49% | 51% / 53% |
+| Lob receptions controlled (<= 30 m, our control attempt) | 51/52 / 218/219 | 45/45 / 202/203 |
+| Control success feet / body / head band (80) | 98% / 97% / - | 98% / 95% / 89% (51 head-control gains) |
+| Headers / min (80) | 0.43 | 0.44 |
+| Goals / min (80) | 0.49 | 0.48 |
+| aimatch 20x5: goals, passes | 16+28, 75/77% | 15+29, 74/76% |
+
+Clean touches: instep 0.45 m, thigh 0.84 m / 0.48 s, chest 0.98 m / 0.58 s, head-control 0.90 m / 0.68 s; lofted
+passes 10-47 m (8-17 m/s) controlled, drop 0.8-1.0 m; a chest ball at 20 / 23 / 26 m/s drops 2.0 / 3.5 / 5.8 m.
+bench_sim 16.8 us/tick (+8%). Avatar stance poses: stage 5.
+
+### Playtest guide (CP0.5a stage 2, aerial control)
+1. Lob (A) to a team-mate and do nothing with him: he runs to where the ball will be at chest / thigh height and
+   takes it down; the ball drops just in front of him. Hold a direction as it arrives: he cushions it that way.
+2. Long switch (full meter): still controlled, a bit further away. A driven/fast ball at the chest (a clearance)
+   bounces off him.
+3. A slow ball at head height with no button: he cushions it down with his head (pressing S/D still heads it).
+4. Under pressure (an opponent close), or meeting it without time to set, the touch is heavier.
+Question: does the touch feel too clean or too heavy?
 
 ### Playtest guide (CP0.5a stage 1, lofted passes)
 1. Hold A (lob) longer and longer into space: the ball lands where the violet meter says - and floats (high, ~2-3 s
@@ -187,8 +215,8 @@ Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (19 ctest entries, all passing):** test_lob, test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `51ad9c0dcc50f6a7`, 7v7 `41955f92797c21c8` after D-046; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (20 ctest entries, all passing):** test_contact, test_lob, test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
+  (golden 5v5 `6f21d636d56b9644`, 7v7 `8925d4ceea2ff5c7` after D-047; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

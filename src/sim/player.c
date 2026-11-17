@@ -572,7 +572,11 @@ static void control_owner(SimState *s, int i, const WpSeatInput *in) {
     fv2 sdir = stick_dir(in, &has);
 
     {
-        if (dist > T_LOSE_DIST || b->z > WP_BAND_BODY_MAX) { b->owner = -1; return; }
+        if (dist > T_LOSE_DIST || b->z > (p->settle_ticks ? T_SETTLE_Z : WP_BAND_BODY_MAX)) {   /* settling: D-047 */
+            b->owner = -1;
+            p->settle_ticks = 0;
+            return;
+        }
         if (p->action == WP_ACT_KICK && !p->kick.done) {   /* gather: the foot brings the ball to the contact point */
             if (b->z > WP_BAND_FEET_MAX) return;            /* a dropping ball falls by itself (volley) */
             fv2 spot = fv2_add(p->pos, fv2_from_angle(contact_dir(s, i), FOOT_SPOT));
@@ -643,7 +647,8 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
     if (s->phase != WP_PHASE_PLAY || !player_can_control(s, i)) return -1;
     if (b->owner >= 0 || p->touch_cooldown || p->action != WP_ACT_NONE || p->z > 0) return -1;
     int gk = keeper_hands(s, i);                          /* hands: own box, no back-pass (D-032) */
-    if (b->z > (gk ? T_KEEPER_HANDS_Z : WP_BAND_BODY_MAX)) return -1;
+    int st = gk ? 0 : contact_stance(s, i, b);            /* the body part for this height and pace (D-047) */
+    if (gk ? b->z > T_KEEPER_HANDS_Z : !st) return -1;
     /* reach is SWEPT over the coming tick (ball.pos .. ball.pos + vel*dt): a ball passing between ticks counts.
      * The pass's receiver may also stretch beyond clean reach, with a heavier touch. */
     fv2 seg = fv2_scale(b->vel, WP_DT);
@@ -653,15 +658,17 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
     /* cutting out the other team's pass in flight needs a closer foot than receiving one */
     int intercept = s->pass_target >= 0 && s->players[s->pass_from].team != p->team;
     fx reach = gk ? T_KEEPER_REACH : intercept ? T_INTERCEPT_REACH : T_CONTROL_REACH;
+    if (st > WP_CK_TRAP) reach = fx_min(reach, contact_reach(st));
     if (s->pass_target == i && dseg > T_CONTROL_REACH) {
         /* stretch (heavier touch) only for a ball that would otherwise pass him out of clean reach;
          * one coming to him rolls in to his foot */
         fx bs2 = fv2_dot(b->vel, b->vel);
         fx tc = bs2 > 0 ? fx_max(fx_div(fv2_dot(fv2_sub(p->pos, b->pos), b->vel), bs2), 0) : 0;
         fx closest = fv2_len(fv2_sub(p->pos, fv2_add(b->pos, fv2_scale(b->vel, tc))));
-        if (closest > T_CONTROL_REACH) reach = T_CONTROL_STRETCH;
+        if (closest > T_CONTROL_REACH && st <= WP_CK_INSTEP) reach = T_CONTROL_STRETCH;
     }
     if (dseg > reach) return -1;
+    if (st > WP_CK_TRAP && contact_waiting(s, i, dseg)) return -1;   /* planned a later, better contact (D-047) */
     if (s->pass_target == i && s->pass_plan != WP_PLAN_CLOSEST && s->pass_stick[0] != -128) {
         /* a runner on a planned meet lets a ball passing clear of him run until shortly before the meeting point
          * (he'd otherwise trap a through ball that passes him early) - unless the human is steering him */
@@ -671,7 +678,7 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
         /* ...but a ball coming through his body/feet is taken in stride (never rolls through him, D-016) */
         if (!opinion && left > 12 && dseg > FX(0.5)) return -1;
     }
-    if (fv2_len(fv2_sub(b->vel, p->vel)) > (gk ? T_KEEPER_CATCH_REL : T_CONTROL_MAX_REL)) return -1;   /* too hot */
+    if (gk && fv2_len(fv2_sub(b->vel, p->vel)) > T_KEEPER_CATCH_REL) return -1;   /* too hot (others: the stance) */
     return dseg;
 }
 
@@ -679,22 +686,26 @@ static fx gain_check(const SimState *s, int i, const WpSeatInput *in) {
 static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const WpInput *all) {
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
-    fv2 rel = fv2_sub(b->vel, p->vel);
-    fx rs = fv2_len(rel);
-    /* first touch: kills most of the relative speed; harder balls spill further (visible cause) */
-    fx spill = fx_mul(fx_div(rs, T_CONTROL_MAX_REL), T_FIRST_TOUCH_SPILL);
-    if (in->buttons & WP_BTN_SPRINT) spill += T_SPRINT_SPILL;     /* receiving at a sprint: heavier touch */
-    if (dseg > T_CONTROL_REACH)                                       /* stretching for it */
-        spill += fx_mul(T_STRETCH_SPILL, fx_div(dseg - T_CONTROL_REACH, T_CONTROL_STRETCH - T_CONTROL_REACH));
-    spill = fx_mul(spill, FX_ONE - fx_mul(T_STAT_CONTROL, stat_k(s, i, WP_STAT_CONTROL)));   /* first touch (D-034) */
-    b->vel = fv2_add(p->vel, fv2_scale(rel, spill));
-    if (b->z > WP_BAND_FEET_MAX) b->vz = 0;                /* chest/thigh: drop it to the feet */
-    b->spin = 0;
+    int hands = keeper_hands(s, i);
+    p->settle_ticks = 0;
+    if (!hands && b->z > T_CB_GROUND) contact_touch(s, i, in, dseg);   /* in the air: the stance's cushion (D-047) */
+    else {
+        fv2 rel = fv2_sub(b->vel, p->vel);
+        fx rs = fv2_len(rel);
+        /* first touch: kills most of the relative speed; harder balls spill further (visible cause) */
+        fx spill = fx_mul(fx_div(rs, T_CONTROL_MAX_REL), T_FIRST_TOUCH_SPILL);
+        if (in->buttons & WP_BTN_SPRINT) spill += T_SPRINT_SPILL;     /* receiving at a sprint: heavier touch */
+        if (dseg > T_CONTROL_REACH)                                       /* stretching for it */
+            spill += fx_mul(T_STRETCH_SPILL, fx_div(dseg - T_CONTROL_REACH, T_CONTROL_STRETCH - T_CONTROL_REACH));
+        spill = fx_mul(spill, FX_ONE - fx_mul(T_STAT_CONTROL, stat_k(s, i, WP_STAT_CONTROL)));   /* first touch (D-034) */
+        b->vel = fv2_add(p->vel, fv2_scale(rel, spill));
+        if (b->z > WP_BAND_FEET_MAX) b->vz = 0;            /* (keeper's hands) */
+        b->spin = 0;
+    }
     b->owner = (int8_t)i;
     b->last_touch = (int8_t)i;
     p->touch_cooldown = T_GAIN_TOUCH_COOLDOWN;
     s->events |= WP_EV_TOUCH;
-    int hands = keeper_hands(s, i);
     b->no_hands = 0;                                      /* controlled: a new deliberate touch sets it again */
     if (hands) {                                          /* gathered into his hands */
         ball_to_hands(s, i);
@@ -721,6 +732,7 @@ static void air_and_timers(WpPlayer *p) {
     }
     if (p->touch_cooldown) p->touch_cooldown--;
     if (p->immune) p->immune--;
+    if (p->settle_ticks) p->settle_ticks--;
 }
 
 void sim_player_jump(SimState *s, int i, uint8_t action) {
@@ -766,6 +778,7 @@ void players_step(SimState *s, const WpInput *in) {
     WpSeatInput pin[WP_MAX_PLAYERS], mv[WP_MAX_PLAYERS];
     seats_update(s, in);                                  /* switching first: this tick's inputs go to the new player */
     team_plan_update(s);                                  /* the team layer (D-030), before anyone decides */
+    contact_update(s);                                    /* ball prediction + aerial contact plans (D-047) */
     for (int i = 0; i < np; i++) {
         int seat = seat_of(s, i);
         if (seat >= 0) {
