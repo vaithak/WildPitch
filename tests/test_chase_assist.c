@@ -32,6 +32,59 @@ static int run(WpSeatInput in, int n, fv2 *path) {
     return -1;
 }
 
+/* D-049 helpers: the stick at `deg_off` degrees from the bearing to `at`, and how far (deg, signed) the assist turned
+ * it toward that point (positive = toward) */
+static WpSeatInput stick_off(fv2 at, int deg_off) {
+    fv2 to = fv2_sub(at, s.players[ME].pos);
+    int bearing = (int)((int32_t)fx_atan2(to.y, to.x) * 360 / 65536);
+    fv2 u = dir_deg(bearing + deg_off);
+    WpSeatInput in = {c127(u.x), c127(u.y), 0};
+    return in;
+}
+static int turned_deg(WpSeatInput in, WpSeatInput out) {
+    int din = fx_atan2(FX_INT(in.move_y), FX_INT(in.move_x)), dout = fx_atan2(FX_INT(out.move_y), FX_INT(out.move_x));
+    int t = (int16_t)(uint16_t)(dout - din);
+    return t * 360 / 65536;
+}
+/* how close ME gets to `at` within n ticks with a fixed stick, at OFF (lv 0) or NORMAL (0 = he has the ball) */
+static double dist_after(void (*scene)(int), WpSeatInput in, int n, fv2 at, int lv) {
+    scene(lv ? WP_ASSIST_NORMAL : WP_ASSIST_OFF);
+    double best = tod(fv2_len(fv2_sub(at, s.players[ME].pos)));
+    for (int t = 0; t < n && s.ball.owner != ME; t++) {
+        run_seat(&s, in, 1);
+        double d = tod(fv2_len(fv2_sub(at, s.players[ME].pos)));
+        if (d < best) best = d;
+    }
+    return s.ball.owner == ME ? 0 : best;
+}
+/* the D-049 scenes are played on the 80 x 52 m pitch with everyone else parked in the far corner (setup_empty's
+ * "off the pitch" spot is clamped to the boards of the small pitch, close enough to take control by a switch) */
+static void wide(void) {
+    s.pitch = sim_config_7v7().pitch;
+    for (int i = 0; i < 2 * s.n_per_side; i++) if (i != ME) s.players[i].pos = fv2_make(FX(28.0) + i * FX(1.0), FX(25.0));
+}
+static void scene_runaway(int lv) {                      /* a ball rolling away from him faster than he jogs */
+    loose_ball_scene(fv2_make(FX(3.0), FX(1.0)), fv2_make(FX(12.0), FX(4.0)), lv);
+    wide();
+}
+static void scene_slow_lob(int lv) {                     /* a 32 m lob (vz 15.5) that comes down 8 m from him in > 3 s */
+    fx vz = FX(15.5);
+    loose_ball_scene(fv2_make(-FX(18.0), FX(6.0)), fv2_make(ball_lob_speed_for(FX(32.0), vz), 0), lv);
+    s.players[ME].pos = fv2_make(FX(9.0), 0);
+    s.ball.z = FX(0.1); s.ball.vz = vz;
+    wide();
+}
+static void scene_drop(int lv) {                         /* a ball dropping at chest height a few metres away */
+    loose_ball_scene(fv2_make(-FX(9.0), FX(5.0)), fv2_make(FX(9.0), -FX(2.0)), lv);
+    s.ball.z = FX(1.2); s.ball.vz = FX(4.0);
+    wide();
+}
+static void scene_their_pass(int lv) {                   /* their pass crossing in front of him */
+    loose_ball_scene(fv2_make(FX(5.0), -FX(9.0)), fv2_make(0, FX(8.0)), lv);
+    s.pass_target = 8; s.pass_from = 7; s.pass_ticks = 1; s.ball.last_touch = 7;
+    wide();
+}
+
 int main(void) {
     static fv2 pa[240], pb[240];
     /* 1. neutral stays still, every level */
@@ -189,6 +242,132 @@ int main(void) {
         }
         printf("short pass, receiver's stick held away (90/135/180 deg): received %d/%d\n", got, n);
         CHECK(got == n);
+    }
+    /* ---- D-049 (CP0.5b, owner: "whenever the player being actively controlled is near the ball, always have some
+     * system assist ... chasing a stray ball / defending / receiving a pass / through ball / loft ball") ---- */
+    /* 11. near the ball, a team-mate quicker to it: assisted now (D-037 faded it to zero); far: still raw */
+    {
+        loose_ball_scene(fv2_make(FX(6.0), FX(1.5)), fv2_make(0, 0), WP_ASSIST_NORMAL);
+        s.players[3].pos = fv2_make(FX(6.3), FX(2.2));     /* a mate standing on it */
+        WpSeatInput in = stick_off(s.ball.pos, 25), out = in;
+        seats_chase_assist(&s, 0, &out);
+        int tn = turned_deg(in, out);
+        loose_ball_scene(fv2_make(FX(16.0), FX(1.5)), fv2_make(0, 0), WP_ASSIST_NORMAL);
+        s.players[3].pos = fv2_make(FX(16.3), FX(2.2));
+        WpSeatInput fin = stick_off(s.ball.pos, 25), fout = fin;
+        seats_chase_assist(&s, 0, &fout);
+        printf("D-049 near, mate quicker: turned %d deg (6 m); far (16 m): turned %d deg\n", -tn, turned_deg(fin, fout));
+        CHECKF(tn < -10 && tn >= -31, "near ball with a quicker mate: turned %d", tn);
+        CHECK(fout.move_x == fin.move_x && fout.move_y == fin.move_y);
+    }
+    /* 12. a ball rolling away faster than he jogs (no reachable point at his pace in 4 s): toward where it ends up
+     * (D-037 gave the raw stick) */
+    {
+        WpSeatInput in;
+        scene_runaway(WP_ASSIST_NORMAL);
+        in = stick_off(s.ball.pos, -30);
+        WpSeatInput out = in;
+        seats_chase_assist(&s, 0, &out);
+        int tn = turned_deg(in, out);
+        WpBall rest = s.ball;                             /* where it stops */
+        for (int t = 0; t < 900 && (rest.vel.x || rest.vel.y); t++) ball_predict_tick(&s.pitch, &rest);
+        fv2 end = rest.pos;
+        double off = dist_after(scene_runaway, in, 90, end, 0), on = dist_after(scene_runaway, in, 90, end, 1);
+        printf("D-049 ball running away: turned %d deg; closest to its stop %.1f m (OFF) vs %.1f m (NORMAL)\n", tn, off, on);
+        CHECKF(tn > 5 && tn <= 31, "runaway ball: turned %d", tn);
+        CHECK(on < off);
+    }
+    /* 13. a long lob coming down 8 m from him (contact plan from ~3 s out): steered onto it from the start */
+    {
+        scene_slow_lob(WP_ASSIST_NORMAL);
+        WpBall fl = s.ball;                               /* where and when it first lands */
+        int land = 0;
+        for (fx pvz = fl.vz; land < 600; land++) {         /* the first bounce: vz flips up (or it rests) */
+            ball_predict_tick(&s.pitch, &fl);
+            if (fl.z == 0 || (pvz < 0 && fl.vz >= 0)) break;
+            pvz = fl.vz;
+        }
+        WpSeatInput in = stick_off(fl.pos, 30), out = in;
+        seats_chase_assist(&s, 0, &out);
+        int tn = turned_deg(in, out);
+        double off = dist_after(scene_slow_lob, in, land, fl.pos, 0), on = dist_after(scene_slow_lob, in, land, fl.pos, 1);
+        printf("D-049 slow lob (lands in %.1f s, %.1f m away): turned %d deg; closest to it %.1f m (OFF) vs %.1f m (NORMAL)\n",
+               land / 60.0, tod(fv2_len(fv2_sub(fl.pos, s.players[ME].pos))), -tn, off, on);
+        CHECKF(tn < -10 && tn >= -31, "slow lob: turned %d", tn);
+        CHECK(on < off);
+    }
+    /* 14. an aerial ball with a contact plan: steered to the plan's point (contact.c), and he gets there sooner */
+    {
+        scene_drop(WP_ASSIST_NORMAL);
+        run_seat(&s, NOIN, 1);
+        CHECK(s.players[ME].plan.kind != WP_CK_NONE);
+        fv2 at = s.players[ME].plan.at;
+        int left = (int16_t)(uint16_t)(s.players[ME].plan.tick - (uint16_t)s.tick);
+        WpSeatInput in = stick_off(at, 35), out = in;
+        seats_chase_assist(&s, 0, &out);
+        int tn = turned_deg(in, out);
+        WpSeatInput keys = stick_off(at, 35);
+        double off = dist_after(scene_drop, keys, left, at, 0), on = dist_after(scene_drop, keys, left, at, 1);
+        printf("D-049 aerial plan (%d ticks ahead): turned %d deg; closest to it %.2f m (OFF) vs %.2f m (NORMAL)\n",
+               left, -tn, off, on);
+        CHECKF(tn < -10 && tn >= -31, "aerial plan: turned %d", tn);
+        CHECK(on < off);
+    }
+    /* 15. their pass in flight in front of him: steered onto its line, and he intercepts it */
+    {
+        WpSeatInput in;
+        scene_their_pass(WP_ASSIST_NORMAL);
+        in = stick_off(s.ball.pos, 50);
+        int got[2];
+        for (int lv = 0; lv < 2; lv++) {
+            scene_their_pass(lv ? WP_ASSIST_NORMAL : WP_ASSIST_OFF);
+            got[lv] = run(in, 120, 0) >= 0;
+        }
+        scene_their_pass(WP_ASSIST_NORMAL);
+        s.players[3].pos = fv2_make(FX(5.0), -FX(1.0));    /* a team-mate right on its line: still assisted */
+        WpSeatInput out = in;
+        seats_chase_assist(&s, 0, &out);
+        printf("D-049 their pass: intercepted OFF %d, NORMAL %d; with a mate on its line turned %d deg\n",
+               got[0], got[1], turned_deg(in, out));
+        CHECK(got[1] && !got[0]);
+        CHECK(turned_deg(in, out) != 0);
+    }
+    /* 16. our pass to another team-mate: his ball only if he is quicker to it than the receiver */
+    {
+        for (int c = 0; c < 2; c++) {
+            loose_ball_scene(fv2_make(FX(3.0), -FX(4.0)), fv2_make(0, FX(7.0)), WP_ASSIST_NORMAL);
+            s.pass_target = 3; s.pass_from = 2; s.pass_ticks = 1; s.ball.last_touch = 2;
+            s.players[3].pos = c ? fv2_make(FX(3.2), -FX(2.6)) : fv2_make(FX(3.0), FX(30.0));   /* receiver close / far */
+            WpSeatInput in = stick_off(fv2_make(FX(3.0), FX(1.0)), 30), out = in;
+            seats_chase_assist(&s, 0, &out);
+            int turned = out.move_x != in.move_x || out.move_y != in.move_y;
+            CHECKF(turned == (c == 0), "our pass to a mate (receiver %s): turned %d", c ? "close" : "far", turned);
+        }
+    }
+    /* 17. the contract in every D-049 situation: neutral never moves him, the turn never exceeds F, never sprints */
+    {
+        void (*scenes[4])(int) = {scene_runaway, scene_slow_lob, scene_drop, scene_their_pass};
+        int worst = 0, moved = 0, sprinted = 0;
+        for (int sc = 0; sc < 4; sc++) {
+            scenes[sc](WP_ASSIST_OFF);
+            run(NOIN, 90, pa);
+            scenes[sc](WP_ASSIST_NORMAL);
+            run(NOIN, 90, pb);
+            for (int t = 0; t < 90; t++) moved += pa[t].x != pb[t].x || pa[t].y != pb[t].y;
+            for (int deg = 0; deg < 360; deg += 10) {
+                scenes[sc](WP_ASSIST_NORMAL);
+                run_seat(&s, NOIN, 1);
+                fv2 u = dir_deg(deg);
+                WpSeatInput in = {c127(u.x), c127(u.y), 0}, out = in;
+                seats_chase_assist(&s, 0, &out);
+                int tn = turned_deg(in, out);
+                if (tn < 0) tn = -tn;
+                if (tn > worst) worst = tn;
+                sprinted += out.buttons != in.buttons;
+            }
+        }
+        printf("D-049 contract: neutral moved %d ticks, largest turn %d deg (cap 30), sprint added %d\n", moved, worst, sprinted);
+        CHECK(moved == 0 && worst <= 31 && sprinted == 0);
     }
     return TEST_DONE();
 }

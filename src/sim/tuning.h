@@ -83,6 +83,7 @@
 #define T_CHASE_MAX_T      {FX(2.0), FX(3.0), FX(3.5)}  /* only meeting points this soon (s) */
 #define T_CHASE_SHARE_S    {FX(0.15), FX(0.30), FX(0.50)} /* weight fades to 0 when a team-mate is this much quicker */
 #define T_CHASE_PRESS_MAX  FX(12.0)   /* ... and onto an opponent with the ball within this (CP0.3e) */
+#define T_CHASE_NEAR_R     FX(12.0)   /* D-049: ball or meeting point this close = always his to chase (no share fade) */
 #define T_RECV_LOCK_S      FX(0.6)    /* receiver: no takeover once the ball is this close in time (CP0.3e) */
 #define T_CHASE_STICK_MIN  48         /* stick magnitude (of 127) below this never chases */
 #define T_CHASE_MATES      3          /* team-mates nearest the ball compared for "is it mine" */

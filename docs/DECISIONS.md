@@ -619,3 +619,27 @@ first-time contact isn't possible; "Readable" error. New `src/sim/intent.c`; fir
   head-control's 11 m/s with a button pressed was neither headed nor controlled. HEAD band 1.6-2.05.
 - test_ai_rules' throw-in check accepts the marker at the 2 m line heading the throw first (it already did in stage 2;
   where it then went was luck).
+
+## D-049 — Chase assist wherever the controlled man is near the ball (2026-11-17, CP0.5b, owner request)
+Owner: "whenever the player being actively controlled is near the ball, always have some system assist so that player
+moves towards the ball as long as the direction of movement is somewhat in the direction of where the ball is".
+**Amends D-037** (the cone itself, its levels and its contract are unchanged).
+- **Audit of `seats_chase_assist` (D-037/D-039) - where a stick held at the ball got NO help:** (1) a team-mate
+  quicker to it (the "his ball" share weight faded to 0 when a mate was 0.3 s quicker - even with the ball 5 m away);
+  (2) a ball he can't reach at the pace he is running (no meeting point in 4 s: a ball rolling away, a jog after a
+  long ball); (3) meeting points later than T_CHASE_MAX_T (2/3/3.5 s: high lofts); (4) any pass of ours travelling to
+  another team-mate (always raw); (5) aerial balls steered to meet_chase's body-height point instead of the contact
+  plan's point (D-047) where his first touch actually happens. Already covered: still / stray / deflected balls,
+  their pass in flight (when no mate was quicker), their carrier within 12 m (D-039), his own receive (D-020).
+- **Rule now:** "near the ball" = the ball OR his meeting point within `T_CHASE_NEAR_R` = 12 m (the same radius as
+  the carrier press; ~1.5-2 s of running). Near, the ball is always his to chase: no share fade, no time limit; an
+  unreachable ball -> the cone steers toward where it ends up (meet_chase's last predicted point). Further away the
+  D-037 rules hold unchanged.
+- **Targets:** aerial ball with a contact plan -> `plan.at` (contact.c); otherwise meet_chase's stick-preferred
+  reachable point (still ball = the ball, rolling / deflected = intercept on its path with bounces, their pass =
+  intercept, through ball / loft once down at body height); their carrier -> the led press point (unchanged).
+- **Our pass to another team-mate:** the receiver is added to the share-weight comparison; the cone helps only if the
+  controlled man is quicker to it than him (near or far), so the assist never steals a mate's pass for you.
+- **Contract kept:** neutral stick never moves him, the turn is <= F (20/30/40 deg), never beyond E, speed and sprint
+  are his, Off = raw. Restarts excluded. Tests: `test_chase_assist` 11-17 (each situation, assisted vs OFF, and the
+  contract across all of them). 7v7 golden changed on purpose (the scripted seat plays at Normal); 5v5 (Off) unchanged.

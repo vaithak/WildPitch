@@ -394,13 +394,14 @@ static const wp_angle CH_ANG[3] = T_CHASE_ANG_FULL;
 static const fx CH_COSF[3] = T_CHASE_COS_FULL, CH_COSE[3] = T_CHASE_COS_EDGE, CH_MAXT[3] = T_CHASE_MAX_T,
                 CH_SHARE[3] = T_CHASE_SHARE_S;
 
-/* 1 when he gets there no later than the quickest of the team-mates nearest the ball, fading to 0 when one of them is
- * CH_SHARE quicker: it's "his" ball (continuous, so two near-equal men never make the pull flicker) */
-static fx share_weight(const SimState *s, int me, int lv) {
+/* 1 when he gets there no later than the quickest of the team-mates nearest the ball (and the team-mate a pass of
+ * ours is going to, `also`), fading to 0 when one of them is CH_SHARE quicker: it's "his" ball (continuous, so two
+ * near-equal men never make the pull flicker) */
+static fx share_weight(const SimState *s, int me, int lv, int also) {
     const WpPlayer *p = &s->players[me];
     Meet mine = meet_chase(s, p, fv2_make(0, 0), 0, 1);
     if (!mine.found) return 0;
-    int pick[T_CHASE_MATES], n = 0;
+    int pick[T_CHASE_MATES + 1], n = 0;
     for (int r = 0; r < T_CHASE_MATES; r++) {             /* the few team-mates nearest the ball */
         int best = -1; fx bd = 0;
         for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
@@ -413,6 +414,11 @@ static fx share_weight(const SimState *s, int me, int lv) {
         }
         if (best < 0) break;
         pick[n++] = best;
+    }
+    if (also >= 0 && also != me) {
+        int used = 0;
+        for (int q = 0; q < n; q++) used |= pick[q] == also;
+        if (!used) pick[n++] = also;
     }
     fx tb = FX(99.0);
     for (int q = 0; q < n; q++) {
@@ -453,7 +459,14 @@ static void chase_carrier(const SimState *s, int seat, WpSeatInput *io) {
 }
 
 /* Legs only: a stick held roughly at a loose ball is turned (at most F) toward where he can meet it. Exactly zero
- * beyond E, with the stick released, below T_CHASE_STICK_MIN, or when it isn't his ball - then the raw stick. */
+ * beyond E, with the stick released, below T_CHASE_STICK_MIN - then the raw stick.
+ * Where he meets it (D-049): an aerial ball he has a contact plan for -> the plan's point (contact.c); otherwise the
+ * stick-preferred reachable point of meet_chase (a still ball, a stray / deflected ball, an opponent's pass = its
+ * intercept, a through ball or loft once it is down at body height); a ball he can't catch at his pace -> where it
+ * ends up. Near the ball (it, or that point, within T_CHASE_NEAR_R) it is always his to chase: no "a team-mate is
+ * quicker" fade and no T_CHASE_MAX_T limit. Further away the D-037 rules hold (his ball, meeting soon enough).
+ * A pass of ours travelling to another team-mate is that team-mate's unless he is quicker to it (share weight with
+ * the receiver, near or not). */
 void seats_chase_assist(const SimState *s, int seat, WpSeatInput *io) {
     int me = s->seat_player[seat];
     if (me < 0 || s->assist_level[seat] == WP_ASSIST_OFF || s->phase != WP_PHASE_PLAY) return;
@@ -464,18 +477,31 @@ void seats_chase_assist(const SimState *s, int seat, WpSeatInput *io) {
     int mx = io->move_x, my = io->move_y;
     if (mx * mx + my * my < T_CHASE_STICK_MIN * T_CHASE_STICK_MIN) return;
     if (b->owner >= 0) { chase_carrier(s, seat, io); return; }   /* theirs: close him down (owner, CP0.3e) */
-    if (s->pass_target >= 0 && s->pass_target != me && s->players[s->pass_target].team == p->team) return;
+    int mates_pass = s->pass_target >= 0 && s->pass_target != me && s->players[s->pass_target].team == p->team;
     int lv = s->assist_level[seat] - 1;
     fv2 st = fv2_norm(fv2_make(FX_INT(mx), FX_INT(my)));
-    Meet m = meet_chase(s, p, st, 1, (io->buttons & WP_BTN_SPRINT) != 0);
-    if (!m.found || m.t > CH_MAXT[lv]) return;
-    fv2 tm = fv2_sub(m.pos, p->pos), tb = fv2_sub(b->pos, p->pos);
+    fv2 goal;
+    fx t_meet;
+    int found;
+    int pleft = (int16_t)(uint16_t)(p->plan.tick - (uint16_t)s->tick);
+    if (contact_plan_at(p, &goal) && pleft > 0) {         /* an aerial ball: where his body meets it (D-047) */
+        t_meet = FX_INT(pleft) / WP_TICK_HZ;
+        found = 1;
+    } else {
+        Meet m = meet_chase(s, p, st, 1, (io->buttons & WP_BTN_SPRINT) != 0);
+        goal = m.pos; t_meet = m.t; found = m.found;
+    }
+    fv2 tm = fv2_sub(goal, p->pos), tb = fv2_sub(b->pos, p->pos);
+    int64_t nr2 = (int64_t)T_CHASE_NEAR_R * T_CHASE_NEAR_R;
+    int near = !mates_pass && (fv2_len2_wide(tb) <= nr2 || fv2_len2_wide(tm) <= nr2);
+    if (!found && !near) return;                          /* far and out of his reach: not his to chase */
+    if (found && !near && t_meet > CH_MAXT[lv]) return;
     if (fv2_len(tm) < FX(0.05)) return;                   /* meeting it where he stands: nothing to steer */
     fx c = fv2_dot(st, fv2_norm(tm));
     if (fv2_len(tb) > FX(0.05)) c = fx_max(c, fv2_dot(st, fv2_norm(tb)));
     fx w = fx_clamp(fx_div(c - CH_COSE[lv], CH_COSF[lv] - CH_COSE[lv]), 0, FX_ONE);
     if (w == 0) return;
-    w = fx_mul(w, share_weight(s, me, lv));
+    if (!near) w = fx_mul(w, share_weight(s, me, lv, mates_pass ? s->pass_target : -1));
     if (w == 0) return;
     wp_angle a = fx_atan2(st.y, st.x);
     int32_t dl = (int16_t)(uint16_t)(fx_atan2(tm.y, tm.x) - a);

@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-17 by Claude session (CP0.5b part 0)_
+_Last updated: 2026-11-17 by Claude session (CP0.5b part 1)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -101,6 +101,21 @@ header-pass bisection + its per-mate retarget and meet_choose in the buffer's et
   step. Bit-identical results. bench_sim 18.7 -> 10.6 us/tick (1578x real time).
   AI-vs-AI reference before CP0.5b (`WP_STATS=1 WP_RULES=3`, 20 x 5 min 7v7): aimatch goals 18+26, passes 74/76%;
   aerial goals 0.44/min, lobs 71% (76/107), crosses 52% (27/52), headers 0.40/min.
+
+- **Part 1 (D-049, owner request 1), done, 7v7 golden updated on purpose (`64e4492ca8981d6f`; 5v5 Off unchanged):**
+  the chase cone now helps whenever the controlled man is near the ball (it or his meeting point within 12 m): no
+  more "a team-mate is quicker" fade near the ball, balls he can't catch at his pace (steer to where they end up),
+  late meeting points (long lofts), aerial balls steered to his contact-plan point, our pass to another mate only if
+  he is quicker than the receiver. Contract unchanged (neutral stick, <= F turn, no sprint, Off = raw).
+
+### Playtest guide (CP0.5b part 1, chase assist near the ball)
+1. A loose ball 5-10 m away with a team-mate closer to it: hold roughly toward it (even the neighbouring arrow
+   key) - your man now bends onto it (before: only if he was the quickest).
+2. A ball rolling away from you faster than you jog: hold roughly after it - he bends onto its line.
+3. A long lob / cross dropping near you: hold roughly toward it - he heads for the spot where his chest/thigh meets
+   it (the same spot the receive assist uses), not just the bounce.
+4. Their pass across you: hold roughly at it - he bends onto the interception even with a team-mate near it.
+5. Release the stick: he stops, every time. Point well away (> 55 deg): untouched. Esc > Movement assist Off = raw.
 
 ### Playtest guide (CP0.5a stage 3, first-time play)
 1. Header pass: as a cross comes in, press S (pass) early with the stick at a team-mate - he heads it down to him
