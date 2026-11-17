@@ -81,25 +81,41 @@ static void draw_pitch(SDL_Renderer *r, const WpCamera *c, const WpPitch *p) {
     }
 }
 
-static void draw_goal(SDL_Renderer *r, const WpCamera *c, const WpPitch *p, int sgn) {
+/* a net line: straight while the net is still, else subdivided and pushed out where the ball hit it (CP0.6) */
+static void net_line(SDL_Renderer *r, const WpCamera *c, const WpJuice *j, int sgn, float gx, float depth,
+                     float x0, float y0, float z0, float x1, float y1, float z1) {
+    if (j->net_t[sgn > 0] < 0) { line3(r, c, x0, y0, z0, x1, y1, z1); return; }
+    enum { N = 8 };
+    SDL_FPoint pts[N + 1];
+    for (int k = 0; k <= N; k++) {
+        float t = (float)k / N, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t, z = z0 + (z1 - z0) * t;
+        x += (float)sgn * wp_juice_net_bulge(j, sgn, y, z, fabsf(x - gx) / depth);
+        WpScreenPt p = wp_project(c, x, y, z);
+        pts[k] = (SDL_FPoint){p.x, p.y};
+    }
+    SDL_RenderLines(r, pts, N + 1);
+}
+
+static void draw_goal(SDL_Renderer *r, const WpCamera *c, const WpPitch *p, int sgn, const WpJuice *j) {
     float gx = (float)sgn * tof(p->length) / 2, gw = tof(p->goal_width) / 2, gh = tof(p->goal_height);
-    float back = gx + (float)sgn * tof(p->goal_depth);
+    float dep = tof(p->goal_depth), back = gx + (float)sgn * dep;
     /* net = the physics box (ball.c): roof at crossbar height, back wall, side walls */
     SDL_SetRenderDrawColor(r, 210, 210, 220, 120);
     for (int i = 0; i <= 8; i++) {
         float y = -gw + (float)i * (2 * gw / 8);
-        line3(r, c, gx, y, gh, back, y, gh); line3(r, c, back, y, gh, back, y, 0);
+        net_line(r, c, j, sgn, gx, dep, gx, y, gh, back, y, gh); net_line(r, c, j, sgn, gx, dep, back, y, gh, back, y, 0);
     }
     for (int i = 1; i <= 4; i++) {
         float z = gh * (float)i / 5.0f;
-        line3(r, c, back, -gw, z, back, gw, z);
-        line3(r, c, gx, -gw, z, back, -gw, z); line3(r, c, gx, gw, z, back, gw, z);
+        net_line(r, c, j, sgn, gx, dep, back, -gw, z, back, gw, z);
+        net_line(r, c, j, sgn, gx, dep, gx, -gw, z, back, -gw, z); net_line(r, c, j, sgn, gx, dep, gx, gw, z, back, gw, z);
     }
     for (int i = 1; i <= 3; i++) {
         float x = gx + (back - gx) * (float)i / 4.0f;
-        line3(r, c, x, -gw, 0, x, -gw, gh); line3(r, c, x, gw, 0, x, gw, gh); line3(r, c, x, -gw, gh, x, gw, gh);
+        net_line(r, c, j, sgn, gx, dep, x, -gw, 0, x, -gw, gh); net_line(r, c, j, sgn, gx, dep, x, gw, 0, x, gw, gh);
+        net_line(r, c, j, sgn, gx, dep, x, -gw, gh, x, gw, gh);
     }
-    line3(r, c, back, -gw, 0, back, -gw, gh); line3(r, c, back, gw, 0, back, gw, gh);
+    net_line(r, c, j, sgn, gx, dep, back, -gw, 0, back, -gw, gh); net_line(r, c, j, sgn, gx, dep, back, gw, 0, back, gw, gh);
     SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
     for (int k = -1; k <= 1; k++) {   /* thick posts */
         float o = (float)k * 0.04f;
@@ -114,11 +130,13 @@ void wp_render_ctx_init(WpRenderCtx *ctx, SDL_Renderer *r, uint64_t seed) {
     SDL_memset(ctx, 0, sizeof *ctx);
     ctx->soft = wp_soft_disc_create(r);
     ctx->look_seed = seed;
+    ctx->juice.net_t[0] = ctx->juice.net_t[1] = -1;
 }
 
 void wp_render_reset_anim(WpRenderCtx *ctx) {
     for (int i = 0; i < WP_MAX_PLAYERS; i++) { ctx->anim[i].init = false; ctx->stance[i].valid = false; }
     wp_ball_vis_reset(&ctx->ball);
+    wp_juice_reset(&ctx->juice);
 }
 
 /* next-man indicator (D-050): a "V" chevron of two thick strokes (hollow, dim) or a filled triangle (solid: an
@@ -186,7 +204,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
     wp_stadium_draw_ground(r, cam, &cur->pitch);
     draw_pitch(r, cam, &cur->pitch);
     wp_stadium_draw_back(r, &ctx->stadium, cam, &cur->pitch, ctx->time);
-    draw_goal(r, cam, &cur->pitch, -1);
+    draw_goal(r, cam, &cur->pitch, -1, &ctx->juice);
     if (cur->restart_kind == WP_RS_FREEKICK && cur->restart_indirect && cur->phase != WP_PHASE_PLAY) {
         /* offside given (D-041): the line where it was when the pass was played */
         float ox = tof(cur->offside_x), hw = tof(cur->pitch.width) / 2;
@@ -212,6 +230,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
     float by = lerpf(tof(prev->ball.pos.y), tof(cur->ball.pos.y), alpha);
     float bz = lerpf(tof(prev->ball.z), tof(cur->ball.z), alpha);
     wp_ball_vis_update(&ctx->ball, bx, by, bz);
+    wp_juice_update(&ctx->juice, cur, ctx->frame_events, bx, by, bz, px, py, pz, dt);
     items[n++] = (DrawItem){by, 1, 0};
     for (int i = 1; i < n; i++) {   /* far (large y) first */
         DrawItem t = items[i]; int j = i - 1;
@@ -226,6 +245,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                      (SDL_FColor){0, 0, 0, 0.30f * sh});
     }
     wp_ball_draw_shadow(r, ctx->soft, cam, bx, by, bz);
+    wp_juice_draw_puffs(&ctx->juice, r, ctx->soft, cam);
     /* pass receiver preview (D-021): the sim's pick, so the ring is exactly who a pass goes to. White, tinting to
      * amber when an opponent is near that lane. */
     for (int k = 0; k < WP_MAX_SEATS && !ctx->hide_markers; k++) {
@@ -317,9 +337,10 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                     }
                 }
         } else {
+            wp_juice_draw_trail(&ctx->juice, r, cam);
             wp_ball_draw(r, ctx->soft, cam, &ctx->ball, bx, by, bz, tof(cur->ball.vel.x), tof(cur->ball.vel.y));
         }
     }
-    draw_goal(r, cam, &cur->pitch, 1);
+    draw_goal(r, cam, &cur->pitch, 1, &ctx->juice);
     wp_stadium_draw_front(r, &ctx->stadium, cam, &cur->pitch, ctx->time);
 }

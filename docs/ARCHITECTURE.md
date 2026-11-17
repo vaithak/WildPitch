@@ -67,6 +67,7 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   mixer.h/.c            software mixer (voices, buses, crowd loops, glides, limiter); no device needed
   audio.h/.c            SDL audio stream + callback around the mixer; silent no-op without a device
   audio_check.c         --check-audio: sounds + mixer checks (ctest `audio`)
+  juice.h/.c            visual effects (CP0.6): fast-ball ribbon, net bulge / ripple, dust puffs, goal flash + banner
   sfx.h/.c              sim state + WP_EV_* (per tick, live and replay) -> sounds; crowd danger per frame
   ball_draw.h/.c        the ball: visual orientation rolled from drawn motion, 12 panels, speed blur/streak, shadow
   avatar.h/.c           procedural skeleton footballers (D-009): looks, styles, pose solver, soft-capsule drawing

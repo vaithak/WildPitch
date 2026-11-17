@@ -39,6 +39,7 @@
 #include "game/settings.h"
 #include "game/audio.h"
 #include "game/sfx.h"
+#include "game/kits.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen (40 m pitch) */
 /* bigger pitches show a bit more (7v7 55 m: x1.19) so the wide view still reads the game */
@@ -665,13 +666,9 @@ int main(int argc, char **argv) {
                 char ob[48];
                 snprintf(ob, sizeof ob, "indirect free kick - %s", vc->restart_team == 0 ? "RED" : "BLUE");
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(ob), (float)h * 0.22f + 34, ob);
-            } else if (vc->phase == WP_PHASE_GOAL) {
-                const char *msg = "G O A L !";
-                float sc = 4.0f;
-                SDL_SetRenderScale(g.ren, sc, sc);
-                SDL_SetRenderDrawColor(g.ren, 255, 235, 90, 255);
-                SDL_RenderDebugText(g.ren, ((float)w / sc - 8.0f * (float)strlen(msg)) * 0.5f, (float)h / sc * 0.22f, msg);
-                SDL_SetRenderScale(g.ren, 1, 1);
+            } else if (vc->phase == WP_PHASE_GOAL) {          /* flash + the scorer's colours sweep in (CP0.6) */
+                const WpKit *k0 = wp_kit(g.set.kit[0]), *k1 = wp_kit(g.set.kit[1]);
+                wp_juice_draw_goal(&g.rctx.juice, g.ren, w, h, vc, k0->name, k1->name, k0->shirt, k1->shirt);
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
             } else if (vc->phase == WP_PHASE_OUT || vc->restart_kind) {
                 static const char *RS[7] = {"OUT", "THROW-IN", "CORNER", "GOAL KICK", "KICK-OFF", "FREE KICK", "PENALTY"};

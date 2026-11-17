@@ -20,7 +20,14 @@ checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
   spikes on the kick ticks, peak 0.34); no-device paths (`SDL_AUDIO_DRIVER=bogus` / `dummy`) run silently. SDL here
   has ALSA + PulseAudio (no rebuild was needed). **Not verified by ear** (the agent has no speakers): timbre and the
   balance between sounds are guesses - owner, please judge.
-- Part 2 visual juice, part 3 battery mode + PERF.md, part 4 title screen + quick match: next.
+- **Part 2 - visual juice: done** (`src/game/juice.c`, fixed pools, time-based): a fading ribbon behind fast balls
+  (> 15 m/s, or high and > 9 m/s: shots, long lobs, punts) on top of the old half-frame streak; the net bulges out
+  where the ball hit it and ripples back (~0.9 s, strength by ball speed); dust puffs on slide tackles (a trail
+  while he skids), landings from jumps / headers, keeper dives (~0.3 s in, the dive is a pose) and hard bounces; a
+  goal flashes the screen once and a band in the scorer's kit colour sweeps in with a popping "G O A L !" and the
+  score. Trail / puffs clear on teleports and replay jumps. Checked in screenshots (Modern + Retro) on the
+  `--autoplay` goal (frames 140-185).
+- Part 3 battery mode + PERF.md, part 4 title screen + quick match: next.
 
 ### Playtest guide (CP0.6 part 1, audio) - listen for
 1. Launch normally: a short whistle at kick-off, a soft crowd murmur under everything.
@@ -33,6 +40,13 @@ checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
 6. Ball on the left / right of the screen: the sound comes from that side.
 7. Esc: the crowd drops back; change the volumes (a kick plays so you hear the level); M mutes / unmutes in game.
 8. Tell me: too loud / quiet? whistle too shrill? crowd too hissy? any sound that's annoying after 10 minutes?
+
+### Playtest guide (CP0.6 part 2, visual juice) - look for
+1. A hard shot or a long lob leaves a short white ribbon behind the ball; passes along the ground don't.
+2. Score (or shoot into the side netting): the net pushes out where the ball hit and wobbles back.
+3. Slide tackle (A without the ball near an opponent's ball): dust behind him. Keeper dives and jump landings: a puff.
+4. Goal: one white flash, then a band in the scorer's colour sweeps in with "G O A L !" and the score.
+5. Tell me: too much / too little? Anything distracting in Retro style (P)?
 
 ### History (CP0.4 - CP0.5b, kept for reference)
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks

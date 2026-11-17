@@ -11,6 +11,7 @@
 #include "game/stance_vis.h"
 #include "game/ball_draw.h"
 #include "game/stadium.h"
+#include "game/juice.h"
 
 /* Render context: presentation-only state that persists across frames. */
 typedef struct {
@@ -20,6 +21,7 @@ typedef struct {
     WpAvatarLook  look[WP_MAX_PLAYERS];
     WpStadium     stadium;               /* boards, flags, stands (D-033) */
     WpBallVis     ball;                  /* visual ball orientation (rolls with the drawn motion) */
+    WpJuice       juice;                 /* ball trail, net ripple, dust, goal flash (CP0.6) */
     uint64_t      look_seed;
     bool          looks_ready;
     int           style;                 /* index into wp_avatar_styles */
