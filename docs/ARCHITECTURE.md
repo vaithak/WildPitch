@@ -15,8 +15,12 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
                         net box, interpolated goal-line crossing, touchline/out
   player.c              movement + turn rate, buttons -> parametric kicks (targeted/weighted passes), control,
                         dribbling; players_step builds every player's WpSeatInput (human / assisted / team.c)
-  seats.c               which player each seat controls: manual/auto switch, pass hand-off on contact, pass in
-                        flight, assisted receive (legs only; aim stays the human's stick)
+  seats.c               which player each seat controls: LEGACY switching (D-017/D-029/D-037), pass hand-off on
+                        contact, pass in flight, assisted receive (legs only; aim stays the human's stick), the chase
+                        cone (D-037/D-049), meet_choose with its cached ball path (shared with switching.c)
+  switching.c           D-050 switching for non-LEGACY seats: intercept-ETA oracle (sw_next), event / override gates,
+                        dwell + return lock, the SWITCH button (indicator man, Q + direction, cycling), post-switch
+                        blend; team_plan.c reads its ETA for the human-winner bonus
   pass_pick.c           who receives a pass (D-021): two-bearing cone + score, keyboard stage B, keeper band, lane
                         danger, stick memory, per-tick preview (pick_recv) that passes read
   lob.c                 lofted passes (D-045/D-046): D-indexed flight table (filled once at sim_init), meter range,

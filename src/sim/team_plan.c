@@ -101,11 +101,26 @@ void team_plan_update(SimState *s) {
                 fv2 to = fv2_sub(b->pos, h->pos);
                 if (fv2_len(to) < FX(4.0) || fv2_dot(h->vel, to) > 0) human_first = fastest;
             }
-            if (human_first >= 0) pl->winner = (int8_t)human_first;
-            else {
-                for (int k = 0; k < n; k++) if (seat_has(s, base + k)) ok[k] = 0;
-                pl->winner = (int8_t)pick(tt, ok, n, base, pl->winner);
+            /* D-050 (a seat on this team not LEGACY): the man the seat just left can't be the AI winner while its
+             * return lock runs (no A -> B -> A), and the seat's man - engaging (close, or moving at it) - stays the
+             * winner when he is within 1.2x (+0.1 s) of the quickest AI man by the switching ETA (not only when he is
+             * the fastest): an AI mate doesn't run in and take the ball off him */
+            int sw = -1;
+            for (int k = 0; k < WP_MAX_SEATS; k++)
+                if (s->seat_player[k] >= 0 && s->players[s->seat_player[k]].team == t && s->switch_mode[k]) sw = k;
+            for (int k = 0; k < n; k++) if (seat_has(s, base + k)) ok[k] = 0;
+            if (sw >= 0 && s->sw_back[sw] && s->sw_prev[sw] >= base && s->sw_prev[sw] < base + n) ok[s->sw_prev[sw] - base] = 0;
+            if (human_first < 0 && sw >= 0) {
+                int h = s->seat_player[sw], ai = pick(tt, ok, n, base, -1);
+                const WpPlayer *hp = &s->players[h];
+                fv2 to = fv2_sub(b->pos, hp->pos);
+                int engaging = fv2_len(to) < FX(4.0) || fv2_dot(hp->vel, to) > 0;   /* a passive human doesn't hold it */
+                if (hp->role != WP_ROLE_KEEPER && ai >= 0 && engaging &&
+                    ((int32_t)switch_eta(s, h) + T_SW_HUMAN_OFF) * T_SW_HUMAN_DEN <=
+                    ((int32_t)switch_eta(s, ai) + T_SW_HUMAN_OFF) * T_SW_HUMAN_NUM) human_first = h;
             }
+            if (human_first >= 0) pl->winner = (int8_t)human_first;
+            else pl->winner = (int8_t)pick(tt, ok, n, base, pl->winner);
         }
         /* --- cover (not in possession): to a point 5 m goal-side of the ball, 2 m toward the middle --- */
         if (us != 1) {

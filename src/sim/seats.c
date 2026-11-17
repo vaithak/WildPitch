@@ -21,8 +21,9 @@ static int seat_owns(const SimState *s, int player) {
     return 0;
 }
 
-static void do_switch(SimState *s, int seat, int to, uint8_t cool, const WpSeatInput *si, int latch) {
-    WpPlayer *old = &s->players[s->seat_player[seat]];
+void seats_switch_to(SimState *s, int seat, int to, uint8_t cool, const WpSeatInput *si, int latch, uint8_t reason) {
+    int from = s->seat_player[seat];
+    WpPlayer *old = &s->players[from];
     old->kick_charge = 0;
     old->charge_kind = 0xFF;
     s->seat_player[seat] = (int8_t)to;
@@ -35,7 +36,9 @@ static void do_switch(SimState *s, int seat, int to, uint8_t cool, const WpSeatI
         s->latch_stick[seat][1] = si->move_y;
         s->latch_ticks[seat] = T_SWITCH_LATCH_TICKS;
     }
+    if (s->switch_mode[seat] != WP_SWITCH_LEGACY) switch_note(s, seat, from, reason);   /* D-050 */
 }
+#define do_switch(s, seat, to, cool, si, latch) seats_switch_to(s, seat, to, cool, si, latch, WP_SW_NONE)
 
 /* nearest outfield team-mate of `team` to the ball, skipping `skip` and players other seats hold */
 static int nearest_to_ball(const SimState *s, int team, int skip, fx *out_d) {
@@ -118,6 +121,14 @@ Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
     return m;
 }
 
+/* the cached path meet_choose uses (D-050's switch ETA shares it): 50 ms steps, "too high" flags; returns the count */
+int meet_path(const SimState *s, const fv2 **at, const uint8_t **high) {
+    mc_path(&s->ball);
+    *at = MC.at;
+    *high = MC.high;
+    return MC_STEPS;
+}
+
 void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput *in, fv2 meet, fx t_meet,
                         uint8_t plan) {
     int seat = -1;
@@ -143,7 +154,7 @@ void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput
     s->pass_stick[0] = in->move_x;
     s->pass_stick[1] = in->move_y;
     /* a pass to the keeper: the stick the passer was holding (toward his own goal) must not carry over */
-    do_switch(s, seat, receiver, T_SWITCH_COOL, in, s->players[receiver].role == WP_ROLE_KEEPER);
+    seats_switch_to(s, seat, receiver, T_SWITCH_COOL, in, s->players[receiver].role == WP_ROLE_KEEPER, WP_SW_PASS);
 }
 
 /* the assisted receiver's goal + speed for this tick, and the takeover rule */
@@ -209,6 +220,11 @@ static void deflect_switch(SimState *s, const WpInput *in, int team) {
     for (int k = 0; k < WP_MAX_SEATS; k++) {
         int me = s->seat_player[k];
         if (me < 0 || s->players[me].team != team) continue;
+        if (s->switch_mode[k] != WP_SWITCH_LEGACY) {      /* D-050: the oracle's scorer, forced */
+            int to = switch_best(s, k);
+            uint16_t tme = switch_eta(s, me);
+            if (to >= 0 && switch_eta(s, to) < tme) { seats_switch_to(s, k, to, T_SWITCH_COOL, &in->seat[k], 1, WP_SW_DEFLECT); continue; }
+        }
         int best = -1; fx bt = 0;
         for (int j = team * s->n_per_side; j < (team + 1) * s->n_per_side; j++) {
             const WpPlayer *q = &s->players[j];
@@ -217,6 +233,7 @@ static void deflect_switch(SimState *s, const WpInput *in, int team) {
             fx t = m.found ? m.t : FX(9.0);
             if (best < 0 || t < bt) { best = j; bt = t; }
         }
+        if (s->switch_mode[k] != WP_SWITCH_LEGACY) best = me;
         if (best >= 0 && best != me) do_switch(s, k, best, T_SWITCH_COOL, &in->seat[k], 1);
         else if (in->seat[k].move_x || in->seat[k].move_y) {   /* same man: still ignore the stale pass stick */
             s->latch_stick[k][0] = in->seat[k].move_x;
@@ -238,8 +255,11 @@ void seats_update(SimState *s, const WpInput *in) {
             int team = s->players[s->pass_from].team;
             s->pass_target = -1;
             if (deflected && s->phase == WP_PHASE_PLAY) deflect_switch(s, in, team);
+            if (b->owner < 0 && s->phase == WP_PHASE_PLAY) switch_events(s, team);   /* D-050: ended loose */
         }
     }
+    switch_events(s, -1);                             /* D-050: the ball has just gone loose */
+    s->sw_last_owner = b->owner;
     for (int k = 0; k < WP_MAX_SEATS; k++) {
         int me = s->seat_player[k];
         if (me < 0) continue;
@@ -253,6 +273,7 @@ void seats_update(SimState *s, const WpInput *in) {
             else s->latch_ticks[k]--;
         }
         if (s->pass_target == me && s->pass_stick[0] != -128) recv_update(s, me, si);
+        if (s->switch_mode[k] != WP_SWITCH_LEGACY) { switch_seat(s, k, si); continue; }   /* D-050 */
         const WpPlayer *p = &s->players[me];
         if (p->role == WP_ROLE_KEEPER && b->owner != me && s->phase == WP_PHASE_PLAY && s->pass_target != me) {
             /* our keeper has played it / lost it: hand control back to an outfield man (the AI keeps goal) */
@@ -321,7 +342,7 @@ void seats_on_gain(SimState *s, int i, const WpInput *in) {
         if (s->seat_player[k] >= 0 && s->players[s->seat_player[k]].team == team) { seat = k; break; }
     if (seat < 0) return;
     if (s->pass_target == s->seat_player[seat]) s->pass_target = -1;
-    do_switch(s, seat, i, T_SWITCH_COOL, &in->seat[seat], 1);
+    seats_switch_to(s, seat, i, T_SWITCH_COOL, &in->seat[seat], 1, s->phase == WP_PHASE_PLAY ? WP_SW_GAIN : WP_SW_RESTART);
 }
 
 /* Legs-only input for a seat's player (aim and buttons always stay the human's): the assisted receiver, or a

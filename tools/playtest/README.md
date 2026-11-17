@@ -29,3 +29,8 @@ taps to the ringed mate: 67% received, 21% intercepted (6% on clear lanes), laun
 jogging and sprinting; mirror divergence at tick 166 (rounding, same actions).
 
 All match harnesses honour `WP_STATS=0|1|2` (neutral / mirrored / own squads, D-034).
+
+CP0.5b: `switchrate.c [seeds] [minutes]` (D-050 acceptance): 7v7 seat 0 scripted (R = stick released, H = held at
+the ball), switches per minute by reason (inferred from the state, so it runs on any sim version; build with
+`-DWP_HAVE_SWITCH_MODE` to also print the sim's own WP_SW_* reasons and honour `WP_SWITCH=1|2|3`), A->B->A within
+60 ticks. `WP_SW_TRACE=1|2` prints the ping-pongs / every switch.

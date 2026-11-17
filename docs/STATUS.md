@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-17 by Claude session (CP0.5b part 1)_
+_Last updated: 2026-11-17 by Claude session (CP0.5b part 2)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -108,16 +108,38 @@ header-pass bisection + its per-mate retarget and meet_choose in the buffer's et
   late meeting points (long lofts), aerial balls steered to his contact-plan point, our pass to another mate only if
   he is quicker than the receiver. Contract unchanged (neutral stick, <= F turn, no sprint, Off = raw).
 
-- **Part 2 (switching redesign, D-050) stage 0 - baseline:** `tools/playtest/switchrate.c` (7v7, assist Normal, seat 0
-  scripted, 3 seeds x 5 min; reasons inferred from the state: restart / pass hand-off / gain / deflect / keeper /
-  unprompted). Before D-050:
+- **Part 2 (switching redesign, D-050), done, 7v7 golden updated on purpose (`83c4eca063ec2c62`; 5v5 LEGACY
+  unchanged):** new `src/sim/switching.c`; per-seat `switch_mode` (LEGACY for tests / regression format; the game:
+  Esc > Auto switching Manual / Events / Assisted, default Events, saved in settings.cfg, applies on Restart).
+  One intercept-ETA oracle (sw_next, hysteresis), forced hand-overs as before, unprompted switches only through event
+  gates / the 3x override with dwell, return lock and stick-intent suppression; Q goes to the man the new chevron
+  shows, Q + direction picks the man that way from the ball, repeated Q cycles; 0.3 s post-switch heading blend; team
+  plan stops the old man being the AI winner while the lock runs. Harness `tools/playtest/switchrate.c` (7v7, assist
+  Normal, seat 0 scripted, 3 seeds x 5 min; reasons inferred from the state; R walks onto a still ball within 5 m so a
+  passive seat can't freeze the match):
 
-  | Script | switches/min | unprompted/min | unprompted while THEIR PASS travels | A->B->A in 60 ticks (both unprompted) |
-  |---|---|---|---|---|
-  | R stick released | 18.5 | 14.9 | 172 of 223 | 18 |
-  | H stick held toward the ball | 29.0 | 15.9 | 196 of 239 | 11 |
+  | Script | unprompted / min before -> after | A->B->A in 60 ticks (both unprompted) | all switches / min |
+  |---|---|---|---|
+  | R stick released | 34.2 -> 15.3 (45%) | 19 -> 0 | 45.7 -> 30.1 |
+  | H stick held toward the ball | 17.3 -> 0.47 (3%) | 10 -> 0 | 31.1 -> 19.1 |
+  | Manual (after) | 0 / 0 | 0 / 0 | 13.1 / 16.7 |
+  | Assisted (after) | 25.9 / 1.9 | 0 / 0 | 40.5 / 21.2 |
 
-  The flicker is mostly D-029's distance rule chasing a spot that moves at pass speed while their pass travels.
+  Before, most unprompted switches happened while their pass travelled (D-029's distance spot moving at pass speed).
+  After, the remaining released-stick ones are the defensive switch onto the best man against their carrier.
+  AI vs AI byte-identical (no seats). Cost: bench_sim (5v5 LEGACY) 10.5 us/tick unchanged; the 7v7 seat harness
+  2.36 -> 2.47 s for the same 45 minutes (+5%).
+
+### Playtest guide (CP0.5b part 2, switching)
+1. Esc > Auto switching: Events (default). Defend: a dim yellow "V" over a team-mate shows who Q gives you; it turns
+   into a solid triangle just before the game switches for you (their tackle / clearance / lofted ball, or a man 3x
+   better placed). Does control still jump between two men near the ball? (It shouldn't: 0 ping-pongs measured.)
+2. Hold the stick at the ball while chasing: the game only takes him off you if you're hopeless (4x).
+3. Q: goes exactly to the man with the V. Tap Q again within ~0.7 s: the next man, then the next (cycle).
+4. Q while holding a direction: the team-mate that way from the ball (e.g. hold up + Q = the man above the ball).
+5. After any switch with the stick held, the new man curves out of his run instead of snapping round.
+6. Try Manual (only passes, gaining the ball and deflections move control) and Assisted (more eager).
+Questions: is the V readable but quiet enough? Events vs Assisted - which feels right? Is 1.5 s after Q too long?
 
 ### Playtest guide (CP0.5b part 1, chase assist near the ball)
 1. A loose ball 5-10 m away with a team-mate closer to it: hold roughly toward it (even the neighbouring arrow

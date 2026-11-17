@@ -121,6 +121,26 @@ void wp_render_reset_anim(WpRenderCtx *ctx) {
     wp_ball_vis_reset(&ctx->ball);
 }
 
+/* next-man indicator (D-050): a "V" chevron of two thick strokes (hollow, dim) or a filled triangle (solid: an
+ * automatic switch is about to land on him) */
+static void draw_chevron(SDL_Renderer *r, float x, float y, float rad, SDL_FColor c, int solid) {
+    if (solid) {
+        SDL_Vertex tri[3] = {{{x - rad * 0.6f, y - rad * 0.8f}, c, {0, 0}}, {{x + rad * 0.6f, y - rad * 0.8f}, c, {0, 0}},
+                             {{x, y}, c, {0, 0}}};
+        SDL_RenderGeometry(r, NULL, tri, 3, NULL, 0);
+        return;
+    }
+    float w = fmaxf(1.5f, rad * 0.22f);
+    for (int side = -1; side <= 1; side += 2) {
+        float x0 = x + (float)side * rad * 0.6f, y0 = y - rad * 0.8f;
+        float dx = x - x0, dy = y - y0, l = sqrtf(dx * dx + dy * dy);
+        float nx = -dy / l * w * 0.5f, ny = dx / l * w * 0.5f;
+        SDL_Vertex q[6] = {{{x0 + nx, y0 + ny}, c, {0, 0}}, {{x0 - nx, y0 - ny}, c, {0, 0}}, {{x + nx, y + ny}, c, {0, 0}},
+                           {{x0 - nx, y0 - ny}, c, {0, 0}}, {{x - nx, y - ny}, c, {0, 0}}, {{x + nx, y + ny}, c, {0, 0}}};
+        SDL_RenderGeometry(r, NULL, q, 6, NULL, 0);
+    }
+}
+
 /* thin elliptical ring on the grass (annulus as a triangle strip) */
 static void draw_ring(SDL_Renderer *r, float cx, float cy, float rx, float ry, float th, SDL_FColor col) {
     enum { N = 28 };
@@ -251,6 +271,19 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 if (dxb * dxb + dyb * dyb < 4.0f) pose.charge01 = (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
             }
             wp_avatar_draw(r, ctx->soft, cam, px[i], py[i], &pose, &ctx->look[i], style);
+            /* who SWITCH goes to (D-050): only while we haven't got the ball and no pass of ours is travelling */
+            for (int s = 0; s < WP_MAX_SEATS && !ctx->hide_markers; s++) {
+                int me = cur->seat_player[s];
+                if (me < 0 || cur->switch_mode[s] == WP_SWITCH_LEGACY || cur->phase != WP_PHASE_PLAY) continue;
+                int team = cur->players[me].team, o = cur->ball.owner;
+                if ((o >= 0 && cur->players[o].team == team) ||
+                    (cur->pass_target >= 0 && cur->players[cur->pass_from].team == team)) continue;
+                int hot = cur->sw_hot[s] && cur->sw_next[s] >= 0;
+                if ((hot ? cur->sw_next[s] : cur->sw_q[s]) != i) continue;
+                WpScreenPt m = wp_project(cam, px[i], py[i], pz[i] + 2.25f * ctx->look[i].height / 1.8f);
+                float rad = 0.28f * cam->ppm * m.s;
+                draw_chevron(r, m.x, m.y, rad, hot ? (SDL_FColor){1, 0.95f, 0.3f, 0.85f} : (SDL_FColor){1, 0.95f, 0.3f, 0.55f}, hot);
+            }
             for (int s = 0; s < WP_MAX_SEATS && !ctx->hide_markers; s++)
                 if (cur->seat_player[s] == i) {
                     WpScreenPt m = wp_project(cam, px[i], py[i], pz[i] + 2.25f * ctx->look[i].height / 1.8f);

@@ -801,6 +801,7 @@ void players_step(SimState *s, const WpInput *in) {
      * the legs only - aim and buttons always come from the human's real stick) */
     WpSeatInput pin[WP_MAX_PLAYERS], mv[WP_MAX_PLAYERS];
     seats_update(s, in);                                  /* switching first: this tick's inputs go to the new player */
+    for (int k = 0; k < WP_MAX_SEATS; k++) if (s->sw_blend[k]) s->sw_blend[k]--;   /* D-050 blend clock */
     team_plan_update(s);                                  /* the team layer (D-030), before anyone decides */
     contact_update(s);                                    /* ball prediction + aerial contact plans (D-047) */
     for (int i = 0; i < np; i++) {
@@ -812,7 +813,10 @@ void players_step(SimState *s, const WpInput *in) {
                 pin[i].move_x = pin[i].move_y = 0;
                 mv[i] = pin[i];
             }
-            if (!seats_assist_receive(s, seat, &mv[i])) seats_chase_assist(s, seat, &mv[i]);   /* D-037 */
+            if (!seats_assist_receive(s, seat, &mv[i])) {
+                switch_blend(s, seat, &mv[i]);                /* D-050: just switched - keep some of his run */
+                seats_chase_assist(s, seat, &mv[i]);          /* D-037 / D-049 */
+            }
         }
         else if (s->flags & WP_SIMF_STATIC_OTHERS) pin[i] = mv[i] = (WpSeatInput){0, 0, 0};
         else { brain_input(s, i, &pin[i]); mv[i] = pin[i]; }

@@ -2,7 +2,8 @@
  *   sim.c     orchestration: init, kickoff reset, match flow (goal/out phases), hashing
  *   player.c  movement, turning, buttons -> parametric kicks, ball control & dribbling
  *   ball.c    ball physics (substepped), posts/crossbar/net, bodies, goal & out detection
- *   seats.c   which player each human seat controls (switching), pass in flight, assisted receive
+ *   seats.c   which player each human seat controls (legacy switching), pass in flight, assisted receive, chase cone
+ *   switching.c  D-050 switching: intercept-ETA oracle, event gates, the button (direction / cycle), post-switch blend
  *   pass_pick.c  who receives a pass (stick cone + score, preview, stick memory)
  *   header.c  contextual headers: trigger, take-off timing, head-band contact
  *   restart.c throw-ins, corners, goal kicks: spot, taker, distance rule
@@ -83,6 +84,15 @@ void seats_pass_handoff(SimState *s, int kicker, int receiver, const WpSeatInput
 int  seats_assist_receive(const SimState *s, int seat, WpSeatInput *io);   /* 1 if it steered the legs */
 void seats_chase_assist(const SimState *s, int seat, WpSeatInput *io);     /* the chase cone (D-037) */
 void seats_on_gain(SimState *s, int i, const WpInput *in);   /* a team-mate of a seat won the ball */
+void seats_switch_to(SimState *s, int seat, int to, uint8_t cool, const WpSeatInput *si, int latch, uint8_t reason);
+int  meet_path(const SimState *s, const fv2 **at, const uint8_t **high);   /* meet_choose's cached ball path */
+/* switching.c (D-050): non-LEGACY seats */
+uint16_t switch_eta(const SimState *s, int j);            /* intercept ETA (ticks) of player j */
+int  switch_best(const SimState *s, int seat);            /* eligible team-mate with the smallest ETA, -1 */
+void switch_seat(SimState *s, int seat, const WpSeatInput *si);   /* per tick: oracle, button, unprompted gate */
+void switch_note(SimState *s, int seat, int from, uint8_t reason);   /* every switch's bookkeeping */
+void switch_events(SimState *s, int ended_team);           /* the ball went loose: event windows */
+void switch_blend(const SimState *s, int seat, WpSeatInput *io);    /* legs: post-switch blend */
 /* tackle.c */
 int  tackle_wanted(const SimState *s, int i);             /* an opponent has the ball within reach of a tackle */
 void tackle_start(SimState *s, int i);

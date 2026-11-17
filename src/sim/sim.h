@@ -166,6 +166,13 @@ enum { WP_RULE_FOULS = 1 << 0, WP_RULE_OFFSIDE = 1 << 1 };   /* WpMatchConfig.ru
 enum { WP_AI_EASY = 0, WP_AI_NORMAL = 1, WP_AI_HARD = 2, WP_AI_LEVELS };
 /* movement assist toward the ball (D-037), per seat; OFF = the pre-D-037 sim bit for bit */
 enum { WP_ASSIST_OFF = 0, WP_ASSIST_LOW = 1, WP_ASSIST_NORMAL = 2, WP_ASSIST_HIGH = 3, WP_ASSIST_LEVELS };
+/* active-player switching (D-050), per seat. LEGACY = the pre-D-050 rules bit for bit (D-017/D-029/D-037; tests and
+ * the regression format); the game's menu offers MANUAL (only forced hand-overs + the button), EVENTS (default) and
+ * ASSISTED (more eager). */
+enum { WP_SWITCH_LEGACY = 0, WP_SWITCH_MANUAL = 1, WP_SWITCH_EVENTS = 2, WP_SWITCH_ASSISTED = 3, WP_SWITCH_MODES };
+/* why the seat's player last changed (D-050): forced (PASS..KEEPER, RESTART), the button, or unprompted (EVENT/OVERRIDE) */
+enum { WP_SW_NONE = 0, WP_SW_PASS, WP_SW_GAIN, WP_SW_DEFLECT, WP_SW_KEEPER, WP_SW_RESTART, WP_SW_MANUAL,
+       WP_SW_MANUAL_DIR, WP_SW_EVENT, WP_SW_OVERRIDE };
 enum { WP_RS_NONE = 0, WP_RS_THROW, WP_RS_CORNER, WP_RS_GOALKICK, WP_RS_KICKOFF, WP_RS_FREEKICK, WP_RS_PENALTY };
 
 /* Team plan (D-030): computed once per tick for both teams before anyone decides - a shared observation that says
@@ -260,6 +267,21 @@ typedef struct {
     uint8_t  first_kickoff;          /* who kicked off the first half (the other team starts the second) */
     uint8_t  stats_mode;             /* WP_STATS_* */
     uint8_t  assist_level[WP_MAX_SEATS]; /* WP_ASSIST_* per seat (D-037) */
+    /* active-player switching (D-050; hashed only when a seat isn't LEGACY). switch_cool is the dwell. */
+    uint8_t  switch_mode[WP_MAX_SEATS];  /* WP_SWITCH_* */
+    uint8_t  sw_reason[WP_MAX_SEATS];    /* WP_SW_* of the last change */
+    int8_t   sw_next[WP_MAX_SEATS];      /* the oracle: best team-mate by intercept ETA (hysteresis), -1 */
+    int8_t   sw_next_old[WP_MAX_SEATS];  /* ... the one before it changed */
+    uint8_t  sw_next_age[WP_MAX_SEATS];  /* ticks since sw_next changed (255 = long ago) */
+    int8_t   sw_q[WP_MAX_SEATS];         /* who a SWITCH press goes to right now (the indicator), -1 */
+    uint8_t  sw_hot[WP_MAX_SEATS];       /* an automatic switch to sw_next is close: the indicator turns solid */
+    int8_t   sw_prev[WP_MAX_SEATS];      /* the man the last switch left ... */
+    uint8_t  sw_back[WP_MAX_SEATS];      /* ... can't be switched back to (nor be the AI ball-winner) for this long */
+    uint8_t  sw_event[WP_MAX_SEATS];     /* event window: the ball just went loose */
+    uint8_t  sw_cycle[WP_MAX_SEATS];     /* ticks since the last manual switch (255 = long ago): repeated presses cycle */
+    uint8_t  sw_blend[WP_MAX_SEATS];     /* post-switch movement blend ticks left */
+    uint16_t sw_visited[WP_MAX_SEATS];   /* men (bit = team slot) this press cycle has visited */
+    int8_t   sw_last_owner;              /* ball owner at the end of the last seats update (events) */
     uint8_t  stats[WP_MAX_PLAYERS][WP_STAT_N];
     WpPlayer players[WP_MAX_PLAYERS];
 } SimState;
@@ -273,6 +295,7 @@ typedef struct {
     uint32_t half_ticks;              /* 0 = endless (tests); the game: 2 halves of 5 min = 90' at 9x (D-036) */
     uint8_t  assist_level;            /* WP_ASSIST_* for every seat (D-037) */
     uint8_t  rules;                   /* WP_RULE_* (game formats: fouls + offside; sim_default_config: none) */
+    uint8_t  switch_mode;             /* WP_SWITCH_* for every seat (D-050; game formats EVENTS, default LEGACY) */
 } WpMatchConfig;
 
 WpMatchConfig sim_default_config(void);   /* 5-a-side, 40 x 25 m (the regression-test format) */

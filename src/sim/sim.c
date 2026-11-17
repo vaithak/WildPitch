@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 2848  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 2960  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
  * 5.6 x 2.1 m goals (7.32/68 of the width, like a real pitch) */
@@ -20,6 +20,7 @@ WpMatchConfig sim_config_7v7(void) {
     c.half_ticks = T_HALF_TICKS;                      /* two 5-minute halves, 90' at 9x (D-036) */
     c.assist_level = WP_ASSIST_NORMAL;                /* movement assist toward the ball (D-037) */
     c.rules = WP_RULE_FOULS | WP_RULE_OFFSIDE;        /* a real match (D-040/D-041) */
+    c.switch_mode = WP_SWITCH_EVENTS;                 /* active-player switching on events (D-050) */
     return c;
 }
 
@@ -35,6 +36,7 @@ WpMatchConfig sim_config_5v5(void) {
     c.half_ticks = T_HALF_TICKS;
     c.assist_level = WP_ASSIST_NORMAL;
     c.rules = WP_RULE_FOULS | WP_RULE_OFFSIDE;
+    c.switch_mode = WP_SWITCH_EVENTS;
     return c;
 }
 
@@ -115,7 +117,11 @@ void sim_kickoff_setpiece(SimState *s) {
     s->restart_taker = (int8_t)taker;
     s->restart_ticks = 0;
     for (int k = 0; k < WP_MAX_SEATS; k++)                /* a seat on the kicking team takes it */
-        if (s->seat_player[k] >= 0 && s->players[s->seat_player[k]].team == s->kickoff_team) s->seat_player[k] = (int8_t)taker;
+        if (s->seat_player[k] >= 0 && s->players[s->seat_player[k]].team == s->kickoff_team) {
+            if (s->switch_mode[k] != WP_SWITCH_LEGACY && s->seat_player[k] != taker)
+                switch_note(s, k, s->seat_player[k], WP_SW_RESTART);   /* D-050 bookkeeping */
+            s->seat_player[k] = (int8_t)taker;
+        }
 }
 
 void sim_init(SimState *s, const WpMatchConfig *cfg) {
@@ -132,7 +138,11 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
         s->pick_stick_age[i] = s->pick_diag_age[i] = 255;
         s->intent[i] = 0xFF;
         s->intent_eta[i] = 0xFFFF;
+        s->sw_next[i] = s->sw_next_old[i] = s->sw_q[i] = s->sw_prev[i] = -1;
+        s->sw_next_age[i] = s->sw_cycle[i] = 255;
+        s->switch_mode[i] = cfg->switch_mode < WP_SWITCH_MODES ? cfg->switch_mode : WP_SWITCH_EVENTS;
     }
+    s->sw_last_owner = -1;
     s->seat_player[0] = (int8_t)(s->n_per_side - 1); /* seat 0 = team 0 striker */
     s->half_ticks = cfg->half_ticks;                 /* 0 = endless (D-036) */
     s->first_kickoff = 0;
@@ -233,6 +243,19 @@ uint64_t sim_hash(const SimState *s) {
         int any = 0;
         for (int k = 0; k < WP_MAX_SEATS; k++) any |= s->assist_level[k];
         if (any) for (int k = 0; k < WP_MAX_SEATS; k++) fnv_i(&f, s->assist_level[k]);
+    }
+    {   /* switching (D-050): all LEGACY carries nothing (the pre-D-050 hash) */
+        int any = 0;
+        for (int k = 0; k < WP_MAX_SEATS; k++) any |= s->switch_mode[k];
+        if (any) {
+            for (int k = 0; k < WP_MAX_SEATS; k++) {
+                fnv_i(&f, s->switch_mode[k]); fnv_i(&f, s->sw_reason[k]); fnv_i(&f, s->sw_next[k]);
+                fnv_i(&f, s->sw_next_old[k]); fnv_i(&f, s->sw_next_age[k]); fnv_i(&f, s->sw_q[k]); fnv_i(&f, s->sw_hot[k]);
+                fnv_i(&f, s->sw_prev[k]); fnv_i(&f, s->sw_back[k]); fnv_i(&f, s->sw_event[k]); fnv_i(&f, s->sw_cycle[k]);
+                fnv_i(&f, s->sw_blend[k]); fnv_i(&f, s->sw_visited[k]);
+            }
+            fnv_i(&f, s->sw_last_owner);
+        }
     }
     if (s->half_ticks) {                                  /* endless matches carry no clock: unhashed (D-036) */
         fnv_i(&f, s->half_ticks); fnv_i(&f, s->clock); fnv_i(&f, s->stoppage); fnv_i(&f, s->stop_acc);

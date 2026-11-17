@@ -359,6 +359,8 @@ int main(int argc, char **argv) {
     cfg.ai_level[1] = (uint8_t)g.menu.difficulty;          /* the opposition; our AI team-mates stay NORMAL */
     g.menu.assist = (shot_path || autoplay || demo || gallery) ? WP_ASSIST_NORMAL : wp_settings_load_assist();
     if (!(autoplay || demo || gallery)) cfg.assist_level = (uint8_t)g.menu.assist;   /* D-037 (harnesses: as configured) */
+    g.menu.switching = (shot_path || autoplay || demo || gallery) ? WP_SWITCH_EVENTS : wp_settings_load_switching();
+    if (!(autoplay || demo || gallery)) cfg.switch_mode = (uint8_t)g.menu.switching;   /* D-050 */
     sim_init(&g.cur, &cfg);
     if (!(autoplay || demo || gallery)) sim_kickoff_setpiece(&g.cur);   /* a real kick-off (D-032) */
     g.demo = demo;
@@ -421,6 +423,7 @@ int main(int argc, char **argv) {
                 if (res == WP_MENU_RESTART) {                 /* new match, same format, chosen difficulty */
                     cfg.ai_level[1] = (uint8_t)g.menu.difficulty;
                     cfg.assist_level = (uint8_t)g.menu.assist;
+                    cfg.switch_mode = (uint8_t)g.menu.switching;
                     sim_init(&g.cur, &cfg);
                     sim_kickoff_setpiece(&g.cur);
                     g.prev = g.cur;

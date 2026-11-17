@@ -643,3 +643,50 @@ moves towards the ball as long as the direction of movement is somewhat in the d
 - **Contract kept:** neutral stick never moves him, the turn is <= F (20/30/40 deg), never beyond E, speed and sprint
   are his, Off = raw. Restarts excluded. Tests: `test_chase_assist` 11-17 (each situation, assisted vs OFF, and the
   contract across all of them). 7v7 golden changed on purpose (the scripted seat plays at Normal); 5v5 (Off) unchanged.
+
+## D-050 — Active-player switching: one ETA oracle, event gates, a visible next man (2026-11-17, CP0.5b, owner request)
+Owner: "the switching of active player needs improvement ... frequent switching sometimes when a couple of players
+near the ball". Research: `reports/Active player switching.md`. **Amends D-017, D-020, D-029 and D-037** (switching
+parts only). Owner decisions (binding): a menu setting "Auto switching: Manual / Events / Assisted", default Events
+with the 3x override; Q + a held direction picks the man that way (ball-relative), repeated Q cycles, no right stick
+(R3 stays zoom); keep the 1.5 s manual lock.
+- **Modes** (`SimState.switch_mode` per seat, `WpMatchConfig.switch_mode`): LEGACY = the pre-D-050 rules bit for bit
+  (sim_default_config, every regression test; 5v5 golden unchanged), MANUAL (forced hand-overs + the button only),
+  EVENTS (game default), ASSISTED (more eager). Independent of the movement assist level (Off / Low / Normal / High
+  keep their D-037 meaning). Menu row saved in settings.cfg (`switching = manual|events|assisted`), applied on
+  Restart match like the assist row. New fields hashed only when a seat isn't LEGACY.
+- **Oracle** (`switching.c`): per seat, `sw_next` = the eligible team-mate (outfield, no seat) with the smallest
+  intercept ETA in ticks: first 50 ms step of meet_choose's cached ball path (<= 1.9 m) he reaches from his position
+  0.2 s ahead, react 0.15 s + turn (0.30 s x (1-cos)/2 toward THAT point) + acceleration (0.22 s x (1 - speed along it
+  / top)) at sprint speed, squared compares with an optimistic pre-check (a root only for steps that pass it). None
+  in 4 s: his time to the path's end (>= 241; no 9 s cliff). Their carrier: a press point led 0.3 s and 1.5 m toward
+  our goal centre, +0.5 s if he's the wrong side. GRF hysteresis (t_c + 30)·5 < (t_inc + 30)·4. Refreshed every 3
+  ticks (and on a press).
+- **Forced** (fire at once, set the dwell): our pass struck (hand-off), gaining the ball (AI mate / keeper / restart
+  taker), a deflection (best ETA if quicker than him), the keeper handing back (best ETA), kick-offs.
+- **Unprompted** (Events / Assisted only), all of: dwell over (every switch: 24 / 18 ticks; manual: 90 = the 1.5 s
+  lock), phase PLAY, not his ball / ours / in the hands, not mid-kick or header, no held charge, no buffered press
+  (D-048), not the pass target, no pass of ours travelling, **their ground pass travelling: wait** (where it ends up
+  decides), the candidate isn't the man just left (return lock 60 ticks), and a ratio on (ETA + 30 ticks):
+  *defensive* 1/2 (Events; Assisted 7/10) inside a 9-tick event window (the ball went loose by a tackle / block /
+  clearance / shot, their lofted pass, they took it off us, our pass ended loose) and while their carrier has it
+  (D-029 kept); otherwise the *override* 1/3 (3x quicker; Assisted 1/2). **Stick intent** (held >= 48/127 within 50
+  deg of the ball or where it is in 0.5 s): either rule needs 1/4 (Assisted 1/3). The switch always lands on sw_next.
+  Deviations from the report: events-only defensive ratio except their carrier (the report held it for their whole
+  possession incl. passes in flight - measured: one switch every dwell while their pass travelled); event ratio 1/2
+  (report 3/5); Assisted return lock 60 (report 45: 24 ping-pongs in 15 min).
+- **Button:** a press goes to exactly the man the indicator shows (`sw_q`): with a direction held, the team-mate within
+  45 deg of it seen from the ball, minimising d·(2 - cos) (nobody that way: the oracle's man - never a dead press);
+  no direction: sw_next (or the previous one if it changed < 6 ticks ago). Presses within 40 ticks of the last cycle
+  through men not yet visited (bit mask incl. the start; resets when all are visited). No hold-to-aim mode.
+- **Indicator** (`render.c`): a dim hollow chevron over sw_q while we don't have the ball and no pass of ours travels;
+  a solid one over sw_next when an automatic switch is near (event window, or within 1.25x of the ratio).
+- **Post-switch blend:** while the stick is held, for 18 ticks (Assisted 24) the stick's heading is turned toward his
+  own run by w = r / 2 x 18 (at most half the angle, magnitude kept; the report's vector blend cancels to a dead stop
+  on a reversal). Released stick untouched.
+- **Team plan:** the man a seat just left can't be the AI ball-winner while the return lock runs; the seat's man stays
+  the winner when engaging (close / moving at it) and within 1.2x + 0.1 s of the quickest AI man by switch_eta (was:
+  only when the fastest). No-op for a team without a non-LEGACY seat (AI vs AI byte-identical).
+- **Measured** (`tools/playtest/switchrate.c`, 7v7, assist Normal, 3 seeds x 5 min): unprompted switches/min stick
+  released 34.2 -> 15.3, stick held at the ball 17.3 -> 0.47; A->B->A within 60 ticks (both unprompted) 19 / 10 -> 0 /
+  0. Manual: 0 unprompted. Assisted: 25.9 / 1.9, A->B->A 0. Tests: `tests/test_switching.c`.

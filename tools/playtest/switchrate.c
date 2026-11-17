@@ -1,6 +1,6 @@
 /* switchrate.c - how often control of the human seat changes hands without being asked (CP0.5b, D-050 acceptance).
  * 7v7 (sim_config_7v7: assist Normal, the game's switching mode), seat 0 on team 0, everyone else AI, two scripts:
- *   R = stick released (the human only taps PASS when he has the ball, ~0.25 s after getting it),
+ *   R = stick released (he only walks onto a still loose ball within 5 m, and taps PASS 0.25 s after getting it),
  *   H = stick held toward the ball (full 8-way keys; on the ball: toward their goal, tap PASS likewise).
  * Reasons are inferred from the state around the tick (works on any version of the sim):
  *   restart (not in open play) / pass (hand-off to the receiver of his pass) / gain (the new man has the ball) /
@@ -28,11 +28,18 @@ static WpSeatInput script(const SimState *s, int held, int *own_ticks) {
     if (s->ball.owner == me) {
         (*own_ticks)++;
         if (held) in.move_x = (int8_t)(team_dir(s, p->team) > 0 ? 127 : -127);
-        if (*own_ticks == 15) in.buttons = WP_BTN_PASS;   /* a tap: pressed one tick, released the next */
+        if (*own_ticks % 30 == 15) in.buttons = WP_BTN_PASS;   /* a tap (pressed one tick); again every 0.5 s */
         return in;
     }
     *own_ticks = 0;
-    if (!held) return in;
+    if (!held) {                                      /* released - but a still loose ball at his feet he walks onto */
+        fv2 d = fv2_sub(s->ball.pos, p->pos);
+        if (s->ball.owner < 0 && !s->ball.held && fv2_len(s->ball.vel) < FX(0.5) && fv2_len(d) < FX(5.0) && fv2_len(d) > FX(0.2)) {
+            d = fv2_norm(d);
+            in.move_x = (int8_t)(d.x * 127 / FX_ONE); in.move_y = (int8_t)(d.y * 127 / FX_ONE);
+        }
+        return in;
+    }
     double dx = (double)(s->ball.pos.x - p->pos.x) / 65536.0, dy = (double)(s->ball.pos.y - p->pos.y) / 65536.0;
     if (dx * dx + dy * dy < 0.04) return in;
     double a = atan2(dy, dx);
@@ -47,6 +54,7 @@ int main(int argc, char **argv) {
     int seeds = argc > 1 ? atoi(argv[1]) : 3, minutes = argc > 2 ? atoi(argv[2]) : 5;
     static SimState s;
     for (int held = 0; held < 2; held++) {
+        long sim_reason[16] = {0};
         long cnt[R_N] = {0}, aba_un = 0, aba_any = 0, ticks = 0, aba_un_gain = 0, ctx[4] = {0};
         for (int seed = 1; seed <= seeds; seed++) {
             WpMatchConfig cfg = sim_config_7v7();
@@ -81,6 +89,12 @@ int main(int argc, char **argv) {
                 else if (ours0 && s.pass_target < 0 && s.ball.owner < 0) r = R_DEFLECT;
                 else r = R_UNPROMPTED;
                 cnt[r]++;
+#ifdef WP_HAVE_SWITCH_MODE
+                sim_reason[s.sw_reason[0] < 16 ? s.sw_reason[0] : 15]++;
+                if (getenv("WP_SW_TRACE") && (t - h_tick[1] <= 60 || atoi(getenv("WP_SW_TRACE")) > 1))
+                    printf("t%ld %d->%d r%d simr%d (prev %d->%d r%d at t%ld) owner %d ptgt %d\n", t, before, now, r, s.sw_reason[0],
+                           h_from[1], h_to[1], h_r[1], h_tick[1], s.ball.owner, s.pass_target);
+#endif
                 if (r == R_UNPROMPTED) ctx[bctx]++;
                 /* A->B->A: this switch goes back to the man the previous one left, within 60 ticks */
                 if (h_to[1] == before && h_from[1] == now && t - h_tick[1] <= 60) {
@@ -100,6 +114,12 @@ int main(int argc, char **argv) {
         for (int r = 0; r < R_N; r++) printf(" %s %ld (%.2f/min)", RN[r], cnt[r], cnt[r] / mins);
         printf("\n    unprompted by ball state before it: their carrier %ld, their pass %ld, our pass %ld, loose %ld",
                ctx[0], ctx[1], ctx[2], ctx[3]);
+#ifdef WP_HAVE_SWITCH_MODE
+        printf("\n    sim reasons (WP_SW_*): pass %ld gain %ld deflect %ld keeper %ld restart %ld manual %ld/%ld event %ld override %ld",
+               sim_reason[WP_SW_PASS], sim_reason[WP_SW_GAIN], sim_reason[WP_SW_DEFLECT], sim_reason[WP_SW_KEEPER],
+               sim_reason[WP_SW_RESTART], sim_reason[WP_SW_MANUAL], sim_reason[WP_SW_MANUAL_DIR], sim_reason[WP_SW_EVENT],
+               sim_reason[WP_SW_OVERRIDE]);
+#endif
         printf("\n    A->B->A within 60 ticks: unprompted both %ld, unprompted then gain %ld, any non-pass %ld\n",
                aba_un, aba_un_gain, aba_any);
     }

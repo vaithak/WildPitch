@@ -137,6 +137,33 @@
 #define T_SWITCH_HYST      FX(2.0)    /* auto-switch only to a team-mate this much nearer the ball */
 #define T_SWITCH_DEF_HYST  FX(3.0)    /* they have it: switch to the man this much nearer the goal-side spot ... */
 #define T_SWITCH_DEF_COOL  45         /* ... at most every 0.75 s */
+/* active-player switching (D-050, reports/Active player switching.md), per mode {MANUAL, EVENTS, ASSISTED} */
+#define T_SW_K             30         /* ratio offset (ticks): (t_c + K) vs (t_me + K) - GRF's +500 ms */
+#define T_SW_NEXT_NUM      4          /* oracle hysteresis: a challenger replaces sw_next when (t_c+K)*5 < (t_inc+K)*4 */
+#define T_SW_NEXT_DEN      5
+#define T_SW_EV_NUM        {0, 1, 7}  /* event window: switch when (t_c+K)*DEN < (t_me+K)*NUM */
+#define T_SW_EV_DEN        {1, 2, 10}
+#define T_SW_OV_NUM        {0, 1, 1}  /* otherwise only this override (Events: 3x quicker) */
+#define T_SW_OV_DEN        {1, 3, 2}
+#define T_SW_INTENT_X      {1, 4, 3}  /* stick held at the ball: either rule needs 1/x */
+#define T_SW_INTENT_COS    FX(0.643)  /* ... "at the ball" = within 50 deg of it (or of where it is in 0.5 s) */
+#define T_SW_DWELL         {24, 24, 18}   /* every switch: no unprompted switch for this long (ticks) */
+#define T_SW_BACK          {60, 60, 60}   /* return lock: not back to the man just left (nor him as AI winner) */
+#define T_SW_EVENT_WIN     {9, 9, 12}     /* ticks the defensive ratio applies after the ball goes loose */
+#define T_SW_BLEND         {18, 18, 24}   /* post-switch blend (ticks; <= 50% of his old motion) */
+#define T_SW_LOOK          FX(0.2)    /* ETA: start from where he'll be in 0.2 s (position + velocity) */
+#define T_SW_TURN_S        FX(0.30)   /* ... + a full reversal costs this (scaled by (1 - cos)/2) */
+#define T_SW_ACC_PEN       FX(0.22)   /* ... + a standing man loses this reaching full speed (top / 2 T_ACCEL) */
+#define T_SW_DEF_LEAD      FX(0.3)    /* their carrier: the press point leads him by this ... */
+#define T_SW_GS_DIST       FX(1.5)    /* ... and sits this far goal-side of the ball (toward our goal centre) */
+#define T_SW_GS_TOL        FX(0.5)    /* a man this far the wrong side of the ball is beaten ... */
+#define T_SW_BEATEN_PEN    FX(0.5)    /* ... and pays this (s) */
+#define T_SW_RTC           6          /* a press within this of sw_next changing goes to the previous one */
+#define T_SW_CYCLE_WIN     40         /* presses this close together cycle through new men */
+#define T_SW_DIR_COS       FX(0.707)  /* Q + direction: men within 45 deg of the stick, seen from the ball */
+#define T_SW_HUMAN_NUM     6          /* team plan: the seat's man stays the ball-winner within (t_ai+6)*6/5 ticks */
+#define T_SW_HUMAN_DEN     5
+#define T_SW_HUMAN_OFF     6
 #define T_PASS_FLIGHT_MAX  240        /* a pass in flight stops blocking auto-switch after this many ticks */
 /* passes & reception (D-020: solve the meeting point, steer the receiver, widen the foot) */
 #define T_PASS_ARR_MIN     FX(8.0)    /* tap pass arrival pace: MIN + PER_M * (distance - 5 m), capped at MAX */
