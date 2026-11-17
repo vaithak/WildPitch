@@ -765,3 +765,27 @@ Report row 5 (presentation only; the owner chose no lob ghost ring). New `src/ga
   stance (instep, thigh, chest, head control, volley, half-volley, lay-off, header pass, header shot) at 3 lateral
   offsets and measures the drawn contact centre on the contact tick: worst 0.104 m (volley), all others <= 0.033 m
   (limit 0.15). Goldens unchanged (presentation only).
+
+## D-053 — A human's corner: runners in the box, a slower dead-ball meter, the ball to his head (2026-11-17, owner)
+Owner: "the corner kicks have some problem, the nearby player is too near and I am never able to send a long kick for
+header in the D-area. Either it is non-intuitive or not-doable right now, I tried with long press of lofted pass
+button". Measured (headless, 7v7): on a human's corner no team-mate ever stood in the box (formation spots 13-29 m
+out; the plan's near-support walked to ~2 m of the taker); the open-play meter fills 12 -> 45 m in 0.4 s, so the box
+(20-32 m from the flag) was a ~0.15 s window and a "long press" sailed 45 m over everyone; the meter's +-3 m depth
+bias dropped the ball past / short of the snapped man, where his marker headed it (0/30 reached an attacker vs 6/6
+with a tap).
+- **Box runners** (`setpiece.c`, a seat's corner only): penalty spot, far post, near post, a short option ~10 m off
+  (n - 3 of them: 4 in 7v7, 2 in 5v5); the rest keep the plan. The walk-up waits for them (within 2 m) up to 7 s
+  (`T_CORNER_SETUP_MAX`, a seat's corner only). AI takers keep their own runs (fixed spots cost AI lob completion
+  72% -> 59%).
+- **Skipping a walk-up places everyone** (`restart_setup_step`, any restart): the press that skips it teleports the
+  AI players to where they were walking (legal distance / receiving spot). Was: play started with them mid-walk.
+- **Dead-ball lob meter** (`lob_ramp_ticks`): the taker of a dead-ball restart (not a kick-off) fills the meter over
+  `T_LOB_SET_RAMP` = 60 ticks after the tap window (1.0 s; open play 24 ticks unchanged); render.c's bar matches.
+- **To his head:** a lofted ball (human or AI) snapped to a mate within `T_AI_CROSS_ZONE` of goal comes down at
+  `T_LOB_HEAD_Z` (was AI only), and the meter's depth bias is off for it (the meter picks the man; the ball goes to
+  him).
+- **Known, not fixed:** the snapped runner still loses most headers to his marker (headless, buttons pressed late:
+  attackers win the first touch in few cases; the AI's own corners win ~30%). A seat receiver doesn't attack a
+  contested ball the way aerial_ai.c's AI receiver does (contact_reachable finds no head-height point for him) - a
+  follow-up. Tests: `tests/test_corner.c`. Goldens updated on purpose (5v5 `319956738752144e`, 7v7 `9dfc679575aa1e19`).

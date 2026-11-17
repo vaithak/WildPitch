@@ -5,6 +5,11 @@
  * the restart team's attacking frame, so they work in both halves (D-036). */
 #include "sim/sim_internal.h"
 
+static int is_seat_man(const SimState *s, int j) {
+    for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == j) return 1;
+    return 0;
+}
+
 static int predicted_taker(const SimState *s) {
     if (s->restart_taker >= 0) return s->restart_taker;
     int t = s->restart_team, n = s->n_per_side, best = -1; fx bd = 0;
@@ -76,7 +81,7 @@ static int foul_spot(const SimState *s, int i, fv2 *at) {
 int setpiece_spot(const SimState *s, int i, fv2 *at) {
     int kind = s->restart_kind;
     if (kind == WP_RS_FREEKICK || kind == WP_RS_PENALTY) return foul_spot(s, i, at);
-    if (kind != WP_RS_THROW && kind != WP_RS_GOALKICK) return 0;
+    if (kind != WP_RS_THROW && kind != WP_RS_GOALKICK && kind != WP_RS_CORNER) return 0;
     int live = s->phase == WP_PHASE_OUT || s->phase == WP_PHASE_SETUP ||
                (s->phase == WP_PHASE_PLAY && s->restart_taker >= 0 && s->ball.owner == s->restart_taker);
     if (!live || s->players[i].team != s->restart_team || s->players[i].role == WP_ROLE_KEEPER) return 0;
@@ -86,7 +91,24 @@ int setpiece_spot(const SimState *s, int i, fv2 *at) {
     fv2 sp = fv2_make(fx_clamp(s->restart_spot.x, -hl, hl), fx_clamp(s->restart_spot.y, -hw, hw));
     fv2 spot[5];
     int ns = 0;
-    if (kind == WP_RS_THROW) {
+    if (kind == WP_RS_CORNER) {                           /* D-053: attack the box; the rest keep the team plan */
+        if (taker < 0 || !is_seat_man(s, taker)) return 0;
+        /* (a human's corner only: an AI taker's runners make their own runs - brain.c - and he picks the open one;
+         * fixed spots cost the AI's corners 72% -> 59% lob completion) */
+        fx gx = fx_mul(sg, hl), side = sp.y > 0 ? FX_ONE : -FX_ONE, gw = s->pitch.goal_width / 2;
+        fx L = s->pitch.length;
+        const fx C[5][2] = {                              /* depth from their goal line, across (toward the flag +) */
+            {fx_mul(L, T_PENALTY_FRAC), FX(0.5)},             /* penalty spot */
+            {fx_mul(L, FX(0.06)), -(gw + FX(1.0))},           /* far post */
+            {fx_mul(L, FX(0.045)), gw - FX(0.5)},             /* near post */
+            {FX(3.0), hw - FX(10.0)},                         /* short option, ~10 m from the taker (his marker stays outside the 9.15 m) */
+            {fx_mul(L, FX(0.2)), -FX(2.0)},                   /* edge of the box */
+        };
+        int want = s->n_per_side - 3;
+        if (want < 1) want = 1;
+        if (want > 5) want = 5;
+        for (int k = 0; k < want; k++) spot[ns++] = fv2_make(gx - fx_mul(sg, C[k][0]), fx_mul(side, C[k][1]));
+    } else if (kind == WP_RS_THROW) {
         fx in = sp.y > 0 ? -FX_ONE : FX_ONE;              /* into the pitch */
         static const fx F[4][2] = {{FX(7.0), FX(3.0)}, {FX(1.0), FX(9.0)}, {-FX(7.0), FX(5.0)}, {FX(15.0), FX(4.0)}};
         for (int k = 0; k < 4; k++)                       /* down the line, inside, back, long down the line */

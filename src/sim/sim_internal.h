@@ -136,6 +136,7 @@ void offside_step(SimState *s);
 void lob_table_init(void);
 fx   lob_max_d(const SimState *s);                         /* the meter's top end on this pitch */
 fx   lob_meter_dist(const SimState *s, fx h);              /* hold h (0..1] -> how far the lofted ball lands */
+int  lob_ramp_ticks(const SimState *s, int i);            /* ticks the lob meter takes to fill after the tap window */
 fx   lob_recv_time(fx D, int head);                        /* a D lob: time / distance to come down through ... */
 fx   lob_recv_dist(fx D, int head);                        /* ... T_LOB_RECV_Z (head: T_LOB_HEAD_Z) */
 int  lob_snap(const SimState *s, int i, wp_angle dir, fx h);   /* meter release: the team-mate it snaps to, or -1 */

@@ -354,7 +354,8 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     else if (p->kick.kind == WP_KICK_LOB) {               /* lofted pass (D-046): AI balls keep to the meter's range */
         int ai = seat_of(s, i) < 0;
         fv2 goal = fv2_make(team_dir(s, p->team) * (s->pitch.length / 2), 0);
-        int head = ai && r >= 0 && fv2_len(fv2_sub(s->players[r].pos, goal)) < T_AI_CROSS_ZONE;   /* a cross / corner */
+        int head = r >= 0 && fv2_len(fv2_sub(s->players[r].pos, goal)) < T_AI_CROSS_ZONE;   /* a cross / corner: to his
+                                                          head - a seat's too since D-053 (owner: "a long kick for header") */
         b->vel = fv2_make(0, 0);
         if (head && T_CROSS_DRIVEN) b->vel = cross_solve(s, r, &vz, &meet, &t_meet);   /* driven, to his head (D-051) */
         if (!b->vel.x && !b->vel.y)                       /* (a man in the driven ball's way: loft it over him) */
@@ -409,7 +410,7 @@ void player_fire(SimState *s, int i, uint8_t kind, uint16_t ticks, const WpSeatI
         make_kick(s, i, WP_KICK_THROUGH, fx_div(FX_INT(ticks - T_PASS_TAP_TICKS), FX_INT(T_CHARGE_MAX_TICKS - T_PASS_TAP_TICKS)), aim, has, &k);
     else if (kind == WP_KICK_LOB)                         /* tap = 0 (to the ringed mate), else the meter */
         make_kick(s, i, WP_KICK_LOB, ticks <= T_LOB_TAP_TICKS ? 0
-                  : fx_max(fx_div(FX_INT(ticks - T_LOB_TAP_TICKS), FX_INT(T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS)), 1),
+                  : fx_clamp(fx_div(FX_INT(ticks - T_LOB_TAP_TICKS), FX_INT(lob_ramp_ticks(s, i))), 1, FX_ONE),
                   aim, has, &k);
     else
         make_kick(s, i, kind, fx_div(FX_INT(ticks), FX_INT(T_CHARGE_MAX_TICKS)), aim, has, &k);
@@ -479,7 +480,8 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
             if (kind != WP_KICK_CHIP && s->ball.owner < 0 && !ball_reachable(s, i, KICK_START_REACH))
                 intent_press(s, i, kind);                 /* the ball is still coming: buffer it (D-048) */
         }
-        if ((now & btn) && p->charge_kind == kind && p->kick_charge < T_CHARGE_MAX_TICKS) p->kick_charge++;
+        int cap = kind == WP_KICK_LOB ? T_LOB_TAP_TICKS + lob_ramp_ticks(s, i) : T_CHARGE_MAX_TICKS;
+        if ((now & btn) && p->charge_kind == kind && p->kick_charge < cap) p->kick_charge++;
         if ((released & btn) && p->charge_kind == kind) {
             if (p->action == WP_ACT_NONE && ball_reachable(s, i, KICK_START_REACH)) {
                 player_fire(s, i, kind, p->kick_charge, in);

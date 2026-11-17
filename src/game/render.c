@@ -299,8 +299,11 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                         float c = p->charge_kind == WP_KICK_PASS
                                 ? (float)(p->kick_charge - T_PASS_TAP_TICKS) / (float)(T_CHARGE_MAX_TICKS - T_PASS_TAP_TICKS)
                                 : p->charge_kind == WP_KICK_LOB      /* lob meter: how far (D-045) */
-                                ? (float)(p->kick_charge - T_LOB_TAP_TICKS) / (float)(T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS)
+                                ? (float)(p->kick_charge - T_LOB_TAP_TICKS) /
+                                  (float)(cur->restart_kind && cur->restart_kind != WP_RS_KICKOFF && cur->restart_taker == i &&
+                                          cur->ball.owner == i ? T_LOB_SET_RAMP : T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS)   /* lob_ramp_ticks */
                                 : (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
+                        if (c > 1.0f) c = 1.0f;
                         float bw = 1.1f * cam->ppm * m.s, bh = 0.16f * cam->ppm * m.s + 2.0f;
                         float x0 = m.x - bw * 0.5f, y0 = m.y - rad * 0.8f - bh - 4.0f;
                         SDL_FRect bg = {x0 - 1, y0 - 1, bw + 2, bh + 2}, fg = {x0, y0, bw * c, bh};

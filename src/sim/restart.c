@@ -89,6 +89,8 @@ static fv2 take_pos(const SimState *s, fv2 at, wp_angle *facing) {
 
 /* end of the OUT pause (D-044): the ball goes on its spot, the taker is chosen and RUNS to it while everyone else
  * walks into place; restart_setup_step() starts it once they're there (or the time's up, or a human skips) */
+static int is_seat(const SimState *s, int j);
+
 void restart_setup(SimState *s, const WpInput *in) {
     WpBall *b = &s->ball;
     fv2 at = ball_spot(s);
@@ -103,6 +105,8 @@ void restart_setup(SimState *s, const WpInput *in) {
     s->phase_timer = T_SETUP_MAX;
     s->events |= WP_EV_RESET;                             /* the ball is placed: don't interpolate it */
     if (taker >= 0) seats_on_gain(s, taker, in);
+    if (s->restart_kind == WP_RS_CORNER && taker >= 0 && is_seat(s, taker))   /* (after the hand-over to him) */
+        s->phase_timer = T_CORNER_SETUP_MAX;              /* a human's corner: time for the box runners (D-053) */
 }
 
 static int is_seat(const SimState *s, int j) {
@@ -117,6 +121,10 @@ static int setup_ready(const SimState *s) {
     fv2 dummy;
     for (int j = 0; j < 2 * s->n_per_side; j++)
         if (j != t && !is_seat(s, j) && restart_legal_target(s, j, &dummy)) return 0;   /* AI still walking out */
+    if (s->restart_kind == WP_RS_CORNER)                  /* and the box runners in place (D-053) */
+        for (int j = 0; j < 2 * s->n_per_side; j++)
+            if (j != t && !is_seat(s, j) && setpiece_spot(s, j, &dummy) &&
+                fv2_len(fv2_sub(s->players[j].pos, dummy)) > T_CORNER_SETUP_ARRIVE) return 0;
     return 1;
 }
 
@@ -129,6 +137,15 @@ void restart_setup_step(SimState *s, const WpInput *in) {
     if (s->phase_timer) s->phase_timer--;
     if (s->flags & WP_SIMF_STATIC_OTHERS) skip = 1;     /* statues never walk: isolation tests keep the instant restart */
     if (!skip && s->phase_timer && !setup_ready(s)) return;
+    if (skip && !(s->flags & WP_SIMF_STATIC_OTHERS)) {    /* a human skipped the walk: everyone is simply there (D-053) */
+        fv2 to[WP_MAX_PLAYERS];
+        uint8_t go[WP_MAX_PLAYERS] = {0};
+        for (int j = 0; j < 2 * s->n_per_side; j++)       /* (targets first: they depend on where everyone stands) */
+            if (j != s->restart_taker && !is_seat(s, j))
+                go[j] = (uint8_t)(restart_legal_target(s, j, &to[j]) || setpiece_spot(s, j, &to[j]));
+        for (int j = 0; j < 2 * s->n_per_side; j++)
+            if (go[j]) { s->players[j].pos = to[j]; s->players[j].vel = fv2_make(0, 0); }
+    }
     restart_place(s, in);
     s->phase = WP_PHASE_PLAY;
 }

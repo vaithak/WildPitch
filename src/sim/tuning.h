@@ -242,6 +242,10 @@
 #define T_CROSS_CLEAR_W    FX(1.5)    /* ... only with no opponent within this of its path while it is below T_CB_JUMP, */
 #define T_CROSS_CLEAR_END  FX(3.0)    /* ... up to this short of the receiver (else it is lofted over them) */
 #define T_LOB_TAP_D        FX(18.0)   /* a tap with nobody to pick: lands this far along the aim */
+#define T_LOB_SET_RAMP     60         /* a dead-ball restart (corner, free kick...): the meter fills over this many ticks
+                                         after the tap window (open play: T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS = 24) */
+#define T_CORNER_SETUP_ARRIVE FX(2.0) /* corner walk-up (D-053): waits for the box runners this close ... */
+#define T_CORNER_SETUP_MAX 420        /* ... for at most 7 s (any button skips it: everyone is placed at once) */
 #define T_LOB_AI_MIN_D     FX(12.0)   /* AI lobs / crosses / restart lobs: D clamped to [this, the meter's max] */
 #define T_THROW_LOFT_VZ_BASE FX(4.0)  /* from the hands (keeper's overarm throw, long throw-in): the pre-D-046 loft */
 #define T_THROW_LOFT_VZ_PER_M FX(0.22) /* vz = BASE + PER_M * distance, clamped to [MIN, MAX] */

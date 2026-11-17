@@ -210,3 +210,16 @@ Format:
   no right stick (R3 stays zoom); keep the 1.5 s manual lock.
 - **Action:** CP0.5b: chase assist for every ball situation near the controlled man; switching redesign (one ETA
   scorer, next-man indicator, dwell + return lock, stick-intent suppression, post-switch blend).
+
+## 2026-11-17 — after CP0.5a/b (corners, keeper facing)
+- **Question (verbatim):** "what is the light arrow vs dark arrow over player?" — answered: solid = controlled man,
+  dim hollow V = who Q switches to, solid translucent = an automatic switch is about to happen (offered to make the
+  third more distinct).
+- **Feedback (verbatim):** "the corner kicks have some problem, the nearby player is too near and I am never able to
+  send a long kick for header in the D-area. Either it is non-intuitive or not-doable right now, I tried with long
+  press of lofted pass button"
+- **Action:** D-053.
+- **Feedback (verbatim):** "also, there is the problem of goalkeeper facing in random direction sometimes, like facing
+  its own goal, I am not sure what the logic of goalkeeper moving direction is, but it should be improved"
+- **Feedback (verbatim):** "once both of these are done and committed, continue with the next checkpoint as I am
+  going to sleep and will test them together tomorrow"

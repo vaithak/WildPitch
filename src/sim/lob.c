@@ -90,6 +90,13 @@ static fx lob_d_for_recv(fx d, int head) {
 }
 
 fx lob_max_d(const SimState *s) { return fx_min(T_LOB_MAX_D, fx_mul(s->pitch.length, T_LOB_MAX_D_PITCH)); }
+/* how long player i's lob meter takes to fill: slower for the taker of a dead-ball restart, who has the time to
+ * weigh it (D-053: a corner into the box needs a hold window wider than open play's 0.4 s ramp) */
+int lob_ramp_ticks(const SimState *s, int i) {
+    int dead = s->restart_kind && s->restart_kind != WP_RS_KICKOFF && s->restart_taker == i && s->ball.owner == i;
+    return dead ? T_LOB_SET_RAMP : T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS;
+}
+
 fx lob_meter_dist(const SimState *s, fx h) { return fx_lerp(T_LOB_MIN_D, lob_max_d(s), fx_clamp(h, 0, FX_ONE)); }
 
 static fv2 in_margins(const SimState *s, fv2 p) {
@@ -155,7 +162,7 @@ fv2 lob_solve(const SimState *s, int r, wp_angle dir, fx h, fx d_min, int head, 
     fx D, d_max = lob_max_d(s);
     if (r >= 0) {
         fx bias = 0, tc;
-        if (h > 0) {
+        if (h > 0 && !head) {                         /* (a ball to his head in the box: the meter only picks him, D-053) */
             fv2 P0 = lead_point(s, r, from, 0, head, &tc);
             bias = fx_clamp(lob_meter_dist(s, h) - fv2_len(fv2_sub(P0, from)), -T_LOB_BIAS_MAX, T_LOB_BIAS_MAX);
         }
