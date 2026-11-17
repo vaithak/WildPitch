@@ -737,3 +737,25 @@ Report row 4 ("AI intents through the planner, driven crosses, AI stance choice"
   76/78%. Duels: 70/72 -> 58/72. bench_sim 10.57 -> 10.58 us/tick. Defender read window (80 matches, one code state before
   the last aim fixes): 24 / 36 / 48 ticks -> crosses 47 / 47 / 45%, duels lost in matches 16 / 21 / 38, goals 0.41 /
   0.40 / 0.41; 36 kept (shorter mostly switches the defender off - an owner call on how good defenders should be).
+
+## D-052 — Aerial contact poses: fitted stance families timed on the sim's contact (2026-11-17, CP0.5a stage 5)
+Report row 5 (presentation only; the owner chose no lob ghost ring). New `src/game/avatar_stance.c`,
+`stance_vis.c`, `pose_check.c`, `avatar_internal.h`.
+- **Sim -> pose (read-only):** before a touch, the contact plan (`WpPlan`: stance, tick, point, height) - turned
+  into a volley / half-volley / lay-off when the seat's buffered press or the AI's intent will strike it first time;
+  after it, `WpPlayer.last_touch_kind` / `last_touch_tick` (D-051, hashed bytes) and the ball where `prev` had it at
+  the touch. A header coming: the drag-free point where the ball meets his head. The stance shows from 24 ticks
+  before to 27 after; it is drawn exactly at the contact on alpha 0 of the frame whose `cur` holds the touch.
+- **Families with free parameters**, fitted every frame (coordinate search over the real skeleton, ~100 solves,
+  costs the limb's contact centre - chest front / thigh top / anywhere on the head + a ball radius, or the instep - to
+  the ball, plus a small preference for the limb over a lunge): chest / lay-off (lean, knee give, rise <= 0.15 m, a
+  step), head control (same, a hop <= 0.35 m), thigh (raised thigh, shin hanging, standing leg gives), instep and
+  volleys (hip / knee / splay of the leg on the ball's side, volleys side-on with a backswing and follow-through),
+  headers (the existing header pose nudged by lean / rise / a step; a header pass glances toward its target).
+  Pose `Pose.shift_f/shift_l/rise` added for the lunges and hops.
+- **Timing:** ramps in over 0.30 s to full weight 0.04 s before the contact, holds, eases out by 0.4 s with a cushion
+  (chest leans back, thigh / instep withdraw, head-control nods it down) or a follow-through (volleys, lay-off push).
+- **Check:** `--check-kick-pose` (ctest `avatar_kick_pose`) also flies a ball at a standing seat player for every
+  stance (instep, thigh, chest, head control, volley, half-volley, lay-off, header pass, header shot) at 3 lateral
+  offsets and measures the drawn contact centre on the contact tick: worst 0.104 m (volley), all others <= 0.033 m
+  (limit 0.15). Goldens unchanged (presentation only).

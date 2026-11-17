@@ -8,6 +8,7 @@
 #include "sim/sim.h"
 #include "game/camera.h"
 #include "game/avatar.h"
+#include "game/stance_vis.h"
 #include "game/ball_draw.h"
 #include "game/stadium.h"
 
@@ -15,6 +16,7 @@
 typedef struct {
     SDL_Texture  *soft;                  /* soft disc for antialiased shapes */
     WpAvatarAnim  anim[WP_MAX_PLAYERS];
+    WpStanceVis   stance[WP_MAX_PLAYERS];  /* aerial contact stance being shown (D-052) */
     WpAvatarLook  look[WP_MAX_PLAYERS];
     WpStadium     stadium;               /* boards, flags, stands (D-033) */
     WpBallVis     ball;                  /* visual ball orientation (rolls with the drawn motion) */

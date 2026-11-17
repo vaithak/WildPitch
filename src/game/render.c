@@ -117,7 +117,7 @@ void wp_render_ctx_init(WpRenderCtx *ctx, SDL_Renderer *r, uint64_t seed) {
 }
 
 void wp_render_reset_anim(WpRenderCtx *ctx) {
-    for (int i = 0; i < WP_MAX_PLAYERS; i++) ctx->anim[i].init = false;
+    for (int i = 0; i < WP_MAX_PLAYERS; i++) { ctx->anim[i].init = false; ctx->stance[i].valid = false; }
     wp_ball_vis_reset(&ctx->ball);
 }
 
@@ -270,6 +270,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                 float dxb = bx - px[i], dyb = by - py[i];
                 if (dxb * dxb + dyb * dyb < 4.0f) pose.charge01 = (float)p->kick_charge / (float)T_CHARGE_MAX_TICKS;
             }
+            wp_stance_fill(prev, cur, i, alpha, px[i], py[i], &ctx->stance[i], &pose);   /* chest / thigh / volley (D-052) */
             wp_avatar_draw(r, ctx->soft, cam, px[i], py[i], &pose, &ctx->look[i], style);
             /* who SWITCH goes to (D-050): only while we haven't got the ball and no pass of ours is travelling */
             for (int s = 0; s < WP_MAX_SEATS && !ctx->hide_markers; s++) {

@@ -1,9 +1,6 @@
 /* avatar.c - procedural skeleton footballers. See avatar.h and DECISIONS D-009. */
-#include "game/avatar.h"
+#include "game/avatar_internal.h"
 #include "sim/sim.h"
-#include <math.h>
-
-#define PI_F 3.14159265f
 
 const WpAvatarStyle wp_avatar_styles[WP_AVATAR_STYLE_COUNT] = {
     {"Modern",      1.15f, 1.10f, 1.3f, 1},
@@ -125,27 +122,6 @@ void wp_avatar_anim_update(WpAvatarAnim *a, float x, float y, float sim_facing, 
 }
 
 /* ------------------------------------------------------------------ skeleton */
-
-typedef struct { float x, y, z; } V3;
-static V3 v3(float x, float y, float z) { V3 v = {x, y, z}; return v; }
-static V3 add(V3 a, V3 b) { return v3(a.x + b.x, a.y + b.y, a.z + b.z); }
-static V3 mul(V3 a, float s) { return v3(a.x * s, a.y * s, a.z * s); }
-
-enum { J_PELVIS, J_CHEST, J_HEAD, J_HIP_L, J_KNEE_L, J_ANK_L, J_TOE_L, J_HIP_R, J_KNEE_R, J_ANK_R, J_TOE_R,
-       J_SH_L, J_ELB_L, J_HAND_L, J_SH_R, J_ELB_R, J_HAND_R, J_COUNT };
-
-typedef struct {             /* floats only: blended field-by-field */
-    float lean;                 /* torso pitch forward (rad) */
-    float hip[2], knee[2];      /* leg swing (fwd +), knee bend (>=0); [0]=left [1]=right */
-    float leg_out[2];           /* lateral splay (rad) */
-    float sh[2], elb[2], ab[2]; /* arm swing fwd, elbow bend, abduction */
-    float nod;                  /* extra head pitch */
-    float crouch;               /* extra pelvis drop (m) */
-    float roll;                 /* whole-body sideways tilt about the facing axis (rad, + = toward the left) */
-} Pose;
-
-static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
-static float smooth01(float t) { t = clampf(t, 0, 1); return t * t * (3 - 2 * t); }
 
 /* keeper cradle: forearms forward under the ball the sim holds 0.25 m in front at waist height (z 1.0) */
 #define CRADLE_SH  0.15f
@@ -278,7 +254,7 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         o->ab[s] = 0.10f + 0.04f * (1 - run);
     }
     o->lean = 0.04f + 0.012f * sinf(P->time * 2.1f) * (1 - run) + run * (0.06f + 0.22f * amp);
-    o->nod = 0; o->crouch = 0; o->roll = 0;
+    o->nod = 0; o->crouch = 0; o->roll = 0; o->shift_f = 0; o->shift_l = 0; o->rise = 0;
 
     if (P->keeper && P->action == WP_ACT_NONE && P->speed < 1.5f && !P->holding) {      /* ready stance */
         for (int s = 0; s < 2; s++) {
@@ -316,6 +292,14 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
         o->lean = -0.12f; o->nod = 0.10f;
     } else if (P->holding) {                              /* keeper: forearms up, cradling it at the waist */
         for (int s = 0; s < 2; s++) { o->sh[s] = CRADLE_SH; o->elb[s] = CRADLE_ELB; o->ab[s] = CRADLE_AB; }
+    }
+    if (P->stance && P->action == WP_ACT_NONE) {          /* an aerial contact stance (D-052) */
+        Pose a = *o;
+        float w = avatar_stance_pose(P, &a);
+        float *dst = (float *)o;
+        const float *src = (const float *)&a;
+        for (size_t i = 0; i < sizeof(Pose) / sizeof(float); i++) dst[i] += (src[i] - dst[i]) * w;
+        return;
     }
     if (P->action == WP_ACT_NONE) return;
     /* Action poses are computed separately and blended over the locomotion pose with a weight that ramps in
@@ -387,8 +371,10 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
             a.sh[s] = 1.1f; a.ab[s] = 1.0f; a.elb[s] = 0.95f;
         }
         float nod = t < 0.28f ? -0.35f * smooth01(t / 0.2f) : -0.35f + 0.95f * smooth01((t - 0.28f) / 0.08f);
+        if (P->head_turn != 0.0f) nod *= 0.6f;           /* a header pass: a glance, not a full nod (D-052) */
         a.lean = 0.05f + nod * 0.8f;
         a.nod = nod * 0.6f;
+        a.roll = clampf(P->head_turn, -0.45f, 0.45f) * 0.6f * smooth01((t - 0.2f) / 0.12f);   /* the glance's side */
         w = smooth01(t / 0.06f) * (1 - smooth01((t - 0.50f) / 0.17f));
         break;
     }
@@ -397,12 +383,15 @@ static void build_pose(const WpAvatarPose *P, Pose *o) {
     float *dst = (float *)o;
     const float *src = (const float *)&a;
     for (size_t i = 0; i < sizeof(Pose) / sizeof(float); i++) dst[i] += (src[i] - dst[i]) * w;
+    avatar_header_reach(P, o);                            /* the forehead onto the ball (D-052) */
 }
 
 static void solve(const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarStyle *S, float x, float y,
                   V3 *J, float *head_r) {
     Pose o;
     build_pose(P, &o);
+    x += cosf(P->facing) * o.shift_f - sinf(P->facing) * o.shift_l;   /* stance lunge (D-052) */
+    y += sinf(P->facing) * o.shift_f + cosf(P->facing) * o.shift_l;
     float k = L->height / 1.80f, w = L->build;
     float cf = cosf(P->facing), sf = sinf(P->facing);
     V3 F = v3(cf, sf, 0), Lt = v3(-sf, cf, 0), U = v3(0, 0, 1);
@@ -442,10 +431,10 @@ static void solve(const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarSt
     float lowest = 1e9f;
     int feet[4] = {J_ANK_L, J_TOE_L, J_ANK_R, J_TOE_R};
     for (int i = 0; i < 4; i++) lowest = fminf(lowest, J[feet[i]].z);
-    float shift = (0.05f * k + P->z) - lowest;
+    float shift = (0.05f * k + P->z + o.rise) - lowest;
     for (int i = 0; i < J_COUNT; i++) J[i].z += shift;
     if (o.roll != 0.0f) {                               /* tip the whole body sideways about a point on the ground */
-        float cr = cosf(o.roll), sr = sinf(o.roll), pz = P->z;
+        float cr = cosf(o.roll), sr = sinf(o.roll), pz = P->z + o.rise;
         for (int i = 0; i < J_COUNT; i++) {
             float lx = (J[i].x - x) * Lt.x + (J[i].y - y) * Lt.y;   /* sideways offset */
             float fz = J[i].z - pz;
@@ -462,7 +451,9 @@ void wp_avatar_toe_pos(const WpAvatarPose *pose, const WpAvatarLook *look, const
                        float x, float y, int foot, float out[3]) {
     V3 J[J_COUNT + 4];
     float hr;
-    solve(pose, look, style, x, y, J, &hr);
+    WpAvatarPose Q = *pose;
+    if (Q.stance) avatar_stance_fit(&Q, look, style);
+    solve(&Q, look, style, x, y, J, &hr);
     V3 t = J[foot ? J_TOE_R : J_TOE_L], a = J[foot ? J_ANK_R : J_ANK_L];
     out[0] = (t.x + a.x) * 0.5f; out[1] = (t.y + a.y) * 0.5f; out[2] = (t.z + a.z) * 0.5f;   /* instep */
 }
@@ -481,9 +472,12 @@ typedef struct {
 static V3 lerp3(V3 a, V3 b, float t) { return v3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t); }
 
 void wp_avatar_draw(SDL_Renderer *r, SDL_Texture *soft, const WpCamera *cam, float x, float y,
-                    const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarStyle *S) {
+                    const WpAvatarPose *P0, const WpAvatarLook *L, const WpAvatarStyle *S) {
     V3 J[J_COUNT + 4];
     float head_r;
+    WpAvatarPose Q = *P0;
+    if (Q.stance) avatar_stance_fit(&Q, L, S);           /* the limb onto the ball (D-052) */
+    const WpAvatarPose *P = &Q;
     solve(P, L, S, x, y, J, &head_r);
     float k = L->height / 1.80f, ls = S->limb_scale * L->build;
 
@@ -611,4 +605,9 @@ void wp_avatar_draw(SDL_Renderer *r, SDL_Texture *soft, const WpCamera *cam, flo
             wp_soft_capsule(r, soft, sa.x, sa.y, p->ra * px_per_m + ol * 0.8f, sb.x, sb.y, p->rb * px_per_m + ol * 0.8f, ink);
         wp_soft_capsule(r, soft, sa.x, sa.y, p->ra * px_per_m, sb.x, sb.y, p->rb * px_per_m, p->col);
     }
+}
+
+void avatar_solve(const WpAvatarPose *P, const WpAvatarLook *L, const WpAvatarStyle *S, float x, float y,
+                  V3 *J, float *head_r) {
+    solve(P, L, S, x, y, J, head_r);
 }

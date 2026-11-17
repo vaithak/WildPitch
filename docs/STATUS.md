@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-17 by Claude session (CP0.5a stage 4)_
+_Last updated: 2026-11-17 by Claude session (CP0.5a stage 5)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -133,6 +133,24 @@ header-pass bisection + its per-mate retarget and meet_choose in the buffer's et
   AI vs AI byte-identical (no seats). Cost: bench_sim (5v5 LEGACY) 10.5 us/tick unchanged; the 7v7 seat harness
   2.36 -> 2.50 s for the same 45 minutes of scripted play (+6%, one run; the play differs).
   Known: a seat man who never moves, within 4 m of a still loose ball, can freeze play (D-030 winner rule; also before).
+
+**CP0.5a stage 5 (D-052): done, presentation only (goldens unchanged).** Players now show the touch the sim plans:
+chest (lean back, arms out), thigh (raised), instep (foot lifted), head control (a little hop), volley / half-volley
+(side-on swing with backswing and follow-through), lay-off, and headers whose forehead meets the ball (a header pass
+glances toward its target). Each stance is a pose family fitted every frame so the limb is on the ball at the
+contact tick; it ramps in over 0.3 s and eases out with a cushion or follow-through. `--check-kick-pose` measures
+every stance at 3 offsets: worst limb -> ball 0.104 m (volley), the rest <= 0.033 m (limit 0.15). `--gallery` has
+the stance poses with their ball (bottom right of the close-up rows). No lob ghost ring (owner).
+**Next:** owner playtest of CP0.5a stages 4-5 (and CP0.5b) - then the roadmap's next checkpoint.
+
+### Playtest guide (CP0.5a stage 5, aerial poses)
+1. Lob to a team-mate and watch him take it: the chest / thigh / foot should meet the ball as it arrives (not a
+   generic run cycle), then cushion it down.
+2. Press D early on a dropping ball (volley) or S (half-volley / chest lay-off to a near mate): the strike's leg
+   swings through the ball side-on.
+3. Headers: the forehead meets the ball; a header pass turns the head toward the receiver.
+4. `--gallery` shows each stance with its ball.
+Questions: do the stances read at match zoom? Too much lunge (the body steps to reach a wide ball)?
 
 **CP0.5a stage 4 (D-051): done, goldens updated on purpose** (5v5 `0b3798dfd8207c8c`, 7v7 `df26b28a9aa471c9`).
 The AI plays aerial balls through the same contacts a human gets: new `src/sim/aerial_ai.c` chooses head shot / header

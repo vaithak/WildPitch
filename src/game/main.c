@@ -9,7 +9,8 @@
  *   --zoom N               camera zoom preset (0 wide, 1 medium, 2 close); Z cycles in game
  *   --autoplay             seat 0 is scripted: chase ball, dribble at goal, charged shot (visual checks)
  *   --autoplay-chip / --autoplay-dribble   variants: chip instead of shot / sprint zigzag dribble (no shot)
- *   --check-kick-pose      numeric check: kicking instep at the ball on the contact tick (no window)
+ *   --check-kick-pose      numeric check: kicking instep at the ball on the contact tick, and every aerial
+ *                          stance's limb at the ball on its contact tick (D-052) (no window)
  *   --check-keymap         keymap defaults / save-load round trip / rebind swap (no window)
  *   --check-gamepad        pure pad -> WpSeatInput mapping checks (no window, no pad needed)
  *   --check-replay         instant replay reproduces the live sim hash tick for tick (no window)
@@ -31,6 +32,7 @@
 #include "game/menu.h"
 #include "game/gamepad.h"
 #include "game/replay.h"
+#include "game/pose_check.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen (40 m pitch) */
 /* bigger pitches show a bit more (7v7 55 m: x1.19) so the wide view still reads the game */
@@ -172,26 +174,33 @@ static void autoplay_input(const SimState *s, WpInput *in) {
 
 /* ---- gallery: fixed poses drawn directly through the avatar API ---- */
 static void draw_gallery(Game *g, int w, int h) {
-    typedef struct { const char *label; float facing, speed, phase, z; uint8_t action; float at; bool keeper; } GP;
+    typedef struct { const char *label; float facing, speed, phase, z; uint8_t action; float at; bool keeper;
+                     uint8_t stance; float tf, tl, tz; } GP;   /* stance target: forward, left, up (D-052) */
     const float PI = 3.14159265f;
     GP poses[] = {
-        {"idle front", -PI / 2, 0, 0, 0, 0, 0, false}, {"idle 3/4", -PI / 4, 0, 0, 0, 0, 0, false},
-        {"idle side", 0, 0, 0, 0, 0, 0, false},         {"idle back", PI / 2, 0, 0, 0, 0, 0, false},
-        {"run 0", -PI / 5, 7, 0, 0, 0, 0, false},       {"run 1/4", -PI / 5, 7, PI / 2, 0, 0, 0, false},
-        {"run 1/2", -PI / 5, 7, PI, 0, 0, 0, false},    {"run 3/4", -PI / 5, 7, 1.5f * PI, 0, 0, 0, false},
-        {"kick back", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.04f, false},
-        {"kick contact", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.10f, false},
-        {"header rise", -PI / 3, 0, 0, 0.35f, WP_ACT_JUMP_HEADER, 0.18f, false},
-        {"header nod", -PI / 3, 0, 0, 0.58f, WP_ACT_JUMP_HEADER, 0.34f, false},
-        {"keeper", -PI / 2, 0, 0, 0, 0, 0, true},       {"run side", 0, 5, PI / 3, 0, 0, 0, false},
-        {"keeper dive", -PI / 2, 0, 0, 0.2f, WP_ACT_KEEPER_DIVE, 0.30f, true},
-        {"tackle", -PI / 6, 0, 0, 0, WP_ACT_TACKLE, 0.15f, false},
+        {"idle front", -PI / 2, 0, 0, 0, 0, 0, false, 0, 0, 0, 0}, {"idle 3/4", -PI / 4, 0, 0, 0, 0, 0, false, 0, 0, 0, 0},
+        {"idle side", 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0},         {"idle back", PI / 2, 0, 0, 0, 0, 0, false, 0, 0, 0, 0},
+        {"run 0", -PI / 5, 7, 0, 0, 0, 0, false, 0, 0, 0, 0},       {"run 1/4", -PI / 5, 7, PI / 2, 0, 0, 0, false, 0, 0, 0, 0},
+        {"run 1/2", -PI / 5, 7, PI, 0, 0, 0, false, 0, 0, 0, 0},    {"run 3/4", -PI / 5, 7, 1.5f * PI, 0, 0, 0, false, 0, 0, 0, 0},
+        {"kick back", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.04f, false, 0, 0, 0, 0},
+        {"kick contact", -PI / 6, 0, 0, 0, WP_ACT_KICK, 0.10f, false, 0, 0, 0, 0},
+        {"header rise", -PI / 3, 0, 0, 0.35f, WP_ACT_JUMP_HEADER, 0.18f, false, 0, 0, 0, 0},
+        {"header nod", -PI / 3, 0, 0, 0.58f, WP_ACT_JUMP_HEADER, 0.34f, false, 0, 0, 0, 0},
+        {"keeper", -PI / 2, 0, 0, 0, 0, 0, true, 0, 0, 0, 0},       {"run side", 0, 5, PI / 3, 0, 0, 0, false, 0, 0, 0, 0},
+        {"keeper dive", -PI / 2, 0, 0, 0.2f, WP_ACT_KEEPER_DIVE, 0.30f, true, 0, 0, 0, 0},
+        {"tackle", -PI / 6, 0, 0, 0, WP_ACT_TACKLE, 0.15f, false, 0, 0, 0, 0},
+        {"chest", -PI / 3, 0, 0, 0, 0, 0, false, WP_LT_CHEST, 0.30f, 0.0f, 1.30f},
+        {"thigh", -PI / 3, 0, 0, 0, 0, 0, false, WP_LT_THIGH, 0.35f, -0.10f, 0.95f},
+        {"instep", -PI / 3, 0, 0, 0, 0, 0, false, WP_LT_INSTEP, 0.55f, -0.15f, 0.40f},
+        {"volley", -PI / 6, 0, 0, 0, 0, 0, false, WP_LT_VOLLEY, 0.45f, -0.45f, 0.75f},
+        {"head ctl", -PI / 3, 0, 0, 0, 0, 0, false, WP_LT_HEADCTL, 0.30f, 0.0f, 1.95f},
+        {"header pass", -PI / 3, 0, 0, 0, WP_ACT_STAND_HEADER, 0.30f, false, WP_LT_HEADER, 0.20f, 0.25f, 1.80f},
     };
     int np = (int)(sizeof poses / sizeof poses[0]);
     const WpAvatarStyle *st = &wp_avatar_styles[g->rctx.style];
     SDL_SetRenderDrawColor(g->ren, 64, 140, 70, 255);
     SDL_RenderClear(g->ren);
-    int cols = 7, cw = w / cols;
+    int cols = (np + 1) / 2, cw = w / cols;
     float view = ZOOM_VIEW_M[g->zoom];
     for (int pass = 0; pass < 3; pass++) {           /* rows 0,1: close-up; row 2: match scale */
         for (int i = 0; i < (pass < 2 ? cols : np); i++) {
@@ -208,7 +217,9 @@ static void draw_gallery(Game *g, int w, int h) {
             wp_avatar_make_look(&look, 7, look_id, pi < 4 ? 0 : (pi & 1), p->keeper);
             WpAvatarPose pose = {.facing = p->facing, .speed = p->speed, .phase = p->phase, .z = p->z,
                                  .action = p->action, .action_t = p->at, .keeper = p->keeper,
-                                 .kick_foot = 1, .kick_kind = WP_KICK_SHOT, .kick_windup = 0.1f, .kick_power01 = 0.7f};
+                                 .kick_foot = 1, .kick_kind = WP_KICK_SHOT, .kick_windup = 0.1f, .kick_power01 = 0.7f,
+                                 .stance = p->stance, .stance_leg = p->tl > 0.05f ? 0 : 1, .stance_t = 0,
+                                 .stance_tgt = {p->tf, p->tl, p->tz}, .head_turn = p->stance == WP_LT_HEADER ? 0.4f : 0};
             float yoff = -(float)cam.h * 0.36f / (cam.ppm * cam.tilt);   /* feet near the bottom: headroom for jumps */
             if (f > 1) {
                 if (!g->lowres || g->lowres_w != cam.w || g->lowres_h != cam.h) {
@@ -225,6 +236,12 @@ static void draw_gallery(Game *g, int w, int h) {
             WpScreenPt sh = wp_project(&cam, 0.1f, yoff - 0.06f, 0);
             wp_soft_disc(g->ren, g->rctx.soft, sh.x, sh.y, 0.4f * cam.ppm, 0.4f * cam.ppm * cam.tilt, (SDL_FColor){0, 0, 0, 0.3f});
             wp_avatar_draw(g->ren, g->rctx.soft, &cam, 0, yoff, &pose, &look, st);
+            if (p->stance) {                              /* the ball where the stance meets it */
+                float cf = cosf(p->facing), sf = sinf(p->facing);
+                WpScreenPt bp = wp_project(&cam, cf * p->tf - sf * p->tl, yoff + sf * p->tf + cf * p->tl, p->tz);
+                wp_soft_disc(g->ren, g->rctx.soft, bp.x, bp.y, 0.11f * cam.ppm * bp.s, 0.11f * cam.ppm * bp.s,
+                             (SDL_FColor){1, 1, 1, 0.95f});
+            }
             if (f > 1) {
                 SDL_SetRenderTarget(g->ren, NULL);
                 SDL_SetRenderViewport(g->ren, &vp);
@@ -276,6 +293,7 @@ static int check_kick_pose(void) {
                    (double)d, (double)(dx * cosf(face) + dy * sinf(face)), (double)(-dx * sinf(face) + dy * cosf(face)), (double)dz);
             if (d > 0.16f) bad = 1;   /* ball radius 0.11 + a little */
         }
+    if (wp_check_stance_pose()) { printf("FAIL: an aerial stance's limb is not at the ball on the contact tick\n"); bad = 1; }
     printf(bad ? "FAIL: a kicking foot is not at the ball on the contact tick\n" : "OK\n");
     return bad;
 }

@@ -63,6 +63,11 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   dedication.h/.c       the owner's dedication card on launch (D-018; wording is fixed)
   ball_draw.h/.c        the ball: visual orientation rolled from drawn motion, 12 panels, speed blur/streak, shadow
   avatar.h/.c           procedural skeleton footballers (D-009): looks, styles, pose solver, soft-capsule drawing
+  avatar_internal.h     skeleton internals (joints, Pose, solve) shared by avatar.c and avatar_stance.c
+  avatar_stance.c       aerial contact stances (D-052): chest / thigh / instep / head control / volley / half-volley /
+                        lay-off families + the header's reach, fitted so the limb meets the ball on the contact tick
+  stance_vis.h/.c       sim -> stance adapter (D-052): the contact plan before a touch, last_touch_kind after it
+  pose_check.h/.c       --check-kick-pose's stance part: every stance's limb within 0.15 m of the ball at contact
 tools/playtest/         headless playtest harnesses (sel.c = pass receiver sweep: pick rate, out-of-play, reach) (scripted seat inputs) used to find/verify passing feel issues
 tests/                  headless tests (test_*.c auto-registered with ctest), bench_sim.c
   test_ball.c           physics, curl, roll distances + inverse, bounce (drop/continuity/chip), posts/bar, goals, net, outs
@@ -121,6 +126,9 @@ Sprites are depth-sorted by y (far first). Ball height reads via its ground shad
 running bob → parts (kit-coloured capsule segments) sorted along the camera depth `y - tilt*z` → silhouette outline
 pass, then fills; limbs in front of the body get their own outline. Antialiasing comes from one 64×64 soft-disc
 texture (linear filtered) used for every disc and capsule. Add a new action = add a case in `build_pose`.
+Aerial stances (D-052): `WpAvatarPose.stance` / `stance_t` / `stance_tgt` (the ball's centre at the contact, in his
+frame) come from `stance_vis.c`; the avatar fits the stance's few free parameters (a coordinate search over `solve`,
+preferring the limb to a lunge) every frame the stance shows, so the limb is on the ball at stance_t = 0.
 
 ## Kick pipeline (D-012)
 Input (or AI/tests via `sim_player_kick`) → `WpKick{power, vz, spin, dir, foot, kind, windup}` → action KICK;

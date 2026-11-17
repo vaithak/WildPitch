@@ -31,6 +31,14 @@ typedef struct {
     bool  holding;       /* keeper with the ball in his hands: arms cradle it */
     bool  throwin_hold;  /* throw-in taker holding the ball over his head (both hands, feet together) */
     float touch01;       /* 1 right after a dribble touch, decays to 0 (forward leg flicks the ball) */
+    /* aerial contact stance (D-052): chest / thigh / instep / head control / volley / half-volley / lay-off,
+     * from the sim's contact plan before the touch and its last-touch kind after (render.c / stance_vis.c) */
+    uint8_t stance;      /* WP_LT_* (sim.h), 0 = none */
+    uint8_t stance_leg;  /* the leg that meets it (0 left, 1 right; thigh / instep / volleys) */
+    float stance_t;      /* seconds from the contact tick (< 0 before) */
+    float stance_tgt[3]; /* the ball's centre at the contact, in his frame: forward, left, up (m) */
+    float stance_prm[5]; /* (filled by the avatar: the fit that puts the limb on the ball) */
+    float head_turn;     /* header pass: the head glances this way (rad, + = his left), 0 = straight on */
 } WpAvatarPose;
 
 
@@ -74,6 +82,11 @@ void wp_avatar_draw(SDL_Renderer *r, SDL_Texture *soft, const WpCamera *cam, flo
 void wp_soft_disc(SDL_Renderer *r, SDL_Texture *soft, float cx, float cy, float rx, float ry, SDL_FColor c);
 void wp_soft_capsule(SDL_Renderer *r, SDL_Texture *soft, float ax, float ay, float ar,
                      float bx, float by, float br, SDL_FColor c);
+
+/* Stance check (D-052): world position of the limb's contact centre (where the ball's centre sits when the limb
+ * meets it: chest / thigh top / forehead + a ball radius, or the instep) for a pose with a stance at (x, y). */
+void wp_avatar_stance_point(const WpAvatarPose *pose, const WpAvatarLook *look, const WpAvatarStyle *style,
+                            float x, float y, float out[3]);
 
 /* Joint query for checks: world position of the instep (mid-foot; foot 0 = left, 1 = right) for a pose at (x, y). */
 void wp_avatar_toe_pos(const WpAvatarPose *pose, const WpAvatarLook *look, const WpAvatarStyle *style,
