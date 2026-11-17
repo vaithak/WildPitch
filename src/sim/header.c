@@ -198,7 +198,7 @@ void header_contact(SimState *s, int i, const WpSeatInput *in) {
         dir = (wp_angle)(inc + bend);
         wh = fv2_from_angle(dir, fx_clamp(fv2_len(wh), fx_mul(rhl, T_FLICK_MIN_K), fx_mul(rhl, T_FLICK_K)));
     }
-    fx over = fx_div(fx_max(rs - FX(11.0), 0), FX(11.0));
+    fx over = fx_div(fx_max(rs - T_HEADER_CLEAN_V, 0), T_HEADER_CLEAN_V);
     fx sig = fx_mul(FX_INT(DEG_TO_ANG(T_HEADER_ERR_DEG)), fx_mul(FX_ONE + fx_div(FX_INT(phi), FX_INT(DEG_TO_ANG(90))), FX_ONE + over));
     if (phi > DEG_TO_ANG(90) && phi < DEG_TO_ANG(T_FLICK_DEG)) sig *= 3;
     int human = 0;

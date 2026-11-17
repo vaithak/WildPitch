@@ -615,5 +615,7 @@ first-time contact isn't possible; "Readable" error. New `src/sim/intent.c`; fir
   header pass and on a human's header at goal; the AI's header shots keep no extra error until stage 4 (with it AI
   goals fell 0.48 -> 0.41/min). Header passes in practice reach ~10 m off a 13 m/s cross.
 - Replaces the old header pass (0.7 d + 3 at his current position, vz 1.8); `T_HEADER_PASS_K/BASE/MIN/MAX/VZ` removed.
+- **Bands:** CHEST now runs to 1.6 m (= T_INTENT_HEAD_Z; report: 1.5) - otherwise a 1.5-1.6 m ball faster than
+  head-control's 11 m/s with a button pressed was neither headed nor controlled. HEAD band 1.6-2.05.
 - test_ai_rules' throw-in check accepts the marker at the 2 m line heading the throw first (it already did in stage 2;
   where it then went was luck).

@@ -221,7 +221,7 @@
 #define T_CB_GROUND        FX(0.25)   /* ball-centre z at contact: GROUND <= this: trap (the old first touch) */
 #define T_CB_LOW           FX(0.55)   /* LOW: instep cushion */
 #define T_CB_MID           FX(1.0)    /* MID: thigh */
-#define T_CB_CHEST         FX(1.5)    /* CHEST: chest (CONTROL wins the 1.45-1.5 overlap with HEAD) */
+#define T_CB_CHEST         FX(1.6)    /* CHEST: chest (report 1.5; 1.6 = where a pressed button heads it, D-048) */
 #define T_CB_HEAD          FX(2.05)   /* HEAD: standing header; header-control only for a slow ball */
 #define T_CB_JUMP          FX(2.6)    /* JUMP: jumping header */
 /* stance rows: h_pop, d_ready, e_firm, v_clean, setup ticks, nominal normal elevation (deg; chest: descending /
@@ -248,7 +248,8 @@
 #define T_CONTACT_RING     180        /* ball prediction horizon (ticks) */
 #define T_CONTACT_COMMIT   5          /* the plan freezes this many ticks before contact */
 #define T_CONTACT_WINDOW   20         /* later candidates (the ball dropping to a better band) up to this after the first */
-#define T_CONTACT_REACT    FX(0.15)   /* planner reach: 0.8125 x his sprint speed after this reaction time ... */
+#define T_CONTACT_REACT    FX(0.15)   /* planner reach: REACH_K x his sprint speed after this reaction time ... */
+#define T_CONTACT_REACH_K  FX(0.8125)
 #define T_CONTACT_PLAN_REACH FX(0.6)  /* ... plus this */
 #define T_CONTACT_W_DIFF   FX(4.0)    /* candidate score = -W_DIFF difficulty - W_TIME (t - t_first)/30 - W_PRESS p */
 #define T_CONTACT_W_TIME   FX(1.0)
@@ -258,11 +259,12 @@
 /* ---- intents and first-time contacts (D-048) ---- */
 #define T_INTENT_MAX_AGE   90         /* a buffered press lives this long after the release ... */
 #define T_INTENT_ETA_SLIP  42         /* ... and is dropped when the ball's predicted arrival slips by more than this */
-#define T_INTENT_HEAD_Z    FX(1.6)    /* PASS / SHOOT / LOB on a ball reaching him at least this high: a header (else chest) */
+#define T_INTENT_HEAD_Z    T_CB_CHEST /* PASS / SHOOT / LOB on a ball reaching him at least this high: a header (else chest) */
 #define T_VOLLEY_K         FX(0.9)    /* volley: min(T_SHOT_MAX, 0.9 x the set shot + 0.36 x the ball's pace into it) */
 #define T_VOLLEY_IN_K      FX(0.36)
 #define T_VOLLEY_ERR_DEG   2          /* volley aim error +- this x (2 LOW / 3 MID) x (1 + over) (one draw) */
-#define T_VOLLEY_RISE      FX(0.15)   /* a volley rises this (rad) per metre of contact above 0.45 m */
+#define T_VOLLEY_RISE      FX(0.15)   /* a volley rises this (rad) per metre of contact above ... */
+#define T_VOLLEY_RISE_Z    FX(0.45)
 #define T_VOLLEY_REACH     FX(1.1)    /* a settling ball (chest -> volley) is struck within this */
 #define T_VOLLEY_MIN_H     FX(0.35)   /* a tapped buffered shot strikes at least this hard (0..1) */
 #define T_HALFVOLLEY_K     FX(1.05)   /* half-volley pass: the ground pass x this, struck down at ... */
@@ -280,6 +282,7 @@
 #define T_HEAD_V_STAND     FX(2.5)    /* head speed: standing / jumping (passes, shots) */
 #define T_HEAD_V_JUMP      FX(3.5)
 #define T_HEADER_ERR_DEG   2          /* header aim error +- this x (1 + phi/90) x (1 + over); x3 between 90-135 deg */
+#define T_HEADER_CLEAN_V   FX(11.0)   /* ("over" = the incoming pace beyond this, as head-control's v_clean) */
 #define T_FLICK_DEG        135        /* turned this far from where it came: a flick-on (keeps ~0.88 of the pace, */
 #define T_FLICK_MAX_DEG    40         /*  bends it at most this much) */
 #define T_FLICK_K          FX(0.88)   /* (at most this share of the pace, at least MIN_K: a short flick dies a bit) */

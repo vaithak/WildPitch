@@ -108,7 +108,7 @@ static void plan_one(SimState *s, int i) {
         else if (left <= T_CONTACT_COMMIT) { pl->flags |= WP_PLANF_COMMITTED; return; }   /* frozen */
     }
     if (p->z > 0 || (p->action != WP_ACT_NONE && p->action != WP_ACT_KICK)) { plan_clear(p); return; }
-    fx vr = fx_mul(player_top_speed(s, i, 1), FX(0.8125));
+    fx vr = fx_mul(player_top_speed(s, i, 1), T_CONTACT_REACH_K);
     int already = pl->kind ? (int)(uint16_t)(now - pl->since) : 0;
     int best = -1, t_first = -1, bk = 0;
     fx best_sc = 0;
@@ -293,7 +293,7 @@ void contact_strike(SimState *s, int i, const WpSeatInput *in, uint8_t kind, uin
         fx e = wp_rng_fx_signed(&s->rng, mag);
         dir = (wp_angle)(dir + (e >> FX_SHIFT));
         b->vel = fv2_from_angle(dir, sp);
-        b->vz = fx_lerp(T_SHOT_VZ_MIN, T_SHOT_VZ_MAX, fx_mul(h, h)) + fx_mul(sp, fx_mul(T_VOLLEY_RISE, fx_max(z - FX(0.45), 0)));
+        b->vz = fx_lerp(T_SHOT_VZ_MIN, T_SHOT_VZ_MAX, fx_mul(h, h)) + fx_mul(sp, fx_mul(T_VOLLEY_RISE, fx_max(z - T_VOLLEY_RISE_Z, 0)));
         strike_common(s, i, WP_KICK_SHOT, dir);
         p->kick.power = sp;
         return;

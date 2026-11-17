@@ -81,7 +81,7 @@ Clean touches: instep 0.45 m, thigh 0.84 m / 0.48 s, chest 0.98 m / 0.58 s, head
 passes 10-47 m (8-17 m/s) controlled, drop 0.8-1.0 m; a chest ball at 20 / 23 / 26 m/s drops 2.0 / 3.5 / 5.8 m.
 bench_sim 16.8 us/tick (+8%). Avatar stance poses: stage 5.
 
-**CP0.5a stage 3 (D-048): done, goldens updated on purpose** (5v5 `ee176276e251a166`, 7v7 `9a73bc3b95202d9e`).
+**CP0.5a stage 3 (D-048): done, goldens updated on purpose** (5v5 `438935178956b429`, 7v7 `b84701f83e76ea56`).
 Press early and it happens when the ball arrives: buffered presses per seat (`src/sim/intent.c`), first-time volleys /
 half-volleys / lay-offs, chest -> pass and chest -> volley chains, headers by the measured law with a real header-pass
 solve. New `tests/test_intent.c`. AI vs AI (stage 2 -> stage 3, 80 matches; 20 in brackets): goals 0.48 -> 0.47/min
@@ -89,7 +89,9 @@ solve. New `tests/test_intent.c`. AI vs AI (stage 2 -> stage 3, 80 matches; 20 i
 passes completed 38% -> 40% (stage 1: 32%); aimatch 20x5: goals 15+29 -> 18+26, passes 74/76% -> 74/76%.
 Tests: 12/12 buffered passes fire; stale presses cancelled; chest -> pass at the ground pace (within 2%); chest ->
 volley from 12 m 20/20 on target (no keeper); header passes to a jogging mate 6-10 m 15/20 within 1.5 m.
-bench_sim 18.3 us/tick (stage 2 16.8; stage 1 15.6).
+bench_sim 18.7 us/tick (stage 2 16.8; stage 1 15.6: +20% over the two stages - profile before RL; first suspects the
+header-pass bisection + its per-mate retarget and meet_choose in the buffer's eta check). Chest band now 1.0-1.6 m
+(a ball at 1.5-1.6 m with a button pressed was neither headed nor controlled).
 
 ### Playtest guide (CP0.5a stage 3, first-time play)
 1. Header pass: as a cross comes in, press S (pass) early with the stick at a team-mate - he heads it down to him
@@ -237,7 +239,7 @@ Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
 - **Tests (21 ctest entries, all passing):** test_intent, test_contact, test_lob, test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `ee176276e251a166`, 7v7 `9a73bc3b95202d9e` after D-048; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+  (golden 5v5 `438935178956b429`, 7v7 `b84701f83e76ea56` after D-048; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

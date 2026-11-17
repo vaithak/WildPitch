@@ -92,27 +92,57 @@ int main(void) {
         CHECKF(fired == n, "buffered passes fired %d/%d", fired, n);
     }
 
-    /* 2. stale presses are cancelled: (a) an opponent wins it in between, (b) pressed 2.5 s too early, (c) switch */
-    for (int c = 0; c < 3; c++) {
+    /* 2. stale presses are cancelled (the buffer is checked directly): (a) an opponent wins it in between - then it
+     *    comes back to us and nothing is kicked; (b) pressed > 1.5 s before he gets it; (c) a switch */
+    {
         fv2 me = fv2_make(FX(5.0), 0);
+        /* (a) */
         scene(&s, me, fv2_add(me, fv2_make(-FX(4.0), FX(9.0))));
-        s.ball.pos = fv2_add(me, fv2_make(-FX(20.0), 0)); s.ball.vel = fv2_make(FX(10.0), 0);
-        if (c == 0) s.players[BLUE].pos = fv2_add(me, fv2_make(-FX(8.0), 0));      /* in the way */
+        s.seat_player[1] = BLUE; s.assist_level[1] = WP_ASSIST_OFF;      /* a live opponent in the way */
+        s.players[BLUE].pos = fv2_add(me, fv2_make(-FX(7.0), FX(0.2)));
+        s.ball.pos = fv2_add(me, fv2_make(-FX(16.0), 0)); s.ball.vel = fv2_make(FX(9.0), 0);
         step0(&s, toward(me, s.players[MATE].pos, WP_BTN_PASS));
-        int kick = 0;
-        for (int t = 0; t < 360; t++) {
-            if (c == 1 && t < 150) { s.ball.vel = fv2_make(0, 0); s.ball.pos = fv2_add(me, fv2_make(-FX(12.0), 0)); }   /* held up */
-            if (c == 1 && t == 150) s.ball.vel = fv2_make(FX(9.0), 0);
-            if (c == 0 && s.ball.owner == BLUE) {         /* they had it; it comes back to us */
-                s.ball.owner = -1; s.ball.pos = fv2_add(me, fv2_make(-FX(6.0), 0)); s.ball.vel = fv2_make(FX(6.0), 0);
+        int buffered = s.intent[0] == WP_KICK_PASS, blue_got = 0, cleared = 0, me_got = 0, kick = 0;
+        for (int t = 0; t < 300; t++) {
+            uint16_t ev = step0(&s, NOIN);
+            if (blue_got == 1 && s.ball.owner == BLUE) {     /* (the buffer sees it on the next tick) he loses it: back to us */
+                cleared = s.intent[0] == 0xFF;
+                blue_got = 2;
+                s.seat_player[1] = -1;
                 s.players[BLUE].pos = fv2_make(FX(30.0), FX(80.0));
+                s.ball.owner = -1; s.ball.pos = fv2_add(s.players[ME].pos, fv2_make(-FX(5.0), 0)); s.ball.vel = fv2_make(FX(6.0), 0);
             }
-            WpSeatInput in = c == 2 && t == 5 ? (WpSeatInput){0, 0, WP_BTN_SWITCH} : NOIN;
-            uint16_t ev = step0(&s, in);
-            if ((ev & WP_EV_KICK) && s.ball.last_touch >= 0 && s.players[s.ball.last_touch].team == 0) kick = 1;
+            if (!blue_got && s.ball.owner == BLUE) blue_got = 1;
+            if (s.ball.owner == ME) me_got = 1;
+            if ((ev & WP_EV_KICK) && s.ball.last_touch == ME) kick = 1;
         }
-        printf("stale press (%s): kick %d\n", c == 0 ? "they won it" : c == 1 ? "too early" : "switched", kick);
-        CHECK(!kick);
+        printf("stale press (they won it): buffered %d, blue won it %d, buffer cleared then %d, came back to him %d, kick %d\n",
+               buffered, blue_got != 0, cleared, me_got, kick);
+        CHECK(buffered && blue_got && cleared && me_got && !kick);
+        /* (b) */
+        scene(&s, me, fv2_add(me, fv2_make(-FX(4.0), FX(9.0))));
+        s.ball.pos = fv2_add(me, fv2_make(-FX(12.0), 0));
+        step0(&s, toward(me, s.players[MATE].pos, WP_BTN_PASS));
+        buffered = s.intent[0] == WP_KICK_PASS; cleared = 0; me_got = 0; kick = 0;
+        for (int t = 0; t < 300; t++) {
+            if (t < 120) { s.ball.vel = fv2_make(0, 0); s.ball.pos = fv2_add(me, fv2_make(-FX(12.0), 0)); }   /* held up */
+            if (t == 120) { cleared = s.intent[0] == 0xFF; s.ball.pos = fv2_add(me, fv2_make(-FX(8.0), 0)); s.ball.vel = fv2_make(FX(8.0), 0); }
+            uint16_t ev = step0(&s, NOIN);
+            if (s.ball.owner == ME) me_got = 1;
+            if ((ev & WP_EV_KICK) && s.ball.last_touch == ME) kick = 1;
+        }
+        printf("stale press (too early): buffered %d, cleared after 2 s %d, he got it %d, kick %d\n", buffered, cleared, me_got, kick);
+        CHECK(buffered && cleared && me_got && !kick);
+        /* (c) */
+        scene(&s, me, fv2_add(me, fv2_make(-FX(4.0), FX(9.0))));
+        s.ball.pos = fv2_add(me, fv2_make(-FX(16.0), 0)); s.ball.vel = fv2_make(FX(9.0), 0);
+        step0(&s, toward(me, s.players[MATE].pos, WP_BTN_PASS));
+        buffered = s.intent[0] == WP_KICK_PASS;
+        for (int t = 0; t < 4; t++) step0(&s, NOIN);
+        int8_t before = s.seat_player[0];
+        step0(&s, (WpSeatInput){0, 0, WP_BTN_SWITCH});
+        printf("stale press (switched %d -> %d): buffered %d, cleared %d\n", before, s.seat_player[0], buffered, s.intent[0] == 0xFF);
+        CHECK(buffered && s.seat_player[0] != before && s.intent[0] == 0xFF);
     }
 
     /* 3. chest -> pass: a pass pressed early on a ball dropping at chest height, mate 12 m away (no lay-off): he chests
