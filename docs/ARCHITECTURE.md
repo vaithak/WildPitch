@@ -23,8 +23,10 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
                         predicted-point snap, lob solve (lead to the receiving height, pitch margins)
   contact.c             aerial contact (D-047): ball prediction ring (cached, exact), per-player contact plans by
                         band, the one "can he control it" predicate, stance touches (outcome + residual, settle)
-  header.c              contextual headers (D-010/D-019): trigger on J/K at a high ball, legs step under it while
-                        the stick aims, jump timed so the apex meets it, head-band contact, header pass/shot
+  intent.c              intent buffer per seat (D-048): early presses kept, cancelled when stale, fired first time
+                        or after control (chains); first-time strikes themselves live in contact.c
+  header.c              contextual headers (D-010/D-019/D-048): trigger on J/K at a high ball, legs step under it while
+                        the stick aims, jump timed so the apex meets it, head-band contact, header law + pass solve
   brain.c               INSTINCT AI (D-023): candidates x feature utility -> input/kick/tackle for every non-seat player
   team_plan.c           per-team roles each tick (D-030): ball-winner (hysteresis), cover, capped markers, rest
                         defence, near-support, runner -> SimState.plan[2]; read by brain.c

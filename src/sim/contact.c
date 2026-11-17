@@ -228,3 +228,154 @@ void contact_touch(SimState *s, int i, const WpSeatInput *in, fx dseg) {
     p->settle_ticks = (uint8_t)(settle > 255 ? 255 : settle);
     plan_clear(p);
 }
+
+/* ---------------- first-time contacts (D-048) ---------------- */
+static fx len3(fv2 h, fx z) { return fv2_len(fv2_make(fv2_len(h), z)); }
+
+static void strike_common(SimState *s, int i, uint8_t kind, wp_angle dir) {
+    WpPlayer *p = &s->players[i];
+    WpBall *b = &s->ball;
+    b->spin = 0;
+    b->owner = -1;
+    b->held = 0;
+    b->last_touch = (int8_t)i;
+    b->no_hands = (uint8_t)(p->team + 1);
+    offside_on_kick(s, i);
+    p->immune = T_KICK_IMMUNE;
+    p->touch_cooldown = 18;
+    p->settle_ticks = 0;
+    p->kick.kind = kind;
+    p->kick.dir = dir;
+    p->kick.foot = ang_diff(dir, p->facing) > DEG_TO_ANG(20) ? 0 : 1;
+    p->kick.windup = 1;                                   /* struck on the contact tick: the pose is the follow-through */
+    p->kick.done = 1;
+    p->kick.to = 0;
+    p->action = WP_ACT_KICK;
+    p->action_timer = 1;
+    plan_clear(p);
+    s->events |= WP_EV_KICK;
+}
+
+static int seat_of_c(const SimState *s, int i) {
+    for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == i) return k;
+    return -1;
+}
+
+/* the aim of a first-time strike: the ring's direction for passes, the stick (else facing) for shots */
+static wp_angle strike_dir(const SimState *s, int i, const WpSeatInput *in, uint8_t kind, fv2 *aim, int *has) {
+    const WpPlayer *p = &s->players[i];
+    int seat = seat_of_c(s, i);
+    *has = in->move_x || in->move_y;
+    *aim = *has ? fv2_norm(fv2_make((fx)in->move_x * (FX_ONE / 127), (fx)in->move_y * (FX_ONE / 127))) : fv2_make(0, 0);
+    if (kind != WP_KICK_SHOT && seat >= 0 && !*has) return s->pick_dir[seat];
+    return *has ? fx_atan2(aim->y, aim->x) : p->facing;
+}
+
+void contact_strike(SimState *s, int i, const WpSeatInput *in, uint8_t kind, uint16_t gauge) {
+    WpPlayer *p = &s->players[i];
+    WpBall *b = &s->ball;
+    int seat = seat_of_c(s, i), has;
+    fv2 aim;
+    wp_angle dir = strike_dir(s, i, in, kind, &aim, &has);
+    fv2 rh = fv2_sub(b->vel, p->vel);
+    fx rz = b->vz - p->vz, z = b->z;
+    int band = band_of(z);
+    if (kind == WP_KICK_SHOT) {                           /* volley: the foot law, error grows with height and pace */
+        fx h = fx_clamp(fx_div(FX_INT(gauge), FX_INT(T_CHARGE_MAX_TICKS)), T_VOLLEY_MIN_H, FX_ONE);
+        dir = kick_aim_assist(s, i, dir, aim, has);
+        fv2 w = fv2_from_angle(dir, FX_ONE);
+        fx sp = fx_min(T_SHOT_MAX, fx_mul(T_VOLLEY_K, fx_lerp(T_SHOT_MIN, T_SHOT_MAX, h)) +
+                                   fx_mul(T_VOLLEY_IN_K, fx_max(-fv2_dot(rh, w), 0)));
+        int k = control_kind(band);
+        fx vc = k > WP_CK_TRAP ? ST[k].v_clean : ST[WP_CK_INSTEP].v_clean;
+        fx over = fx_div(fx_max(len3(rh, rz) - vc, 0), vc);
+        fx mag = fx_mul(FX_INT(DEG_TO_ANG(T_VOLLEY_ERR_DEG) * (band >= WP_CB_MID ? 3 : 2)), FX_ONE + over);
+        fx e = wp_rng_fx_signed(&s->rng, mag);
+        dir = (wp_angle)(dir + (e >> FX_SHIFT));
+        b->vel = fv2_from_angle(dir, sp);
+        b->vz = fx_lerp(T_SHOT_VZ_MIN, T_SHOT_VZ_MAX, fx_mul(h, h)) + fx_mul(sp, fx_mul(T_VOLLEY_RISE, fx_max(z - FX(0.45), 0)));
+        strike_common(s, i, WP_KICK_SHOT, dir);
+        p->kick.power = sp;
+        return;
+    }
+    int r = seat >= 0 && dir == s->pick_dir[seat] ? s->pick_recv[seat] : pass_pick(s, i, dir);
+    fv2 meet = b->pos;
+    fx t_meet = FX(1.0), vz = 0;
+    uint8_t plan = WP_PLAN_CLOSEST;
+    if (kind == WP_KICK_LOB) {                            /* volleyed lob / clearance */
+        if (r >= 0 && s->players[r].role == WP_ROLE_KEEPER) r = -1;
+        fx h = gauge <= T_LOB_TAP_TICKS ? 0 : fx_max(fx_div(FX_INT(gauge - T_LOB_TAP_TICKS), FX_INT(T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS)), 1);
+        b->vel = lob_solve(s, r, dir, h, 0, 0, &vz, &meet, &t_meet);
+        plan = WP_PLAN_RUN;
+    } else if (r >= 0) {                                  /* half-volley / volley pass: the ground pass, struck down */
+        b->vel = fv2_scale(player_pass_solve(s, i, r, &meet, &t_meet, &plan), T_HALFVOLLEY_K);
+        vz = T_HALFVOLLEY_VZ;
+        dir = fx_atan2(b->vel.y, b->vel.x);
+    } else {
+        b->vel = fv2_from_angle(dir, ball_roll_speed_for(T_FREE_MIN_ROLL + T_FREE_MIN_ROLL));
+        vz = T_HALFVOLLEY_VZ;
+    }
+    b->vz = vz;
+    strike_common(s, i, kind, b->vel.x || b->vel.y ? fx_atan2(b->vel.y, b->vel.x) : dir);
+    p->kick.power = 0;
+    if (r >= 0) { p->kick.to = (uint8_t)(r + 1); seats_pass_handoff(s, i, r, in, meet, t_meet, plan); }
+}
+
+/* chest lay-off: to a team-mate close by in the aim's cone, at the pace the chest can give */
+static int layoff(SimState *s, int i, const WpSeatInput *in) {
+    WpPlayer *p = &s->players[i];
+    WpBall *b = &s->ball;
+    int has;
+    fv2 aim;
+    wp_angle dir = strike_dir(s, i, in, WP_KICK_PASS, &aim, &has);
+    int r = -1;
+    fx bd = 0;
+    for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
+        if (j == i || s->players[j].role == WP_ROLE_KEEPER) continue;
+        fv2 d = fv2_sub(s->players[j].pos, b->pos);
+        fx dl = fv2_len(d);
+        if (dl > T_LAYOFF_DIST || dl < FX(1.0)) continue;
+        int32_t a = ang_diff(fx_atan2(d.y, d.x), dir);
+        if (a > DEG_TO_ANG(T_LAYOFF_DEG) || a < -DEG_TO_ANG(T_LAYOFF_DEG)) continue;
+        if (r < 0 || dl < bd) { r = j; bd = dl; }
+    }
+    if (r < 0) return 0;
+    fv2 rh = fv2_sub(b->vel, p->vel);
+    fv2 to = fv2_sub(s->players[r].pos, b->pos);
+    fx into = fx_max(-fv2_dot(rh, fv2_norm(to)), 0);
+    fx sp = fx_min(fx_mul(T_LAYOFF_K, into) + T_LAYOFF_BASE, T_LAYOFF_MAX);
+    fv2 P = fv2_add(s->players[r].pos, fv2_scale(s->players[r].vel, fx_div(bd, sp)));
+    fv2 u = fv2_norm(fv2_sub(P, b->pos));
+    b->vel = fv2_scale(u, sp);
+    b->vz = 0;
+    strike_common(s, i, WP_KICK_PASS, fx_atan2(u.y, u.x));
+    p->kick.power = sp;
+    p->kick.to = (uint8_t)(r + 1);
+    seats_pass_handoff(s, i, r, in, P, fx_div(fv2_len(fv2_sub(P, b->pos)), sp), WP_PLAN_CLOSEST);
+    return 1;
+}
+
+int contact_first_time(SimState *s, int i, const WpSeatInput *in) {
+    uint16_t gauge;
+    int kind = intent_of(s, i, &gauge);
+    if (kind < 0) return 0;
+    const WpPlayer *p = &s->players[i];
+    const WpBall *b = &s->ball;
+    int band = band_of(b->z), seat = seat_of_c(s, i), done = 0;
+    if (kind == WP_KICK_SHOT && (band == WP_CB_LOW || band == WP_CB_MID)) done = 1;
+    else if (kind == WP_KICK_LOB && (band == WP_CB_LOW || band == WP_CB_MID)) done = 1;
+    else if (kind == WP_KICK_PASS && band == WP_CB_LOW) done = 1;
+    else if (kind == WP_KICK_PASS && band == WP_CB_MID && seat >= 0) {   /* a volley pass only if it's easy */
+        int32_t a = ang_diff(s->pick_dir[seat], p->facing);
+        done = speed3(fv2_sub(b->vel, p->vel), b->vz - p->vz) <= T_VOLLEYPASS_MAX_REL &&
+               a <= DEG_TO_ANG(T_VOLLEYPASS_DEG) && a >= -DEG_TO_ANG(T_VOLLEYPASS_DEG);
+    }
+    WpSeatInput a = intent_aim(s, i, in);
+    if (done) {
+        contact_strike(s, i, &a, (uint8_t)kind, gauge);
+        intent_clear_player(s, i);
+        return 1;
+    }
+    if (kind == WP_KICK_PASS && band == WP_CB_CHEST && layoff(s, i, &a)) { intent_clear_player(s, i); return 1; }
+    return 0;                                             /* control it; the intent stays for the next touch */
+}

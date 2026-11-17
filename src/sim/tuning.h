@@ -210,12 +210,7 @@
 #define T_HEADER_SHOT      FX(11.0)   /* header at goal: base speed (+25% of the incoming ball's speed) */
 #define T_HEADER_SHOT_MAX  FX(17.0)
 #define T_HEADER_SHOT_VZ   -FX(0.8)   /* nodded down */
-#define T_HEADER_PASS_MAX  FX(12.0)
-#define T_HEADER_PASS_MIN  FX(5.0)    /* header pass: speed = K * distance + BASE, clamped to [MIN, MAX] ... */
-#define T_HEADER_PASS_K    FX(0.7)
-#define T_HEADER_PASS_BASE FX(3.0)
-#define T_HEADER_PASS_VZ   FX(1.8)    /* ... cushioned up a little */
-#define T_HEADER_PASS_NOBODY_D FX(8.0) /* header pass with nobody to pick: as if to a mate this far */
+#define T_HEADER_PASS_NOBODY_D FX(8.0) /* header pass with nobody to pick: this far along the aim (D-048 solve) */
 #define T_HEAD_Z           FX(1.70)   /* head centre above the feet (header.c) */
 #define T_HEAD_FWD         FX(0.12)   /* ... and ahead of the body centre */
 #define T_HEAD_REACH_XY    FX(0.45)   /* head contact: ball within this horizontally ... */
@@ -259,6 +254,41 @@
 #define T_CONTACT_W_TIME   FX(1.0)
 #define T_CONTACT_W_PRESS  FX(2.0)
 #define T_CONTACT_WAIT_D   FX(0.45)   /* waiting for the planned (lower) band: only while the ball is this far off */
+
+/* ---- intents and first-time contacts (D-048) ---- */
+#define T_INTENT_MAX_AGE   90         /* a buffered press lives this long after the release ... */
+#define T_INTENT_ETA_SLIP  42         /* ... and is dropped when the ball's predicted arrival slips by more than this */
+#define T_INTENT_HEAD_Z    FX(1.6)    /* PASS / SHOOT / LOB on a ball reaching him at least this high: a header (else chest) */
+#define T_VOLLEY_K         FX(0.9)    /* volley: min(T_SHOT_MAX, 0.9 x the set shot + 0.36 x the ball's pace into it) */
+#define T_VOLLEY_IN_K      FX(0.36)
+#define T_VOLLEY_ERR_DEG   2          /* volley aim error +- this x (2 LOW / 3 MID) x (1 + over) (one draw) */
+#define T_VOLLEY_RISE      FX(0.15)   /* a volley rises this (rad) per metre of contact above 0.45 m */
+#define T_VOLLEY_REACH     FX(1.1)    /* a settling ball (chest -> volley) is struck within this */
+#define T_VOLLEY_MIN_H     FX(0.35)   /* a tapped buffered shot strikes at least this hard (0..1) */
+#define T_HALFVOLLEY_K     FX(1.05)   /* half-volley pass: the ground pass x this, struck down at ... */
+#define T_HALFVOLLEY_VZ    -FX(0.5)   /* ... this vz */
+#define T_VOLLEYPASS_MAX_REL FX(10.0) /* a MID-band volley pass only off a ball this slow ... */
+#define T_VOLLEYPASS_DEG   60         /* ... and within this of his facing */
+#define T_LAYOFF_DIST      FX(8.0)    /* chest lay-off: a mate this close ... */
+#define T_LAYOFF_DEG       60         /* ... within this of the aim */
+#define T_LAYOFF_K         FX(0.55)   /* ... speed 0.55 x the ball's pace into the chest + 1.5, at most 6 */
+#define T_LAYOFF_BASE      FX(1.5)
+#define T_LAYOFF_MAX       FX(6.0)
+#define T_HEAD_LAW_U       FX(0.63)   /* header: out = sqrt((0.63 u_n + 1.63 v_head)^2 + (0.85 |r_t|)^2) */
+#define T_HEAD_LAW_V       FX(1.63)
+#define T_HEAD_LAW_T       FX(0.85)
+#define T_HEAD_V_STAND     FX(2.5)    /* head speed: standing / jumping (passes, shots) */
+#define T_HEAD_V_JUMP      FX(3.5)
+#define T_HEADER_ERR_DEG   2          /* header aim error +- this x (1 + phi/90) x (1 + over); x3 between 90-135 deg */
+#define T_FLICK_DEG        135        /* turned this far from where it came: a flick-on (keeps ~0.88 of the pace, */
+#define T_FLICK_MAX_DEG    40         /*  bends it at most this much) */
+#define T_FLICK_K          FX(0.88)   /* (at most this share of the pace, at least MIN_K: a short flick dies a bit) */
+#define T_FLICK_MIN_K      FX(0.5)
+#define T_HEADPASS_NOD_D   FX(6.0)    /* header pass: nodded down to feet up to this far, ... */
+#define T_HEADPASS_NOD_VZ  -FX(0.5)
+#define T_HEADPASS_VZ0     FX(1.0)    /* ... further: vz = 1.0 + 0.15 d, dropping to ... */
+#define T_HEADPASS_VZ_K    FX(0.15)
+#define T_HEADPASS_RECV_Z  FX(0.3)    /* ... this height at his predicted point */
 
 /* ---- tackles & bodies (CP0.3) ---- */
 #define T_TACKLE_START     FX(1.6)    /* J with an opponent on the ball this close = a standing tackle */

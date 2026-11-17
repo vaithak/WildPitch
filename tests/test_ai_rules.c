@@ -269,10 +269,16 @@ int main(void) {
             int8_t sx = (int8_t)(d.x > FX(0.38) ? 127 : d.x < -FX(0.38) ? -127 : 0), sy = (int8_t)(d.y > FX(0.38) ? 127 : d.y < -FX(0.38) ? -127 : 0);
             step1((WpSeatInput){sx, sy, WP_BTN_PASS});
         }
-        int got = -1;
-        for (int t = 0; t < 180 && got < 0; t++) { step1(NOIN); if (s.ball.owner >= 0 && s.ball.owner != taker) got = s.ball.owner; }
-        printf("  thrown to %d (team %d)\n", got, got >= 0 ? s.players[got].team : -1);
-        CHECKF(got >= 0 && s.players[got].team == 0, "throw-in didn't reach a team-mate (%d)", got);
+        int got = -1, blue_head = 0, touched = 0;
+        for (int t = 0; t < 180 && got < 0; t++) {
+            uint16_t ev = step1(NOIN);
+            if (!touched && (ev & WP_EV_HEADER) && s.ball.last_touch >= s.n_per_side) blue_head = 1;   /* (legal: 2 m off) */
+            if (ev & (WP_EV_HEADER | WP_EV_TOUCH | WP_EV_BODY)) touched = 1;
+            if (s.ball.owner >= 0 && s.ball.owner != taker) got = s.ball.owner;
+        }
+        printf("  thrown to %d (team %d)%s\n", got, got >= 0 ? s.players[got].team : -1, blue_head ? ", headed by the marker 2 m off first" : "");
+        /* (D-048: the marker at the 2 m line may head a throw that passes over him; then where it goes is football) */
+        CHECKF(blue_head || (got >= 0 && s.players[got].team == 0), "throw-in didn't reach a team-mate (%d)", got);
         /* b) we put it behind OUR goal line -> THEIR corner, their AI crosses it */
         sim_init(&s, &c7);
         s.ball.pos = fv2_make(-((s.pitch.length / 2) - FX(1.0)), FX(6.0)); s.ball.vel = fv2_make(-FX(5.0), 0); s.ball.owner = -1; s.ball.last_touch = 2;

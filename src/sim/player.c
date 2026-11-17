@@ -396,6 +396,29 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     if (r >= 0) seats_pass_handoff(s, i, r, in, meet, t_meet, plan);
 }
 
+/* fire a charged kick of `kind` held for `ticks` - the release rule: pass tap / through ball, lob tap / meter, shot
+ * and chip power (also used by a buffered intent when the ball arrives, D-048) */
+void player_fire(SimState *s, int i, uint8_t kind, uint16_t ticks, const WpSeatInput *in) {
+    int has;
+    fv2 aim = stick_dir(in, &has);
+    WpKick k;
+    if (kind == WP_KICK_PASS && ticks > T_PASS_TAP_TICKS)
+        make_kick(s, i, WP_KICK_THROUGH, fx_div(FX_INT(ticks - T_PASS_TAP_TICKS), FX_INT(T_CHARGE_MAX_TICKS - T_PASS_TAP_TICKS)), aim, has, &k);
+    else if (kind == WP_KICK_LOB)                         /* tap = 0 (to the ringed mate), else the meter */
+        make_kick(s, i, WP_KICK_LOB, ticks <= T_LOB_TAP_TICKS ? 0
+                  : fx_max(fx_div(FX_INT(ticks - T_LOB_TAP_TICKS), FX_INT(T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS)), 1),
+                  aim, has, &k);
+    else
+        make_kick(s, i, kind, fx_div(FX_INT(ticks), FX_INT(T_CHARGE_MAX_TICKS)), aim, has, &k);
+    sim_player_kick(s, i, &k);
+}
+
+/* a ground pass from the ball's spot to team-mate r, struck by player i (contact.c's first-time passes) */
+fv2 player_pass_solve(const SimState *s, int i, int r, fv2 *meet, fx *t_meet, uint8_t *plan) {
+    fx pace = FX_ONE + fx_mul(T_STAT_PASS_PACE, stat_k(s, i, WP_STAT_PASSING));
+    return pass_solve(s, r, pace, meet, t_meet, plan);
+}
+
 static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t prev) {
     WpPlayer *p = &s->players[i];
     uint16_t now = in->buttons, pressed = now & (uint16_t)~prev, released = prev & (uint16_t)~now;
@@ -433,8 +456,13 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     }
     /* contextual header (D-010): pass/shoot pressed while a ball comes in above body height */
     int jump;
-    if ((pressed & (WP_BTN_PASS | WP_BTN_SHOOT)) && p->action == WP_ACT_NONE && header_wanted(s, i, &jump)) {
+    if ((pressed & (WP_BTN_PASS | WP_BTN_SHOOT)) && p->action == WP_ACT_NONE && header_wanted_at(s, i, &jump, T_INTENT_HEAD_Z)) {
         header_start(s, i, (pressed & WP_BTN_SHOOT) != 0, jump);
+        int seat = seat_of(s, i);
+        if (seat >= 0 && !(pressed & WP_BTN_SHOOT)) {     /* the pass is aimed now (the ring); the stick may be let go */
+            p->kick.dir = s->pick_dir[seat];
+            p->kick.power = FX_ONE;
+        }
         return;
     }
     /* pass, shoot, chip and lob share the hold/release mechanic. Pass: a tap (<= T_PASS_TAP_TICKS) = targeted pass,
@@ -443,22 +471,17 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     for (int c = 0; c < 4; c++) {
         uint16_t btn = c == 0 ? WP_BTN_PASS : c == 1 ? WP_BTN_SHOOT : c == 2 ? WP_BTN_CHIP : WP_BTN_LOB;
         uint8_t kind = c == 0 ? WP_KICK_PASS : c == 1 ? WP_KICK_SHOT : c == 2 ? WP_KICK_CHIP : WP_KICK_LOB;
-        if ((pressed & btn) && p->charge_kind == 0xFF) { p->charge_kind = kind; p->kick_charge = 0; }
+        if ((pressed & btn) && p->charge_kind == 0xFF) {
+            p->charge_kind = kind; p->kick_charge = 0;
+            if (kind != WP_KICK_CHIP && s->ball.owner < 0 && !ball_reachable(s, i, KICK_START_REACH))
+                intent_press(s, i, kind);                 /* the ball is still coming: buffer it (D-048) */
+        }
         if ((now & btn) && p->charge_kind == kind && p->kick_charge < T_CHARGE_MAX_TICKS) p->kick_charge++;
         if ((released & btn) && p->charge_kind == kind) {
             if (p->action == WP_ACT_NONE && ball_reachable(s, i, KICK_START_REACH)) {
-                WpKick k;
-                if (kind == WP_KICK_PASS && p->kick_charge > T_PASS_TAP_TICKS)
-                    make_kick(s, i, WP_KICK_THROUGH, fx_div(FX_INT(p->kick_charge - T_PASS_TAP_TICKS),
-                                                            FX_INT(T_CHARGE_MAX_TICKS - T_PASS_TAP_TICKS)), aim, has, &k);
-                else if (kind == WP_KICK_LOB)                     /* tap = 0 (to the ringed mate), else the meter */
-                    make_kick(s, i, WP_KICK_LOB, p->kick_charge <= T_LOB_TAP_TICKS ? 0
-                              : fx_max(fx_div(FX_INT(p->kick_charge - T_LOB_TAP_TICKS), FX_INT(T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS)), 1),
-                              aim, has, &k);
-                else
-                    make_kick(s, i, kind, fx_div(FX_INT(p->kick_charge), FX_INT(T_CHARGE_MAX_TICKS)), aim, has, &k);
-                sim_player_kick(s, i, &k);
-            }
+                player_fire(s, i, kind, p->kick_charge, in);
+                intent_clear_player(s, i);
+            } else intent_release(s, i, kind, p->kick_charge);   /* kept: it fires when the ball gets here */
             p->charge_kind = 0xFF;
             p->kick_charge = 0;
         }
@@ -687,6 +710,7 @@ static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const
     WpPlayer *p = &s->players[i];
     WpBall *b = &s->ball;
     int hands = keeper_hands(s, i);
+    if (!hands && b->z > T_CB_GROUND && contact_first_time(s, i, in)) return;   /* buffered: volley / lay-off (D-048) */
     p->settle_ticks = 0;
     if (!hands && b->z > T_CB_GROUND) contact_touch(s, i, in, dseg);   /* in the air: the stance's cushion (D-047) */
     else {
@@ -796,7 +820,7 @@ void players_step(SimState *s, const WpInput *in) {
     }
     for (int i = 0; i < np; i++) {
         int seat = seat_of(s, i);
-        if (seat >= 0) handle_buttons(s, i, &pin[i], s->prev_buttons[seat]);
+        if (seat >= 0) { handle_buttons(s, i, &pin[i], s->prev_buttons[seat]); intent_step(s, i, &pin[i]); }
         move(s, i, &mv[i]);
         WpPlayer *p = &s->players[i];
         p->pos = fv2_add(p->pos, fv2_scale(p->vel, WP_DT));

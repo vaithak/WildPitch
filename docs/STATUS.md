@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-17 by Claude session #1 (CP0.5a stage 2)_
+_Last updated: 2026-11-17 by Claude session #1 (CP0.5a stage 3)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -80,6 +80,27 @@ ball settling at his feet. New `src/sim/contact.c`, `tests/test_contact.c`. Numb
 Clean touches: instep 0.45 m, thigh 0.84 m / 0.48 s, chest 0.98 m / 0.58 s, head-control 0.90 m / 0.68 s; lofted
 passes 10-47 m (8-17 m/s) controlled, drop 0.8-1.0 m; a chest ball at 20 / 23 / 26 m/s drops 2.0 / 3.5 / 5.8 m.
 bench_sim 16.8 us/tick (+8%). Avatar stance poses: stage 5.
+
+**CP0.5a stage 3 (D-048): done, goldens updated on purpose** (5v5 `ee176276e251a166`, 7v7 `9a73bc3b95202d9e`).
+Press early and it happens when the ball arrives: buffered presses per seat (`src/sim/intent.c`), first-time volleys /
+half-volleys / lay-offs, chest -> pass and chest -> volley chains, headers by the measured law with a real header-pass
+solve. New `tests/test_intent.c`. AI vs AI (stage 2 -> stage 3, 80 matches; 20 in brackets): goals 0.48 -> 0.47/min
+[0.44 -> 0.44], lobs 74% -> 71% [69 -> 71%], crosses 53% -> 48% [51 -> 52%], headers 0.44 -> 0.42/min, AI header
+passes completed 38% -> 40% (stage 1: 32%); aimatch 20x5: goals 15+29 -> 18+26, passes 74/76% -> 74/76%.
+Tests: 12/12 buffered passes fire; stale presses cancelled; chest -> pass at the ground pace (within 2%); chest ->
+volley from 12 m 20/20 on target (no keeper); header passes to a jogging mate 6-10 m 15/20 within 1.5 m.
+bench_sim 18.3 us/tick (stage 2 16.8; stage 1 15.6).
+
+### Playtest guide (CP0.5a stage 3, first-time play)
+1. Header pass: as a cross comes in, press S (pass) early with the stick at a team-mate - he heads it down to him
+   (a long one off a slow cross falls short). D (shoot) = header at goal; A (lob) = a looped header.
+2. Chest then pass: a lob dropping at your chest, press S early (mate further than 8 m): he chests it down and
+   passes as it reaches his feet. A mate within 8 m in front: a chest lay-off straight away.
+3. Chest then volley: same, press D early: he chests it and volleys it as it drops.
+4. Volley: a ball arriving at knee/thigh height with D pressed: struck first time (less accurate than a set shot).
+5. Press S a second before a pass reaches you: it is played first time (or after one touch).
+6. Pressing too early (> 1.5 s) or if they win it: nothing happens later.
+Questions: is the error readable? Do early presses feel responsive or surprising?
 
 ### Playtest guide (CP0.5a stage 2, aerial control)
 1. Lob (A) to a team-mate and do nothing with him: he runs to where the ball will be at chest / thigh height and
@@ -215,8 +236,8 @@ Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (20 ctest entries, all passing):** test_contact, test_lob, test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `6f21d636d56b9644`, 7v7 `8925d4ceea2ff5c7` after D-047; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (21 ctest entries, all passing):** test_intent, test_contact, test_lob, test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
+  (golden 5v5 `ee176276e251a166`, 7v7 `9a73bc3b95202d9e` after D-048; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

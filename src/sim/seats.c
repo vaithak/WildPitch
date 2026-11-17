@@ -27,6 +27,7 @@ static void do_switch(SimState *s, int seat, int to, uint8_t cool, const WpSeatI
     old->charge_kind = 0xFF;
     s->seat_player[seat] = (int8_t)to;
     s->switch_cool[seat] = cool;
+    intent_clear_seat(s, seat);                       /* a buffered press belonged to the old player (D-048) */
     pass_pick_reset(s, seat);                         /* stick memory belongs to the old player */
     s->latch_ticks[seat] = 0;
     if (latch && si && (si->move_x || si->move_y)) {

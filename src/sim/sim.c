@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 2768  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 2848  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
  * 5.6 x 2.1 m goals (7.32/68 of the width, like a real pitch) */
@@ -130,6 +130,8 @@ void sim_init(SimState *s, const WpMatchConfig *cfg) {
         s->seat_player[i] = -1;
         s->pick_recv[i] = -1;
         s->pick_stick_age[i] = s->pick_diag_age[i] = 255;
+        s->intent[i] = 0xFF;
+        s->intent_eta[i] = 0xFFFF;
     }
     s->seat_player[0] = (int8_t)(s->n_per_side - 1); /* seat 0 = team 0 striker */
     s->half_ticks = cfg->half_ticks;                 /* 0 = endless (D-036) */
@@ -217,6 +219,10 @@ uint64_t sim_hash(const SimState *s) {
     fnv_i(&f, s->pass_meet.x); fnv_i(&f, s->pass_meet.y); fnv_i(&f, s->pass_meet_tick); fnv_i(&f, s->pass_plan);
     fnv_i(&f, s->recv_away); fnv_i(&f, s->recv_gone);
     fnv_i(&f, s->recv_goal.x); fnv_i(&f, s->recv_goal.y); fnv_i(&f, s->recv_speed);
+    for (int k = 0; k < WP_MAX_SEATS; k++) {             /* intent buffer (D-048) */
+        fnv_i(&f, s->intent[k]); fnv_i(&f, s->intent_held[k]); fnv_i(&f, s->intent_gauge[k]);
+        fnv_i(&f, s->intent_age[k]); fnv_i(&f, s->intent_eta[k]); fnv_i(&f, s->intent_dir[k]);
+    }
     for (int k = 0; k < WP_MAX_SEATS; k++) {
         fnv_i(&f, s->latch_stick[k][0]); fnv_i(&f, s->latch_stick[k][1]); fnv_i(&f, s->latch_ticks[k]);
         fnv_i(&f, s->pick_recv[k]); fnv_i(&f, s->pick_danger[k]); fnv_i(&f, s->pick_dir[k]);

@@ -234,6 +234,13 @@ typedef struct {
     uint8_t  recv_gone;              /* ticks with no reachable meeting point (ball has gone) */
     fv2      recv_goal;              /* where the assisted receiver is steering this tick */
     fx       recv_speed;             /* ... and how fast (m/s) */
+    /* intent buffer per seat (D-048): PASS / SHOOT / LOB pressed while the ball is still coming */
+    uint8_t  intent[WP_MAX_SEATS];       /* WP_KICK_PASS / SHOT / LOB, 0xFF = none */
+    uint8_t  intent_held[WP_MAX_SEATS];  /* the button is still down (the gauge still grows) */
+    uint16_t intent_gauge[WP_MAX_SEATS]; /* ticks it was held (the kick_charge at release / now) */
+    uint16_t intent_age[WP_MAX_SEATS];   /* ticks since the release */
+    uint16_t intent_eta[WP_MAX_SEATS];   /* predicted contact tick at the press (0xFFFF = unknown) */
+    wp_angle intent_dir[WP_MAX_SEATS];   /* the aim at the press (used when the stick is let go by the contact) */
     int8_t   latch_stick[WP_MAX_SEATS][2]; /* stick held at an auto-switch: treated as neutral until it changes */
     uint8_t  latch_ticks[WP_MAX_SEATS];
     /* pass receiver preview (D-021): the sim owns the pick, the HUD only draws it, so the ring always matches */

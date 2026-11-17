@@ -588,3 +588,32 @@ Report "Action selection" / "Per-stance contact physics" (CONTROL intent only). 
   targets until stage 4 (moving AI receivers to the control point made them head crosses away: lob completion 59%);
   its touches use the stance model.
 - Avatar stance poses deferred to stage 5. bench_sim 15.6 -> 16.8 us/tick (+8%).
+
+## D-048 — Intents and chains: buffered presses, first-time contacts, the header law (2026-11-17, CP0.5a stage 3)
+Owner decisions: a button pressed early = a first-time action, falling back to control and then the action if the
+first-time contact isn't possible; "Readable" error. New `src/sim/intent.c`; first-time strikes in `contact.c`.
+- **Intent buffer per seat** (SimState, hashed): PASS / SHOOT / LOB pressed while the ball is loose and not yet
+  playable records {kind, held, gauge, age, predicted contact tick, aim at the press}; the newest press wins.
+  Cancelled 90 ticks after the release (not while he holds a settling ball - the chain waits), when the predicted
+  contact slips > 42 ticks, when anyone else gets the ball, on a switch, when play stops. A buffered LOB never
+  becomes a slide. The AI has no buffer (stage 4).
+- **Fallback order:** (1) first time - a header if it reaches him >= 1.6 m (T_INTENT_HEAD_Z; also the threshold for
+  a press at a high ball, was 1.30 m: a chest-high ball with PASS/SHOOT is now chested, not headed), a volley /
+  half-volley / volley pass / volleyed lob at the aerial contact, a chest lay-off (PASS, mate <= 8 m within 60 deg),
+  or the kick the moment it is at his feet; (2) otherwise the stance control touch with the intent kept, so chest ->
+  pass fires as the ball reaches his feet (a ground pass, same pace as from a still ball) and chest -> volley fires as
+  it drops through 1 m. The aim is the stick at the strike, else the aim at the press.
+- **Volley:** min(T_SHOT_MAX, 0.9 x the set shot + 0.36 x the ball's pace into it), aim error +-2 deg x (2 LOW /
+  3 MID) x (1 + over) (one draw), rises 0.15 rad per metre above 0.45 m (the report's 0.35 sent every chest volley
+  over). Half-volley / volley pass: the ground pass x 1.05 struck down at vz -0.5; a MID volley pass only off a ball
+  <= 10 m/s within 60 deg of facing.
+- **Header law:** the wanted ball is capped by sqrt((0.63 u_n + 1.63 v_head)^2 + (0.85 |r_t|)^2) about the bisector
+  normal (v_head 2.5 standing / 3.5 jumping); too far = it falls short, after first trying the best-aimed on-pitch
+  team-mate the head CAN reach. Header pass solve: onto the mate's predicted point at 0.3 m, nodded down (vz -0.5) up
+  to 6 m, else vz = 1 + 0.15 d (lofted header: the lob formula); RUN hand-off. Turned >= 135 deg: a flick-on (0.5-
+  0.88 of the pace, bent <= 40 deg). Error +-2 deg x (1 + phi/90) x (1 + over), x3 between 90 and 135 deg - on every
+  header pass and on a human's header at goal; the AI's header shots keep no extra error until stage 4 (with it AI
+  goals fell 0.48 -> 0.41/min). Header passes in practice reach ~10 m off a 13 m/s cross.
+- Replaces the old header pass (0.7 d + 3 at his current position, vz 1.8); `T_HEADER_PASS_K/BASE/MIN/MAX/VZ` removed.
+- test_ai_rules' throw-in check accepts the marker at the 2 m line heading the throw first (it already did in stage 2;
+  where it then went was luck).
