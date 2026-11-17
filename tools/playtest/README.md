@@ -34,3 +34,6 @@ CP0.5b: `switchrate.c [seeds] [minutes]` (D-050 acceptance): 7v7 seat 0 scripted
 the ball), switches per minute by reason (inferred from the state, so it runs on any sim version; build with
 `-DWP_HAVE_SWITCH_MODE` to also print the sim's own WP_SW_* reasons and honour `WP_SWITCH=1|2|3`), A->B->A within
 60 ticks. `WP_SW_TRACE=1|2` prints the ping-pongs / every switch.
+
+CP0.5a stage 4: `duel.c [v]` (D-051) - scripted cross duels: AI crosser on the wing, receiver in the box, one marker on
+a 0.5 m grid around him (72 setups); who makes the first contact. Baseline (stage 3) 70/72 to the attackers.

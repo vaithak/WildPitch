@@ -19,7 +19,12 @@
  *           or body hit, not a header) by an outfield player of the kicker's team; SUCCESS = a gain that passes the
  *           CONTROL SUCCESS check.
  *  - HEADER PASS COMPLETED = after a PASS header (kick.foot == 0), the next player to own / head it is a team-mate.
- *  - per minute = per minute of match ticks (3600 ticks). */
+ *  - per minute = per minute of match ticks (3600 ticks).
+ * Added in CP0.5a stage 4 (do not change the definitions above):
+ *  - AERIAL TURNOVER = a first aerial contact (any kind) by an outfield player of the team that did NOT make the kick.
+ *  - HEADER GOAL = a goal whose last touch was a header shot (no other touch in between).
+ *  - FIRST-TIME AIR STRIKE = a kick (not a header) by a player who did not own the ball the tick before, off a ball
+ *           above the ground band (prev z > 0.25 m): volleys / half-volleys / volley passes / lay-offs. */
 #ifndef WP_AERIAL_METRICS_H
 #define WP_AERIAL_METRICS_H
 #include <stdio.h>
@@ -40,6 +45,7 @@ typedef struct {
     long keeper_contacts;
     long lobrx_try, lobrx_ok;            /* lob receptions (<= 30 m, kicker's team first): controlled */
     long headers, header_shots, header_pass, header_pass_done;
+    long turnovers, header_goals, air_strike_shot, air_strike_pass;
 } AerialStats;
 
 typedef struct {
@@ -49,6 +55,7 @@ typedef struct {
     int chk_team, chk_band, chk_left, chk_lob;       /* pending control check (chk_lob: a lob reception) */
     int air_lob;                                     /* the airborne ball is a lob <= 30 m from team air_lob - 1 */
     int prev_owner, prev_held;
+    int hs_from;                                     /* last touch was this player's header shot (-1: no) */
     fx prev_z;
 } AerialTrack;
 
@@ -57,6 +64,7 @@ static inline void aerial_reset(AerialTrack *t, const SimState *s) {
     t->air_up = 0;
     t->chk_left = 0;
     t->air_lob = 0;
+    t->hs_from = -1;
     t->prev_owner = s->ball.owner;
     t->prev_held = s->ball.held;
     t->prev_z = s->ball.z;
@@ -113,6 +121,7 @@ static inline void aerial_update(AerialStats *a, AerialTrack *t, const SimState 
             int lobrx = t->air_lob && s->players[c].team == t->air_lob - 1;
             if (s->players[c].role == WP_ROLE_KEEPER) a->keeper_contacts++;
             else {
+                if (s->players[c].team != s->players[t->air_from].team) a->turnovers++;
                 if (kind != AK_HEADER) a->lobrx_try += lobrx;
                 int band = aerial_band(t->prev_z);
                 a->contact[band][kind]++;
@@ -126,13 +135,20 @@ static inline void aerial_update(AerialStats *a, AerialTrack *t, const SimState 
             t->air_from = -1;
         } else if (stop || (b->owner >= 0 && b->owner == t->air_from)) t->air_from = -1;
     }
+    /* header goals */
+    if ((ev & WP_EV_GOAL) && t->hs_from >= 0 && b->last_touch == t->hs_from) a->header_goals++;
+    if (gain || stop || (kick && !(header && b->last_touch >= 0 && s->players[b->last_touch].kick.foot == 1))) t->hs_from = -1;
     /* new kicks */
     if (kick && b->last_touch >= 0) {
         int k = b->last_touch;
         const WpPlayer *p = &s->players[k];
+        if (header && p->kick.foot == 1) t->hs_from = k;
+        if (!header && t->prev_owner != k && t->prev_z > FX(0.25) && !t->prev_held) {
+            if (p->kick.kind == WP_KICK_SHOT) a->air_strike_shot++; else a->air_strike_pass++;
+        }
         if (header) {
             a->headers++;
-            if (p->kick.foot) a->header_shots++;
+            if (p->kick.foot == 1) a->header_shots++;
             else { a->header_pass++; t->hp_from = k; t->hp_team = p->team; }
         } else if (p->kick.kind == WP_KICK_LOB && !t->prev_held) {
             int sg = team_dir(s, p->team);
@@ -148,7 +164,7 @@ static inline void aerial_update(AerialStats *a, AerialTrack *t, const SimState 
             t->lob_from = k; t->lob_team = p->team; t->lob_cross = cross; t->lob_bucket = bucket;
             t->air_lob = bucket <= 4 ? p->team + 1 : 0;
         }
-        int shot = header ? p->kick.foot != 0 : (p->kick.kind == WP_KICK_SHOT || p->kick.kind == WP_KICK_CHIP);
+        int shot = header ? p->kick.foot == 1 : (p->kick.kind == WP_KICK_SHOT || p->kick.kind == WP_KICK_CHIP);
         t->air_from = shot ? -1 : k;                 /* shots are blocked, not received: not aerial receptions */
         if (header || p->kick.kind != WP_KICK_LOB || t->prev_held) t->air_lob = 0;
         t->air_up = 0;
@@ -183,5 +199,8 @@ static inline void aerial_print(const AerialStats *a) {
            aerial_pct(a->lobrx_ok, a->lobrx_try));
     printf("  headers %ld (%.2f/min): shots %ld, passes %ld completed %ld (%.0f%%)\n", a->headers, (double)a->headers / mins,
            a->header_shots, a->header_pass, a->header_pass_done, aerial_pct(a->header_pass_done, a->header_pass));
+    printf("  header shots per cross %.2f, header goals %ld; aerial turnovers %ld (%.2f/min); first-time air strikes: shots %ld, passes %ld\n",
+           a->crosses ? (double)a->header_shots / (double)a->crosses : 0.0, a->header_goals, a->turnovers, (double)a->turnovers / mins,
+           a->air_strike_shot, a->air_strike_pass);
 }
 #endif

@@ -355,7 +355,10 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
         int ai = seat_of(s, i) < 0;
         fv2 goal = fv2_make(team_dir(s, p->team) * (s->pitch.length / 2), 0);
         int head = ai && r >= 0 && fv2_len(fv2_sub(s->players[r].pos, goal)) < T_AI_CROSS_ZONE;   /* a cross / corner */
-        b->vel = lob_solve(s, r, p->kick.dir, p->kick.power, ai ? T_LOB_AI_MIN_D : 0, head, &vz, &meet, &t_meet);
+        b->vel = fv2_make(0, 0);
+        if (head && T_CROSS_DRIVEN) b->vel = cross_solve(s, r, &vz, &meet, &t_meet);   /* driven, to his head (D-051) */
+        if (!b->vel.x && !b->vel.y)                       /* (a man in the driven ball's way: loft it over him) */
+            b->vel = lob_solve(s, r, p->kick.dir, p->kick.power, ai ? T_LOB_AI_MIN_D : 0, head, &vz, &meet, &t_meet);
         plan = WP_PLAN_RUN;                               /* the receiver runs to the drop point, in time */
     }
     else if (p->kick.kind == WP_KICK_THROUGH && r >= 0) b->vel = through_solve(s, r, p->kick.power, pace, &meet, &t_meet, &plan);
@@ -712,7 +715,10 @@ static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const
     int hands = keeper_hands(s, i);
     if (!hands && b->z > T_CB_GROUND && contact_first_time(s, i, in)) return;   /* buffered: volley / lay-off (D-048) */
     p->settle_ticks = 0;
-    if (!hands && b->z > T_CB_GROUND) contact_touch(s, i, in, dseg);   /* in the air: the stance's cushion (D-047) */
+    if (!hands && b->z > T_CB_GROUND) {                   /* in the air: the stance's cushion (D-047) */
+        WpSeatInput still = {0, 0, 0};                    /* (the AI's stick is its run, not an aim: it cushions */
+        contact_touch(s, i, seat_of(s, i) >= 0 ? in : &still, dseg);   /*  it the way he faces, D-051) */
+    }
     else {
         fv2 rel = fv2_sub(b->vel, p->vel);
         fx rs = fv2_len(rel);
@@ -725,6 +731,7 @@ static void gain_apply(SimState *s, int i, const WpSeatInput *in, fx dseg, const
         b->vel = fv2_add(p->vel, fv2_scale(rel, spill));
         if (b->z > WP_BAND_FEET_MAX) b->vz = 0;            /* (keeper's hands) */
         b->spin = 0;
+        contact_mark(s, i, WP_LT_TRAP);
     }
     b->owner = (int8_t)i;
     b->last_touch = (int8_t)i;

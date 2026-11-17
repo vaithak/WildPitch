@@ -4,7 +4,7 @@
 #include "sim/sim_internal.h"
 #include <string.h>
 
-#define WP_SIMSTATE_SIZE_EXPECTED 2960  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
+#define WP_SIMSTATE_SIZE_EXPECTED 3224  /* x86-64 gcc/clang; see _Static_assert near sim_hash */
 
 /* 7-a-side (owner requests): keeper + 2-3-1 on 80 x 52 m - a real pitch's 105:68 (1.54) proportion - with
  * 5.6 x 2.1 m goals (7.32/68 of the width, like a real pitch) */
@@ -280,6 +280,8 @@ uint64_t sim_hash(const SimState *s) {
         const WpPlan *pl = &p->plan;                      /* aerial contact plan (D-047) */
         fnv_i(&f, pl->kind); fnv_i(&f, pl->band); fnv_i(&f, pl->flags); fnv_i(&f, pl->tick); fnv_i(&f, pl->since);
         fnv_i(&f, pl->at.x); fnv_i(&f, pl->at.y); fnv_i(&f, pl->z); fnv_i(&f, p->settle_ticks);
+        fnv_i(&f, p->ai_intent); fnv_i(&f, p->ai_air); fnv_i(&f, p->ai_aim.x); fnv_i(&f, p->ai_aim.y);   /* D-051 */
+        fnv_i(&f, p->last_touch_kind); fnv_i(&f, p->last_touch_tick);                                  /* D-052 */
     }
     return f.h;
 }

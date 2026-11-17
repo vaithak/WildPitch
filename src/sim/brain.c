@@ -18,7 +18,7 @@
 #include "sim/sim_internal.h"
 
 enum { AI_NONE = 0, AI_SHAPE, AI_SUPPORT, AI_RUN, AI_CHASE, AI_PRESS, AI_COVER, AI_MARK, AI_RECEIVE,
-       AI_DRIBBLE, AI_PASS, AI_THROUGH, AI_SHOOT, AI_KEEP, AI_CROSS, AI_HEAD, AI_REST, AI_N };
+       AI_DRIBBLE, AI_PASS, AI_THROUGH, AI_SHOOT, AI_KEEP, AI_CROSS, AI_HEAD, AI_REST, AI_AIR, AI_N };
 
 /* candidate features (fx). F_BIAS is always 1. */
 enum { F_FWD = 0,    /* metres gained toward the opponent goal (target vs ball) */
@@ -118,16 +118,18 @@ static fv2 home_spot(const Ctx *x, int attacking) {
 static fx leash(const Ctx *x) { return FX(1.5) - slot_mindset(x->s, x->i % x->s->n_per_side); }
 
 /* 0..1 shot quality from point `at`: distance, angle to the goal mouth, a clear lane, keeper not in the way */
-static fx shot_quality(const Ctx *x, fv2 at) {
-    fx d = dist(at, x->opp_goal);
+fx brain_shot_quality(const SimState *s, int team, fv2 at) {
+    fv2 opp_goal = fv2_make(team_dir(s, team) * (s->pitch.length / 2), 0);
+    fx d = dist(at, opp_goal);
     if (d > T_AI_SHOT_RANGE) return 0;
     fx r = fx_div(d, T_AI_SHOT_RANGE);
     fx q = FX_ONE - fx_mul(r, r);                       /* stays worth it from the edge of the box */
-    fx ay = fx_abs(at.y), wide = fx_max(ay - x->s->pitch.goal_width, 0);
+    fx ay = fx_abs(at.y), wide = fx_max(ay - s->pitch.goal_width, 0);
     q = fx_mul(q, FX_ONE - clampf(fx_div(wide, FX(6.0)), 0, FX_ONE));
-    fx lane = fx_min(pass_lane_clear(x->s, x->team, at, x->opp_goal), FX(2.0));
+    fx lane = fx_min(pass_lane_clear(s, team, at, opp_goal), FX(2.0));
     return fx_mul(q, FX(0.4) + fx_mul(FX(0.3), lane));
 }
+static fx shot_quality(const Ctx *x, fv2 at) { return brain_shot_quality(x->s, x->team, at); }
 
 
 static int possession(const SimState *s) {          /* team in possession, -1 loose/none */
@@ -420,13 +422,13 @@ static void do_kick(SimState *s, int i, uint8_t kind, int to, fv2 at, fx power) 
 }
 
 /* aim a shot at the corner further from their keeper */
-static fv2 shot_target(const Ctx *x) {
-    const SimState *s = x->s;
-    int kp = (1 - x->team) * s->n_per_side;              /* their keeper is index 0 of their team */
+fv2 brain_shot_target(const SimState *s, int team) {
+    int kp = (1 - team) * s->n_per_side;                 /* their keeper is index 0 of their team */
     fx side = fx_mul(s->pitch.goal_width, FX(0.38));
     fx ky = s->players[kp].pos.y;
-    return fv2_make(x->opp_goal.x, ky > 0 ? -side : side);
+    return fv2_make(team_dir(s, team) * (s->pitch.length / 2), ky > 0 ? -side : side);
 }
+static fv2 shot_target(const Ctx *x) { return brain_shot_target(x->s, x->team); }
 
 static void keeper(Ctx *x, WpSeatInput *out) {
     SimState *s = (SimState *)x->s;
@@ -613,20 +615,45 @@ void brain_input(SimState *s, int i, WpSeatInput *out) {
     int decide = ((s->tick + (uint32_t)(i % s->n_per_side)) % LV_DECIDE[lv]) == 0   /* staggered by role: mirror-fair */ || p->ai_act == AI_NONE ||
                  (owner && p->ai_act < AI_DRIBBLE) || (!owner && p->ai_act >= AI_DRIBBLE && p->ai_act != AI_KEEP);
     if (s->pass_target == i && p->ai_act != AI_RECEIVE) decide = 1;
-    /* aerial duel: a ball coming in high - the team's first man (on his decision beat) goes for a header. At goal near
-     * their box, a clearance near ours, otherwise nod it on to a team-mate. The aim target is ai_goal. */
-    int jump;
-    if ((decide || s->pass_target == i) && p->action == WP_ACT_NONE && b->owner < 0 && !owner &&
-        (s->plan[x.team].winner == i || dist(b->pos, p->pos) < FX(3.0)) && header_wanted(s, i, &jump)) {
-        fx to_goal = dist(p->pos, x.opp_goal);
-        int at_goal = to_goal < FX(14.0) && shot_quality(&x, p->pos) > 0;
-        header_start(s, i, at_goal, jump);
-        p->ai_act = AI_HEAD;
-        if (at_goal) p->ai_goal = shot_target(&x);
-        else if (p->pos.x * x.sg < -fx_mul(x.hl, FX(0.3)))                     /* our end: clear it upfield, wide */
-            p->ai_goal = fv2_make(fx_mul(x.hl, FX_INT(x.sg)), p->pos.y > 0 ? x.hw : -x.hw);
-        else p->ai_goal = fv2_add(p->pos, fv2_make(FX_INT(8 * x.sg), 0));       /* nod it on (pass_pick finds a mate) */
-        return;
+    /* a ball coming in the air (D-051): the receiver, the team's ball-winner or a man right under it chooses its
+     * contact (aerial_ai.c: head it at the earliest point, or let it drop to his planned touch - first time or
+     * control) and goes there. Defenders react to their pass first (LV_PASS_REACT), as below. */
+    int react = s->pass_target >= 0 && s->players[s->pass_from].team != p->team && s->pass_ticks < LV_PASS_REACT[lv];
+    if (b->owner >= 0 || (b->z == 0 && b->vz == 0)) { p->ai_air = 0; p->ai_intent = 0; }
+    else if (!react && p->action == WP_ACT_NONE && !owner && p->z == 0) {
+        /* the receiver and the team's ball-winner go to their contact; a bystander only heads a ball that comes to
+         * him, on his decision beat (he doesn't leave his job to attack it) */
+        int main_man = s->pass_target == i || s->plan[x.team].winner == i, jump = 0;
+        int theirs = b->last_touch >= 0 && s->players[b->last_touch].team != p->team;
+        int by = !main_man && decide && dist(b->pos, p->pos) < FX(3.0) && header_wanted_at(s, i, &jump, T_INTENT_HEAD_Z);
+        AirChoice ac;
+        if ((main_man || by) && aerial_choose(s, i, &ac) && (main_man || ac.head)) {
+            p->ai_air = (uint8_t)(ac.act + 1);
+            p->ai_mate = ac.mate;
+            p->ai_aim = ac.aim;
+            p->ai_intent = ac.head ? 0 : ac.intent;
+            /* the header starts (and roots him): ours - once the ball is T_AIR_HEAD_NEAR from him (it comes to
+             * him); theirs - at his attack point, or T_AIR_HEAD_LAST ticks before it */
+            int go = !theirs ? dist(b->pos, p->pos) < T_AIR_HEAD_NEAR
+                   : ac.t <= T_AIR_HEAD_GO && (dist(ac.to, p->pos) <= T_AIR_HEAD_AT || ac.t <= T_AIR_HEAD_LAST);
+            if (ac.head && (by || (go && header_wanted_at(s, i, &jump, T_INTENT_HEAD_Z)))) {
+                if (!by && ac.z > T_HEAD_Z + FX(0.20)) jump = 1;   /* (from the prediction, not the drag-free guess) */
+                header_start(s, i, ac.intent == WP_KICK_SHOT + 1 ? 1 : ac.intent == WP_KICK_LOB + 1 ? 2 : 0, jump);
+                p->ai_act = AI_HEAD;
+                p->ai_goal = ac.aim;                      /* header_contact aims the AI at ai_goal */
+                return;
+            }
+            p->ai_act = AI_AIR;
+            if (!theirs && s->pass_target == i && s->pass_plan != WP_PLAN_CLOSEST && (ac.head || ac.t > T_AIR_SETTLE_T)) {
+                ac.to = s->pass_meet;   /* our ball to him: where it was played to, until he settles for a lower touch */
+                ac.speed = fx_min(fx_mul(dist(ac.to, p->pos), T_AIR_EASE), player_top_speed(s, i, 1));
+            }
+            p->ai_goal = ac.to;
+            team_steer_speed(s, p, ac.to, ac.speed, out);
+            return;
+        }
+        p->ai_air = 0;
+        p->ai_intent = 0;
     }
     if (p->ai_act == AI_HEAD && (p->action == WP_ACT_JUMP_HEADER || p->action == WP_ACT_STAND_HEADER)) return;
     /* a pass by the other team has just been struck: defenders need a moment to react (keep doing what they were) */

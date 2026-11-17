@@ -233,7 +233,14 @@
 #define T_LOB_ANGLE_M      FX(6.0)    /* ... (+ this x angle/pi off the aim) of the landing spot gets it */
 #define T_LOB_BIAS_MAX     FX(3.0)    /* meter surplus / shortfall vs the snapped mate: dropped this much deeper / shorter */
 #define T_LOB_RECV_Z       FX(1.0)    /* a targeted lob is led to where it comes DOWN through this height ... */
-#define T_LOB_HEAD_Z       FX(2.3)    /* ... an AI ball to a mate in the box (T_AI_CROSS_ZONE): through a jumping head (1.7 + 0.6) */
+#define T_LOB_HEAD_Z       FX(2.3)    /* ... an AI ball to a mate in the box (T_AI_CROSS_ZONE): through a jumping head (1.7 + 0.6)
+                                         (D-051 kept it: the driven 1.8 m cross lost every marked duel) */
+#define T_CROSS_DRIVEN     0          /* AI crosses / corners into the box (D-051): 1 = driven to T_CROSS_Z, 0 = lob to HEAD_Z */
+#define T_CROSS_Z          FX(1.8)    /* a driven cross comes down through this height at the receiver's predicted point */
+#define T_CROSS_VZ_BASE    FX(6.0)    /* ... launched with vz = BASE + PER_M x d (apex ~2.4 m at 15 m, ~2.9 m at 25 m) */
+#define T_CROSS_VZ_PER_M   FX(0.06)
+#define T_CROSS_CLEAR_W    FX(1.5)    /* ... only with no opponent within this of its path while it is below T_CB_JUMP, */
+#define T_CROSS_CLEAR_END  FX(3.0)    /* ... up to this short of the receiver (else it is lofted over them) */
 #define T_LOB_TAP_D        FX(18.0)   /* a tap with nobody to pick: lands this far along the aim */
 #define T_LOB_AI_MIN_D     FX(12.0)   /* AI lobs / crosses / restart lobs: D clamped to [this, the meter's max] */
 #define T_THROW_LOFT_VZ_BASE FX(4.0)  /* from the hands (keeper's overarm throw, long throw-in): the pre-D-046 loft */
@@ -288,6 +295,7 @@
 #define T_CONTACT_W_TIME   FX(1.0)
 #define T_CONTACT_W_PRESS  FX(2.0)
 #define T_CONTACT_WAIT_D   FX(0.45)   /* waiting for the planned (lower) band: only while the ball is this far off */
+#define T_CONTACT_STAND_BACK FX(0.50) /* the AI stands this far beyond its planned contact along the flight (> body radius + ball: D-051) */
 
 /* ---- intents and first-time contacts (D-048) ---- */
 #define T_INTENT_MAX_AGE   90         /* a buffered press lives this long after the release ... */
@@ -369,6 +377,26 @@
 #define T_AI_SHOT_POWER    FX(24.0)   /* AI shot speed (m/s) */
 #define T_AI_SHOT_RANGE    FX(22.0)   /* AI considers shooting within this of goal */
 #define T_AI_CROSS_ZONE    FX(16.0)   /* crosses / corner targets: team-mates within this of goal */
+#define T_AI_AIR_GAUGE     36         /* AI first-time strikes (D-051): as a human holding this many ticks (volley h) */
+#define T_AIR_CONTEST_SLACK 4         /* AI aerial choice (D-051): an opponent's contact this many ticks after ours ... */
+#define T_AIR_CONTEST_SPAN 12         /* ... still contests it a little; this many before ours = fully contested */
+#define T_AIR_DEF_READ     36         /* their lofted ball: a defender commits to a contact only this many ticks before it */
+#define T_AIR_HEAD_GO      18         /* their ball: he runs to his attack point and starts the header this many ticks */
+#define T_AIR_HEAD_AT      FX(0.3)    /* before it, once he is this close to the point (or it is this few ticks away: */
+#define T_AIR_HEAD_LAST    8          /*  the header's take-off roots him) */
+#define T_AIR_HEAD_NEAR    FX(3.0)    /* our ball to him: he heads it once it is this close (it comes to him) ... */
+#define T_AIR_SETTLE_T     30         /* ... and he waits where it was played to until this close to a lower touch */
+#define T_AIR_HEAD_TOP     FX(2.35)   /* attack point: a ball he reaches between the head band and this (a jumping
+                                         head's centre, 1.7 + 0.59; higher only grazes the top of his reach) */
+#define T_AIR_HEAD_MAX_T   90         /* attacking the ball with the head: contacts up to this far ahead (ticks) */
+#define T_AIR_HEAD_SHOT_D  FX(14.0)   /* a header at goal from within this */
+#define T_AIR_HEADPASS_MIN FX(3.0)    /* header passes to team-mates this far ... */
+#define T_AIR_HEADPASS_MAX FX(14.0)   /* ... up to this (the head's budget does the rest, D-048) */
+#define T_AIR_HALFVOLLEY_MAX FX(20.0) /* half-volley passes up to this */
+#define T_AIR_FAR_CORNER   FX(0.3)    /* a header at goal aims at the near corner if that cuts G_ERR by more than this */
+#define T_AIR_COMMIT       FX(1.0)    /* utility bonus for keeping the previous aerial choice ... */
+#define T_AIR_LATCH        FX(50.0)   /* ... on our own ball a header, once chosen, is kept */
+#define T_AIR_EASE         FX(4.0)    /* he goes to his contact point at min(sprint, this x the distance) m/s */
 #define T_AI_TACKLE_DIST   FX(0.95)    /* AI tackles when the ball is this close ... */
 #define T_AI_TACKLE_EXPOSED FX(0.6)  /* ... and this far from the carrier's feet (between touches) ... */
 #define T_AI_TACKLE_SHIELD FX(0.3)    /* ... or (carrier slow < 2 m/s, holding it) this far */

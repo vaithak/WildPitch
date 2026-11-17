@@ -8,7 +8,9 @@
  *    of the landing (+ T_LOB_ANGLE_M * angle/pi off the aim) gets it: dropped on P_j, the meter's surplus / shortfall
  *    as a depth bias along his run (<= T_LOB_BIAS_MAX). Nobody: it lands D along the aim, kept inside the pitch.
  *  - Tap / AI: to the receiver's predicted point (AI: D clamped to the meter range; a ball to a mate in the box,
- *    T_AI_CROSS_ZONE from the goal, is met at head height T_LOB_HEAD_Z - crosses and corners are for heading).
+ *    T_AI_CROSS_ZONE from the goal, is met at head height - crosses and corners are for heading: since D-051 a
+ *    driven cross (its own flatter family, cross_solve) through T_CROSS_Z; T_CROSS_DRIVEN 0 = the stage-1 stopgap,
+ *    the lob family met at T_LOB_HEAD_Z).
  *  Every landing / meeting point stays T_THROUGH_MARGIN_X / _Y inside the goal lines / touchlines. */
 #include "sim/sim_internal.h"
 
@@ -17,6 +19,7 @@
 static fx LT_VH[LT_N];                              /* launch vh */
 static fx LT_DC[2][LT_N], LT_TC[2][LT_N];          /* distance + time to come down through T_LOB_RECV_Z / T_LOB_HEAD_Z */
 static int lt_ready;
+static void cross_table_init(void);
 
 static fx lob_vz(fx D) { return T_LOB_VZ_BASE + fx_mul(T_LOB_VZ_PER_M, D); }
 
@@ -34,6 +37,7 @@ void lob_table_init(void) {
         }
     }
     lt_ready = 1;
+    cross_table_init();
 }
 
 static fx lt_at(const fx *tab, fx D) {
@@ -43,6 +47,31 @@ static fx lt_at(const fx *tab, fx D) {
     if (i >= LT_N - 1) i = LT_N - 2;
     fx frac = fx_div(D - LT_STEP * i, LT_STEP);
     return tab[i] + fx_mul(tab[i + 1] - tab[i], frac);
+}
+
+/* driven crosses (D-051): a flatter family, vz = T_CROSS_VZ_BASE + T_CROSS_VZ_PER_M * d, indexed by d = where it
+ * comes DOWN through T_CROSS_Z (the receiver's head): launch vh and the time to get there. Same fill rules as LT_*. */
+static fx CT_VH[LT_N], CT_T[LT_N];
+static int ct_ready;
+static fx cross_vz(fx d) { return T_CROSS_VZ_BASE + fx_mul(T_CROSS_VZ_PER_M, d); }
+static void cross_table_init(void) {
+    for (int k = 0; k < LT_N; k++) {
+        fx d = LT_STEP * k, vz = cross_vz(d), lo = 0, hi = FX(40.0), dist;
+        int ticks = 0;
+        for (int it = 0; it < 16; it++) {
+            fx mid = (lo + hi) / 2;
+            ball_flight_to(mid, vz, 0, T_CROSS_Z, &dist, &ticks);
+            if (dist < d) lo = mid; else hi = mid;
+        }
+        ball_flight_to(hi, vz, 0, T_CROSS_Z, &dist, &ticks);
+        CT_VH[k] = hi;
+        CT_T[k] = FX_INT(ticks) / WP_TICK_HZ;
+    }
+    ct_ready = 1;
+}
+static fx ct_at(const fx *tab, fx d) {
+    if (!ct_ready) cross_table_init();
+    return lt_at(tab, d);
 }
 
 fx lob_recv_time(fx D, int head) { return lt_at(LT_TC[head != 0], D); }
@@ -144,4 +173,36 @@ fv2 lob_solve(const SimState *s, int r, wp_angle dir, fx h, fx d_min, int head, 
     *meet = fv2_add(from, fv2_scale(u, lob_recv_dist(D, head)));
     *t_meet = lob_recv_time(D, head);
     return fv2_scale(u, lt_at(LT_VH, D));
+}
+
+/* a driven cross (D-051) from the ball's spot to team-mate r's predicted point, coming down through his head
+ * (T_CROSS_Z) there; d clamped to [T_LOB_AI_MIN_D, lob_max_d]. Meeting point / time for the receive hand-off.
+ * Returns a zero velocity when an opponent stands under its path (the caller lofts it instead). */
+fv2 cross_solve(const SimState *s, int r, fx *vz, fv2 *meet, fx *t_meet) {
+    const WpPlayer *q = &s->players[r];
+    fv2 from = s->ball.pos, P = q->pos;
+    fx d_max = lob_max_d(s), t = ct_at(CT_T, fv2_len(fv2_sub(q->pos, from))), d = 0;
+    for (int it = 0; it < 3; it++) {
+        P = in_margins(s, fv2_add(q->pos, fv2_scale(q->vel, t)));
+        d = fx_clamp(fv2_len(fv2_sub(P, from)), fx_min(T_LOB_AI_MIN_D, d_max), d_max);
+        t = ct_at(CT_T, d);
+    }
+    fv2 u = fv2_sub(P, from);
+    fx ul = fv2_len(u);
+    u = ul > FX(0.05) ? fv2_scale(u, fx_div(FX_ONE, ul)) : fv2_make(FX_ONE, 0);
+    /* the first man: an opponent standing under the driven path where it is still at a height he can play
+     * (before the last T_CROSS_CLEAR_END metres, by the drag-free arc) - then it isn't on, return 0 */
+    fx vzd = cross_vz(d), vh = ct_at(CT_VH, d);
+    for (int j = (1 - q->team) * s->n_per_side; j < (2 - q->team) * s->n_per_side; j++) {
+        fv2 o = fv2_sub(s->players[j].pos, from);
+        fx along = fv2_dot(o, u);
+        if (along <= 0 || along >= d - T_CROSS_CLEAR_END) continue;
+        if (fx_abs(fx_mul(o.x, u.y) - fx_mul(o.y, u.x)) > T_CROSS_CLEAR_W) continue;   /* off its line */
+        fx tt = fx_div(along, vh), z = fx_mul(vzd, tt) - fx_mul(fx_mul(T_GRAVITY, tt), tt) / 2;
+        if (z < T_CB_JUMP) return fv2_make(0, 0);
+    }
+    *vz = cross_vz(d);
+    *meet = fv2_add(from, fv2_scale(u, d));
+    *t_meet = t;
+    return fv2_scale(u, ct_at(CT_VH, d));
 }

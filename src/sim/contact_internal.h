@@ -9,6 +9,25 @@ void contact_update(SimState *s);
  * One predicate for the first touch (gain_check), the body (collide_bodies) and possession (control_owner). */
 int  contact_stance(const SimState *s, int i, const WpBall *b);
 fx   contact_reach(int kind);                       /* how close (xy) the ball must pass for that stance */
+void contact_mark(SimState *s, int i, uint8_t kind);       /* his last contact (WP_LT_*) and its tick, for the poses */
+const WpBall *contact_ring(const SimState *s, int t);      /* the predicted ball t ticks ahead, NULL = none */
+int  contact_earliest(const SimState *s, int i, fx zlo, fx zhi, int tmax, fv2 *at, fx *z);   /* D-051 */
+int  contact_reachable(const SimState *s, int i, fx zlo, fx zhi, int tmax, int nearest, fv2 *at, fx *z);
+fx   contact_pressure(const SimState *s, int team, fv2 at);   /* 1 = an opponent within 1.5 m .. 0 beyond 4 m */
+fx   contact_plan_difficulty(const SimState *s, int i);        /* his planned touch's difficulty, -1 = no plan */
+fv2  contact_stand_at(const SimState *s, int i);                /* where to stand for it (a little beyond the point) */
+/* aerial_ai.c (D-051): the AI's choice at a ball coming in the air (brain.c carries it out) */
+typedef struct {
+    uint8_t act;                 /* AA_* (aerial_ai.c) */
+    uint8_t head;                /* 1 = attack it with the head at the earliest point; 0 = his planned foot/body contact */
+    uint8_t intent;              /* WP_KICK_* + 1 at the contact (header sub-kind follows from it), 0 = control */
+    int8_t  mate;                /* the team-mate it goes to, -1 */
+    fv2     aim, to;             /* where it is sent / where he goes */
+    fx      speed;               /* how fast he goes there (m/s) */
+    int     t;                   /* ticks to that contact */
+    fx      z;                   /* the ball's height there */
+} AirChoice;
+int  aerial_choose(const SimState *s, int i, AirChoice *c);   /* 0 = no aerial contact for him */
 int  contact_waiting(const SimState *s, int i, fx dseg);   /* 1 = let it drop to the planned (later) contact */
 /* an aerial control touch (z > T_CB_GROUND): outcome + residual model; sets the ball and his settle_ticks */
 void contact_touch(SimState *s, int i, const WpSeatInput *in, fx dseg);

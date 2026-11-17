@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-17 by Claude session (CP0.5b part 2)_
+_Last updated: 2026-11-17 by Claude session (CP0.5a stage 4)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -133,6 +133,39 @@ header-pass bisection + its per-mate retarget and meet_choose in the buffer's et
   AI vs AI byte-identical (no seats). Cost: bench_sim (5v5 LEGACY) 10.5 us/tick unchanged; the 7v7 seat harness
   2.36 -> 2.50 s for the same 45 minutes of scripted play (+6%, one run; the play differs).
   Known: a seat man who never moves, within 4 m of a still loose ball, can freeze play (D-030 winner rule; also before).
+
+**CP0.5a stage 4 (D-051): done, goldens updated on purpose** (5v5 `0b3798dfd8207c8c`, 7v7 `df26b28a9aa471c9`).
+The AI plays aerial balls through the same contacts a human gets: new `src/sim/aerial_ai.c` chooses head shot / header
+pass / clearance header / volley / half-volley / lay-off / control (candidates x features x weights) for the receiver
+and each team's ball-winner; a contested receiver attacks it with his head, a free one controls it. The AI's header
+shots now get the human header error (D-048 law); it compensates by aiming with the law (no flicks at goal, the
+corner with the smaller turn, inside the post by the spread). Driven crosses (1.8 m) were built and measured but are
+OFF (`T_CROSS_DRIVEN 0`): the marker 0.5 m in front heads every one of them (scripted duels 0/72 vs 58/72 lofted).
+Numbers (7v7, WP_STATS=1, rules on; baseline = HEAD before stage 4; 80 x 5 min, 20 in brackets):
+
+| Metric | Baseline | Stage 4 |
+|---|---|---|
+| Goals / min | 0.47 [0.44] | 0.41 (-12%) [0.47] |
+| Cross completion | 48% [52%] | 51% [55%] |
+| Header shots per cross | 0.39 [0.38] | 0.49 [0.55] |
+| Aerial turnovers / min (new counter) | 0.37 [0.37] | 0.39 [0.37] |
+| Lob completion | 71% [71%] | 69% [73%] |
+| Header shots -> goals | 75 -> 50 (no AI error) | 101 -> 39 |
+| Scripted cross duels (`tools/playtest/duel.c`) | 70/72 | 58/72 |
+| aimatch 20x5: goals, passes | 18+26, 74/76% | 20+27, 76/78% |
+
+bench_sim 10.57 -> 10.58 us/tick. New counters in `tests/aerial_metrics.h` (aerial turnovers, header goals, first-time
+air strikes; header shots now count sub-kind 1 only - same numbers as before, no AI lofted headers existed).
+Known: AI first-time foot strikes (volleys / lay-offs) are candidates but almost never chosen (~0-3 per 400 min).
+
+### Playtest guide (CP0.5a stage 4, AI in the air)
+1. Watch AI crosses into the box: the striker waits where the cross is played and attacks it with his head when his
+   marker is close; free, he may take it down instead. Their defender reads it late and comes for it in the last 0.6 s.
+2. AI headers at goal miss sometimes now (same error as yours) - aimed at the corner that needs less of a turn.
+3. A long ball to an AI team-mate: he stands just beyond where it drops and takes it on the chest / thigh.
+4. Defending a cross with your man: the AI attacker beats a marker who stands behind him, not one in front.
+Questions: do AI aerial duels look like football? Should defenders read crosses earlier (better defending, fewer
+headed goals) or later?
 
 ### Playtest guide (CP0.5b part 2, switching)
 1. Esc > Auto switching: Events (default). Defend: a dim yellow "V" over a team-mate shows who Q gives you; it turns

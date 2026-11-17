@@ -24,11 +24,17 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
   pass_pick.c           who receives a pass (D-021): two-bearing cone + score, keyboard stage B, keeper band, lane
                         danger, stick memory, per-tick preview (pick_recv) that passes read
   lob.c                 lofted passes (D-045/D-046): D-indexed flight table (filled once at sim_init), meter range,
-                        predicted-point snap, lob solve (lead to the receiving height, pitch margins)
+                        predicted-point snap, lob solve (lead to the receiving height, pitch margins); the driven
+                        cross family (cross_solve, D-051; off by default: T_CROSS_DRIVEN)
   contact.c             aerial contact (D-047): ball prediction ring (cached, exact), per-player contact plans by
-                        band, the one "can he control it" predicate, stance touches (outcome + residual, settle)
+                        band, the one "can he control it" predicate, stance touches (outcome + residual, settle);
+                        ring queries for the AI (contact_reachable / contact_ring / stand point, D-051)
   intent.c              intent buffer per seat (D-048): early presses kept, cancelled when stale, fired first time
-                        or after control (chains); first-time strikes themselves live in contact.c
+                        or after control (chains); first-time strikes themselves live in contact.c. The AI's
+                        WpPlayer.ai_intent / ai_aim are read through the same intent_of / intent_aim (D-051)
+  aerial_ai.c           the AI's choice at a ball in the air (D-051): head shot / header pass / clearance / volley /
+                        half-volley / lay-off / control as candidates x features x weights (contest, error, threat);
+                        brain.c carries it out (movement, header_start)
   header.c              contextual headers (D-010/D-019/D-048): trigger on J/K at a high ball, legs step under it while
                         the stick aims, jump timed so the apex meets it, head-band contact, header law + pass solve
   brain.c               INSTINCT AI (D-023): candidates x feature utility -> input/kick/tackle for every non-seat player

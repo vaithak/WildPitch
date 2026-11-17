@@ -100,6 +100,9 @@ typedef struct {
 /* Aerial contact (D-047, contact.c): the body part follows the ball's height at the PLANNED contact tick. */
 enum { WP_CB_GROUND = 0, WP_CB_LOW, WP_CB_MID, WP_CB_CHEST, WP_CB_HEAD, WP_CB_JUMP, WP_CB_NONE };   /* contact bands */
 enum { WP_CK_NONE = 0, WP_CK_TRAP, WP_CK_INSTEP, WP_CK_THIGH, WP_CK_CHEST, WP_CK_HEADCTL, WP_CK_N };   /* contact kinds */
+/* a player's last ball contact (WpPlayer.last_touch_kind; the control stances keep their WP_CK_* values) */
+enum { WP_LT_NONE = 0, WP_LT_TRAP, WP_LT_INSTEP, WP_LT_THIGH, WP_LT_CHEST, WP_LT_HEADCTL, WP_LT_VOLLEY,
+       WP_LT_HALFVOLLEY, WP_LT_LAYOFF, WP_LT_HEADER, WP_LT_N };
 typedef struct {
     uint8_t  kind;               /* WP_CK_* planned (NONE = no plan) */
     uint8_t  band;               /* WP_CB_* of the ball at the contact */
@@ -134,6 +137,11 @@ typedef struct {
     fv2      ai_goal;            /* where he is going */
     WpPlan   plan;               /* aerial contact plan (D-047) */
     uint8_t  settle_ticks;       /* after an aerial control touch: he keeps it while it drops (up to T_SETTLE_Z) */
+    uint8_t  ai_intent;          /* AI aerial intent (D-051): WP_KICK_PASS / SHOT / LOB + 1 at the contact, 0 = control */
+    uint8_t  ai_air;             /* AI aerial choice (aerial_ai.c AA_* + 1), 0 = none */
+    uint8_t  last_touch_kind;    /* WP_LT_*: his last ball contact (poses, D-052) ... */
+    uint16_t last_touch_tick;    /* ... and its tick (low 16 bits) */
+    fv2      ai_aim;             /* where the AI's first-time contact sends it (a mate's spot / the goal), D-051 */
 } WpPlayer;
 
 enum { WP_ROLE_KEEPER = 0, WP_ROLE_OUTFIELD = 1 };

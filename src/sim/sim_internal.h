@@ -67,6 +67,8 @@ fx   slot_mindset(const SimState *s, int k);          /* 0 = stays back .. 1 = a
 /* brain.c (CP0.3 instinct AI, D-008): input + actions for a player no seat controls */
 void brain_input(SimState *s, int i, WpSeatInput *out);
 wp_angle kick_aim_assist(const SimState *s, int i, wp_angle dir, fv2 aim, int has_aim);
+fx   brain_shot_quality(const SimState *s, int team, fv2 at);   /* 0..1 from `at` at the goal team attacks */
+fv2  brain_shot_target(const SimState *s, int team);             /* the corner further from their keeper */
 /* header.c */
 int  header_wanted(const SimState *s, int i, int *jump);
 int  header_wanted_at(const SimState *s, int i, int *jump, fx zmin);
@@ -138,6 +140,7 @@ fx   lob_recv_time(fx D, int head);                        /* a D lob: time / di
 fx   lob_recv_dist(fx D, int head);                        /* ... T_LOB_RECV_Z (head: T_LOB_HEAD_Z) */
 int  lob_snap(const SimState *s, int i, wp_angle dir, fx h);   /* meter release: the team-mate it snaps to, or -1 */
 fv2  lob_solve(const SimState *s, int r, wp_angle dir, fx h, fx d_min, int head, fx *vz, fv2 *meet, fx *t_meet);
+fv2  cross_solve(const SimState *s, int r, fx *vz, fv2 *meet, fx *t_meet);   /* AI driven cross into the box (D-051) */
 
 /* clock.c (D-036) */
 void clock_step(SimState *s);

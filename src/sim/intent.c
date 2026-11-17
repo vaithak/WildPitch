@@ -7,7 +7,8 @@
  *      it drops to his feet, chest -> volley as it drops through 1 m).
  * Cancelled 90 ticks after the release, when the ball's predicted arrival slips by more than 42 ticks, when anyone
  * else gets the ball, on a switch, and when play stops. A buffered LOB never becomes a slide (that needs a fresh
- * press). The AI has no buffer (stage 4). */
+ * press). The AI has no buffer: its aerial choice (aerial_ai.c, D-051) writes WpPlayer.ai_intent / ai_aim, which
+ * intent_of / intent_aim / intent_clear_player read the same way, so the first-time contacts are shared. */
 #include "sim/sim_internal.h"
 
 static int seat_of_p(const SimState *s, int i) {
@@ -35,6 +36,7 @@ void intent_clear_seat(SimState *s, int seat) {
 void intent_clear_player(SimState *s, int i) {
     int seat = seat_of_p(s, i);
     if (seat >= 0 && s->intent[seat] != 0xFF) intent_clear_seat(s, seat);
+    if (seat < 0) s->players[i].ai_intent = 0;
 }
 
 void intent_press(SimState *s, int i, uint8_t kind) {
@@ -61,7 +63,18 @@ static WpSeatInput aimed(const SimState *s, int seat, const WpSeatInput *in) {
 /* the seat's stick for a strike by player i: his stick, else his buffered press's aim (no intent: as it is) */
 WpSeatInput intent_aim(const SimState *s, int i, const WpSeatInput *in) {
     int seat = seat_of_p(s, i);
-    if (seat < 0 || s->intent[seat] == 0xFF) return *in;
+    if (seat < 0) {                                       /* the AI: a stick at its aim point (D-051) */
+        const WpPlayer *p = &s->players[i];
+        if (!p->ai_intent) return *in;
+        WpSeatInput a = *in;
+        fv2 d = fv2_sub(p->ai_aim, s->ball.pos);
+        if (fx_abs(d.x) + fx_abs(d.y) <= FX(0.05)) d = fv2_from_angle(p->facing, FX_ONE);
+        d = fv2_norm(d);
+        a.move_x = (int8_t)fx_clamp(d.x * 127 / FX_ONE, -127, 127);
+        a.move_y = (int8_t)fx_clamp(d.y * 127 / FX_ONE, -127, 127);
+        return a;
+    }
+    if (s->intent[seat] == 0xFF) return *in;
     return aimed(s, seat, in);
 }
 
@@ -74,7 +87,13 @@ void intent_release(SimState *s, int i, uint8_t kind, uint16_t gauge) {
 
 int intent_of(const SimState *s, int i, uint16_t *gauge) {
     int seat = seat_of_p(s, i);
-    if (seat < 0 || s->intent[seat] == 0xFF) return -1;
+    if (seat < 0) {                                       /* the AI (D-051): its gauge is a fixed strike */
+        const WpPlayer *p = &s->players[i];
+        if (!p->ai_intent) return -1;
+        *gauge = T_AI_AIR_GAUGE;
+        return p->ai_intent - 1;
+    }
+    if (s->intent[seat] == 0xFF) return -1;
     *gauge = s->intent_gauge[seat];
     return s->intent[seat];
 }

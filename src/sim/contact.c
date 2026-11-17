@@ -36,6 +36,16 @@ static fx ctrl_limit(int k) { return k == WP_CK_HEADCTL ? ST[k].v_clean : fx_mul
 
 fx contact_reach(int kind) { return ST[kind].reach; }
 
+static int seat_of_c(const SimState *s, int i) {
+    for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == i) return k;
+    return -1;
+}
+
+void contact_mark(SimState *s, int i, uint8_t kind) {    /* his last contact, for the poses (D-052) */
+    s->players[i].last_touch_kind = kind;
+    s->players[i].last_touch_tick = (uint16_t)s->tick;
+}
+
 int contact_stance(const SimState *s, int i, const WpBall *b) {
     const WpPlayer *p = &s->players[i];
     int k = control_kind(band_of(b->z));
@@ -91,6 +101,8 @@ static fx pressure_at(const SimState *s, int team, fv2 at) {     /* 1 within NEA
     return (fx)(((f2 - best) << FX_SHIFT) / (f2 - n2));            /* falls with the squared distance */
 }
 
+fx contact_pressure(const SimState *s, int team, fv2 at) { return pressure_at(s, team, at); }
+
 static void plan_clear(WpPlayer *p) { memset(&p->plan, 0, sizeof p->plan); }
 
 static int is_seat(const SimState *s, int i) {
@@ -110,6 +122,7 @@ static void plan_one(SimState *s, int i) {
     if (p->z > 0 || (p->action != WP_ACT_NONE && p->action != WP_ACT_KICK)) { plan_clear(p); return; }
     fx vr = fx_mul(player_top_speed(s, i, 1), T_CONTACT_REACH_K);
     int already = pl->kind ? (int)(uint16_t)(now - pl->since) : 0;
+    int volley = p->ai_intent == WP_KICK_SHOT + 1 && !is_seat(s, i);   /* the AI going to volley it: its bands only */
     int best = -1, t_first = -1, bk = 0;
     fx best_sc = 0;
     for (int t = 1; t <= T_CONTACT_RING; t++) {
@@ -120,6 +133,7 @@ static void plan_one(SimState *s, int i) {
         if (fv2_len2_wide(fv2_sub(bt->pos, p->pos)) > (int64_t)reach * reach) { if (rolling) break; continue; }
         int k = control_kind(band_of(bt->z));
         if (k == WP_CK_NONE) continue;
+        if (volley && k != WP_CK_INSTEP && k != WP_CK_THIGH) { if (rolling) break; continue; }   /* (D-051) */
         fx sp = speed3(bt->vel, bt->vz);
         if (k != WP_CK_TRAP && sp > ctrl_limit(k)) { if (rolling) break; continue; }
         if (t_first < 0) t_first = t;
@@ -155,6 +169,71 @@ void contact_update(SimState *s) {
         if (who) plan_one(s, i);
         else if (p->plan.kind) plan_clear(p);
     }
+}
+
+/* the predicted ball t ticks ahead (0..T_CONTACT_RING), NULL = the ring isn't this ball's (D-051) */
+const WpBall *contact_ring(const SimState *s, int t) {
+    if (!R.valid || !same_ball(ring_at(0), &s->ball) || !same_pitch(&R.pitch, &s->pitch)) return 0;
+    return ring_at(t < 0 ? 0 : t > T_CONTACT_RING ? T_CONTACT_RING : t);
+}
+
+/* the earliest ring tick (1..tmax) at which player i can reach the predicted ball with its height in [zlo, zhi],
+ * by the planner's reach model; -1 = none (or the ring isn't this ball's: not a loose ball in the air). D-051. */
+int contact_earliest(const SimState *s, int i, fx zlo, fx zhi, int tmax, fv2 *at, fx *z) {
+    return contact_reachable(s, i, zlo, zhi, tmax, 0, at, z);
+}
+
+/* ... nearest = 1: of those reachable ticks, the one where the ball passes closest to him (ties: the earliest) -
+ * a ball played to him is met where it comes to him, not raced for */
+int contact_reachable(const SimState *s, int i, fx zlo, fx zhi, int tmax, int nearest, fv2 *at, fx *z) {
+    if (!R.valid || !same_ball(ring_at(0), &s->ball) || !same_pitch(&R.pitch, &s->pitch)) return -1;
+    const WpPlayer *p = &s->players[i];
+    fx vr = fx_mul(player_top_speed(s, i, 1), T_CONTACT_REACH_K);
+    int best = -1;
+    int64_t bd = 0;
+    if (tmax > T_CONTACT_RING) tmax = T_CONTACT_RING;
+    for (int t = 1; t <= tmax; t++) {
+        const WpBall *bt = ring_at(t);
+        if (bt->z < zlo || bt->z > zhi) {
+            if (bt->z == 0 && bt->vz == 0 && zlo > 0) break;          /* rolling now: never high again */
+            if (best >= 0 && bt->z < zlo) break;                     /* (it has dropped through the window) */
+            continue;
+        }
+        fx reach = T_CONTACT_PLAN_REACH + fx_mul(vr, fx_max(FX_INT(t) / WP_TICK_HZ - T_CONTACT_REACT, 0));
+        int64_t d2 = fv2_len2_wide(fv2_sub(bt->pos, p->pos));
+        if (d2 > (int64_t)reach * reach) continue;
+        if (best < 0 || d2 < bd) { best = t; bd = d2; *at = bt->pos; *z = bt->z; }
+        if (!nearest) break;
+    }
+    return best;
+}
+
+/* the difficulty of player i's planned control touch (the planner's: stance base + speed over v_clean), -1 = none */
+fx contact_plan_difficulty(const SimState *s, int i) {
+    const WpPlan *pl = &s->players[i].plan;
+    if (!pl->kind || !R.valid || !same_ball(ring_at(0), &s->ball)) return -FX_ONE;
+    int t = (int16_t)(uint16_t)(pl->tick - (uint16_t)s->tick);
+    if (t < 0) t = 0;
+    if (t > T_CONTACT_RING) t = T_CONTACT_RING;
+    const WpBall *bt = ring_at(t);
+    const Stance *st = &ST[pl->kind];
+    return st->base + fx_div(fx_max(speed3(bt->vel, bt->vz) - st->v_clean, 0), st->v_clean);
+}
+
+/* where player i should stand for his planned touch: T_CONTACT_STAND_BACK beyond the contact point along the ball's
+ * flight, so it drops into his chest / thigh in front of him instead of clipping his head on the way (the body
+ * deflects a ball above the chest band). No plan: his position. (The AI, D-051.) */
+fv2 contact_stand_at(const SimState *s, int i) {
+    const WpPlayer *p = &s->players[i];
+    if (!p->plan.kind) return p->pos;
+    fv2 v = s->ball.vel;
+    if (R.valid && same_ball(ring_at(0), &s->ball)) {
+        int t = (int16_t)(uint16_t)(p->plan.tick - (uint16_t)s->tick);
+        v = ring_at(t < 0 ? 0 : t > T_CONTACT_RING ? T_CONTACT_RING : t)->vel;
+    }
+    fx vl = fv2_len(v);
+    if (vl < FX(0.5)) return p->plan.at;
+    return fv2_add(p->plan.at, fv2_scale(v, fx_div(T_CONTACT_STAND_BACK, vl)));
 }
 
 int contact_waiting(const SimState *s, int i, fx dseg) {
@@ -226,6 +305,8 @@ void contact_touch(SimState *s, int i, const WpSeatInput *in, fx dseg) {
     b->spin = 0;
     int settle = (int)(fall_time(fx_max(outz, 0), b->z - T_CONTACT_READY_Z) * WP_TICK_HZ / FX_ONE) + T_SETTLE_EXTRA;
     p->settle_ticks = (uint8_t)(settle > 255 ? 255 : settle);
+    contact_mark(s, i, (uint8_t)k);                       /* (WP_LT_* = WP_CK_* for the stances) */
+    if (seat_of_c(s, i) < 0) p->ai_intent = 0;           /* the AI plays on from its brain once it has it (D-051) */
     plan_clear(p);
 }
 
@@ -254,11 +335,6 @@ static void strike_common(SimState *s, int i, uint8_t kind, wp_angle dir) {
     p->action_timer = 1;
     plan_clear(p);
     s->events |= WP_EV_KICK;
-}
-
-static int seat_of_c(const SimState *s, int i) {
-    for (int k = 0; k < WP_MAX_SEATS; k++) if (s->seat_player[k] == i) return k;
-    return -1;
 }
 
 /* the aim of a first-time strike: the ring's direction for passes, the stick (else facing) for shots */
@@ -296,9 +372,12 @@ void contact_strike(SimState *s, int i, const WpSeatInput *in, uint8_t kind, uin
         b->vz = fx_lerp(T_SHOT_VZ_MIN, T_SHOT_VZ_MAX, fx_mul(h, h)) + fx_mul(sp, fx_mul(T_VOLLEY_RISE, fx_max(z - T_VOLLEY_RISE_Z, 0)));
         strike_common(s, i, WP_KICK_SHOT, dir);
         p->kick.power = sp;
+        contact_mark(s, i, WP_LT_VOLLEY);
         return;
     }
-    int r = seat >= 0 && dir == s->pick_dir[seat] ? s->pick_recv[seat] : pass_pick(s, i, dir);
+    int r = seat >= 0 && dir == s->pick_dir[seat] ? s->pick_recv[seat]
+          : seat < 0 && p->ai_intent && p->ai_mate >= 0 && s->players[p->ai_mate].team == p->team && p->ai_mate != i
+          ? p->ai_mate : pass_pick(s, i, dir);                     /* (the AI: the mate it chose, D-051) */
     fv2 meet = b->pos;
     fx t_meet = FX(1.0), vz = 0;
     uint8_t plan = WP_PLAN_CLOSEST;
@@ -318,6 +397,7 @@ void contact_strike(SimState *s, int i, const WpSeatInput *in, uint8_t kind, uin
     b->vz = vz;
     strike_common(s, i, kind, b->vel.x || b->vel.y ? fx_atan2(b->vel.y, b->vel.x) : dir);
     p->kick.power = 0;
+    contact_mark(s, i, WP_LT_HALFVOLLEY);
     if (r >= 0) { p->kick.to = (uint8_t)(r + 1); seats_pass_handoff(s, i, r, in, meet, t_meet, plan); }
 }
 
@@ -350,6 +430,7 @@ static int layoff(SimState *s, int i, const WpSeatInput *in) {
     b->vz = 0;
     strike_common(s, i, WP_KICK_PASS, fx_atan2(u.y, u.x));
     p->kick.power = sp;
+    contact_mark(s, i, WP_LT_LAYOFF);
     p->kick.to = (uint8_t)(r + 1);
     seats_pass_handoff(s, i, r, in, P, fx_div(fv2_len(fv2_sub(P, b->pos)), sp), WP_PLAN_CLOSEST);
     return 1;
@@ -365,8 +446,9 @@ int contact_first_time(SimState *s, int i, const WpSeatInput *in) {
     if (kind == WP_KICK_SHOT && (band == WP_CB_LOW || band == WP_CB_MID)) done = 1;
     else if (kind == WP_KICK_LOB && (band == WP_CB_LOW || band == WP_CB_MID)) done = 1;
     else if (kind == WP_KICK_PASS && band == WP_CB_LOW) done = 1;
-    else if (kind == WP_KICK_PASS && band == WP_CB_MID && seat >= 0) {   /* a volley pass only if it's easy */
-        int32_t a = ang_diff(s->pick_dir[seat], p->facing);
+    else if (kind == WP_KICK_PASS && band == WP_CB_MID) {   /* a volley pass only if it's easy */
+        wp_angle pd = seat >= 0 ? s->pick_dir[seat] : fx_atan2(p->ai_aim.y - b->pos.y, p->ai_aim.x - b->pos.x);
+        int32_t a = ang_diff(pd, p->facing);
         done = speed3(fv2_sub(b->vel, p->vel), b->vz - p->vz) <= T_VOLLEYPASS_MAX_REL &&
                a <= DEG_TO_ANG(T_VOLLEYPASS_DEG) && a >= -DEG_TO_ANG(T_VOLLEYPASS_DEG);
     }

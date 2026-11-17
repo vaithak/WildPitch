@@ -201,11 +201,8 @@ void header_contact(SimState *s, int i, const WpSeatInput *in) {
     fx over = fx_div(fx_max(rs - T_HEADER_CLEAN_V, 0), T_HEADER_CLEAN_V);
     fx sig = fx_mul(FX_INT(DEG_TO_ANG(T_HEADER_ERR_DEG)), fx_mul(FX_ONE + fx_div(FX_INT(phi), FX_INT(DEG_TO_ANG(90))), FX_ONE + over));
     if (phi > DEG_TO_ANG(90) && phi < DEG_TO_ANG(T_FLICK_DEG)) sig *= 3;
-    int human = 0;
-    for (int k = 0; k < WP_MAX_SEATS; k++) human |= s->seat_player[k] == i;
-    /* the readable error (owner): on every header pass, and on a human's header at goal (the AI's shots keep their
-     * own aim model until stage 4) */
-    fx e = p->kick.foot == 1 && !human ? 0 : wp_rng_fx_signed(&s->rng, sig);
+    /* the readable error (owner): on every header, human or AI (D-051: the AI's header shots too) */
+    fx e = wp_rng_fx_signed(&s->rng, sig);
     fx sp = fv2_len(wh);
     dir = (wp_angle)(fx_atan2(wh.y, wh.x) + (e >> FX_SHIFT));
     b->vel = fv2_from_angle(dir, sp);
@@ -221,6 +218,7 @@ void header_contact(SimState *s, int i, const WpSeatInput *in) {
     p->kick.done = 1;
     if (p->action == WP_ACT_STAND_HEADER) p->kick.windup = (uint8_t)(p->action_timer + 1 > 255 ? 255 : p->action_timer + 1);
     s->events |= WP_EV_KICK | WP_EV_HEADER;
+    contact_mark(s, i, WP_LT_HEADER);
     if (to >= 0) seats_pass_handoff(s, i, to, in, P, t, WP_PLAN_RUN);
 }
 

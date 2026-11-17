@@ -696,3 +696,44 @@ with the 3x override; Q + a held direction picks the man that way (ball-relative
   and engaging"), and the team that last had the ball picks no winner for a loose ball - so a human who never moves
   can freeze play beside a still ball (pre-D-050 too; the 1.2x bonus is gated on engaging). The harness's released
   script walks onto such a ball.
+
+## D-051 — AI aerial play through the planner: utility choice, contest, the header law for everyone (2026-11-17, CP0.5a stage 4)
+Report row 4 ("AI intents through the planner, driven crosses, AI stance choice"). New `src/sim/aerial_ai.c`.
+- **Same contacts as a human:** non-seat players carry `WpPlayer.ai_intent` (WP_KICK_* + 1, 0 = control) and
+  `ai_aim`; `intent_of` / `intent_aim` / `intent_clear_player` read them like a seat's buffered press, so the AI's
+  volleys / half-volley passes / lay-offs go through `contact_first_time` / `contact_strike` and its headers through
+  `header_start` / `header_contact` (sub-kind from the intent). With a SHOT intent the AI's planner looks only at the
+  volley bands (LOW / MID). After any aerial touch the AI plays on from its brain (intent cleared). Hashed (with
+  `ai_air`, the choice, and D-052's last-touch fields).
+- **Choice (D-008):** for the pass's receiver and each team's ball-winner (a bystander only heads a ball that comes
+  to him on his decision beat, as before): candidates CONTROL (the plan), HEAD_SHOT, HEAD_PASS per mate 3-14 m,
+  HEAD_CLEAR (our half), VOLLEY (earliest reachable LOW/MID contact), HALF-VOLLEY / LAY-OFF (plan band LOW / CHEST)
+  x features THREAT, OPEN, FWD, DIST, CONTEST, PRESS, DIFF, DANGER, ERR, BIAS; weights in `aerial_ai.c` like brain.c's;
+  ties in fixed order; commit +1, a header once chosen on our own ball is latched (+50).
+- **Contest** = an opponent's earliest contact with the ball (ring, planner reach model, any playable height) before
+  ours, graded over 4 ticks after / 12 before. A contested foot or control contact is headed away before it happens
+  (weight -10), so a contested receiver attacks it with his head; a free one controls / volleys. (Stage 2's 59%: the
+  receiver walked to his control point and the marker headed it.)
+- **Error is the law:** the AI's header shots now get the D-048 header error like a human's (removed the AI
+  exemption). ERR feature = the spread that law (or the volley law) gives at the goal / half the goal; a turn
+  >= 135 deg (a flick) can't be aimed at goal (no candidate); the corner with the smaller turn if it cuts ERR by 0.3;
+  the aim is pulled inside the post by the spread. No dice beyond the existing draws.
+- **Movement:** attack point = for our ball the reachable ring point in the head band (1.6-2.35 m) nearest to him,
+  for theirs the earliest; our ball to him waits where it was played to (pass_meet) and heads it once it is within 3 m
+  (the header then steps him under its path and times the jump; jump from the ring's height); their ball: a defender
+  commits only 36 ticks before his contact (`T_AIR_DEF_READ`: he reads the flight late), starts the header at the
+  point (0.3 m) or 8 ticks before. Control / volley: `contact_stand_at` = 0.5 m beyond the planned point along the
+  flight (standing on the point let the ball clip his head on the way down: 37 of 40 receptions deflected). Aerial AI
+  touches cushion the way he faces (the AI's stick is its run).
+- **Driven crosses (report: z 1.8 m): built, measured, OFF** (`T_CROSS_DRIVEN 0`; `cross_solve`, own table, vz =
+  6 + 0.06 d, a first-man lane check). Scripted marked duels (`tools/playtest/duel.c`, 72 marker spots): lofted 2.3 m
+  58/72 to the attackers, driven 0/72 - a ball that stays at head height for its whole descent is met by the marker
+  0.5 m in front. 80 matches: driven 0.43 goals/min, crosses 47%, header shots/cross 0.43 vs lofted 0.41 / 51% / 0.49.
+  The stage-1 2.3 m column stays (D-046) until a cross that clears the near man exists.
+- **Measured** (7v7, WP_STATS=1, rules on; 80 x 5 min `aerial`, baseline = HEAD before stage 4): goals 0.47 -> 0.41/min
+  (-12%, inside +-15%), crosses completed 48% -> 51%, header shots per cross 0.39 -> 0.49, aerial turnovers 0.37 ->
+  0.39/min, lobs 71% -> 69%, header goals 50 of 75 shots -> 39 of 101, header passes completed 40% -> 41%, AI
+  first-time foot strikes ~0 (candidates exist, rarely the best). aimatch 20x5: goals 18+26 -> 20+27, passes 74/76% ->
+  76/78%. Duels: 70/72 -> 58/72. bench_sim 10.57 -> 10.58 us/tick. Defender read window (80 matches, one code state before
+  the last aim fixes): 24 / 36 / 48 ticks -> crosses 47 / 47 / 45%, duels lost in matches 16 / 21 / 38, goals 0.41 /
+  0.40 / 0.41; 36 kept (shorter mostly switches the defender off - an owner call on how good defenders should be).
