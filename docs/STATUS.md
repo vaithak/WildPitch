@@ -56,6 +56,12 @@ Meter landing error <= 0.37 m on 40 / 60 / 80 m pitches; lobs to moving mates co
 42/42, the mate within 2 m of P 38/42 (sprinters still accelerating miss by 2-4 m). bench_sim 15.6 us/tick.
 **Next: stage 2** (prediction ring + contact planner, CONTROL intent only) - after the owner's playtest.
 
+**Stage 2/3 baselines (at `570b31c`, before the contact planner):** `aerial 20 5 1` (WP_STATS=1): goals 0.44/min,
+lobs 70% (79/113), crosses 47% (27/57), headers 0.43/min (19 shots, 24 passes 38%), new counter "lob receptions"
+(<= 30 m, first contact a gain/body hit by the kicker's team, controlled) 51/52; 80 matches: goals 0.49/min, lobs 70%
+(315/447), crosses 49%, headers 0.43/min (82 shots, 91 passes 32%), receptions 218/219. `aimatch 20 5 1`: goals 16+28,
+passes 75%/77%, tackles 135/148, outs 0.8/min. bench_sim 15.6 us/tick (median of 5).
+
 ### Playtest guide (CP0.5a stage 1, lofted passes)
 1. Hold A (lob) longer and longer into space: the ball lands where the violet meter says - and floats (high, ~2-3 s
    for long switches) instead of being driven. Full meter = 45 m on the 7v7 pitch.

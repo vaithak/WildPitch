@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     }
     double mins = (double)a.ticks / 3600.0;
     printf("AI vs AI aerial: %d matches x %d min (%s)\n", matches, minutes, seven ? "7v7" : "5v5 40 m");
-    printf("  goals %ld (%.2f/min), shots %ld (%.2f/min)\n", goals, goals / mins, shots, shots / mins);
+    printf("  goals %ld (%.2f/min), shots %ld (%.2f/min)\n", goals, (double)goals / mins, shots, (double)shots / mins);
     aerial_print(&a);
     return 0;
 }
