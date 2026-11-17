@@ -61,6 +61,13 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   keymap.h/.c           rebindable controls (D-024): defaults, text save/load in the pref dir, swap-on-rebind
   menu.h/.c             Esc pause menu + Controls screen (rebind); paused + redraw-on-input only
   dedication.h/.c       the owner's dedication card on launch (D-018; wording is fixed)
+  settings.h/.c         settings.cfg (one struct, key = value, old files load) + the settings rows menus show
+  kits.h/.c             team kits (shirt / shorts / socks / keeper) for the quick-match setup
+  synth.h/.c            every sound synthesised at startup (D-055): kicks, bounce, post, net, whistles, crowd
+  mixer.h/.c            software mixer (voices, buses, crowd loops, glides, limiter); no device needed
+  audio.h/.c            SDL audio stream + callback around the mixer; silent no-op without a device
+  audio_check.c         --check-audio: sounds + mixer checks (ctest `audio`)
+  sfx.h/.c              sim state + WP_EV_* (per tick, live and replay) -> sounds; crowd danger per frame
   ball_draw.h/.c        the ball: visual orientation rolled from drawn motion, 12 panels, speed blur/streak, shadow
   avatar.h/.c           procedural skeleton footballers (D-009): looks, styles, pose solver, soft-capsule drawing
   avatar_internal.h     skeleton internals (joints, Pose, solve) shared by avatar.c and avatar_stance.c
@@ -145,4 +152,4 @@ contact on tick `windup` (owner's ball gathered to the foot during wind-up) → 
 
 ## Planned modules (not yet written)
 `sim/ball.c` (physics split out), `sim/ai_instinct.c` (utility AI), `sim/rules.c` (out of play, fouls, clock),
-`game/input.c` (gamepad + remap), `game/hud.c`, `game/audio.c`, `learn/` (Phase 1 brains + trainer, own thread).
+`learn/` (Phase 1 brains + trainer, own thread).

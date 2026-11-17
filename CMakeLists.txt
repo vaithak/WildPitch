@@ -71,6 +71,8 @@ if(WP_BUILD_TESTS)
     add_test(NAME keymap COMMAND wildpitch --check-keymap)
     add_test(NAME gamepad COMMAND wildpitch --check-gamepad)    # pure pad -> seat input mapping (no pad needed)
     add_test(NAME replay COMMAND wildpitch --check-replay)      # instant replay re-steps to the same hashes
+    add_test(NAME audio COMMAND wildpitch --check-audio)        # synthesised sounds + mixer, no device (D-055)
+    add_test(NAME settings COMMAND wildpitch --check-settings)  # settings.cfg round trip, old files, menu rows
   endif()
   add_executable(bench_sim ${CMAKE_SOURCE_DIR}/tests/bench_sim.c)
   target_link_libraries(bench_sim PRIVATE wp_sim)

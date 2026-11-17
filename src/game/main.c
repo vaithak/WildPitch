@@ -14,6 +14,9 @@
  *   --check-keymap         keymap defaults / save-load round trip / rebind swap (no window)
  *   --check-gamepad        pure pad -> WpSeatInput mapping checks (no window, no pad needed)
  *   --check-replay         instant replay reproduces the live sim hash tick for tick (no window)
+ *   --check-audio          every synthesised sound + the mixer (worst case, pan, mute) (no window, no device)
+ *   --check-settings       settings.cfg defaults / round trip / old files / menu rows (no window)
+ *   --audio                harness modes are silent by default; this opens the audio device anyway
  *   --replay-shot          with --screenshot: start an instant replay halfway to the captured frame
  *   --screenshot F.bmp     save frame number --frames N (default 60) to F.bmp and exit
  */
@@ -33,6 +36,9 @@
 #include "game/gamepad.h"
 #include "game/replay.h"
 #include "game/pose_check.h"
+#include "game/settings.h"
+#include "game/audio.h"
+#include "game/sfx.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen (40 m pitch) */
 /* bigger pitches show a bit more (7v7 55 m: x1.19) so the wide view still reads the game */
@@ -58,7 +64,15 @@ typedef struct {
     WpReplayLog   rlog;            /* inputs + snapshots of the last ~12 s (instant replay) */
     WpReplay      rp;              /* the replay's own sim copy; the live g.cur is paused, never touched */
     bool          replay_ok;       /* not in harnesses that write the sim outside sim_step */
+    WpSettings    set;             /* settings.cfg (menus edit it in place) */
+    WpAudio       audio;           /* the device + mixer (no-op without a device, D-055) */
+    WpSfx         sfx;             /* sim events -> sounds */
 } Game;
+
+/* the sounds follow the camera: pan by the ball's x against the view's centre and half width */
+static void sfx_tick(Game *g, const SimState *prev, const SimState *cur, bool replay) {
+    wp_sfx_tick(&g->sfx, &g->audio, prev, cur, replay, g->cam.cx, 0.5f * zoom_view(g->zoom, cur));
+}
 
 static void replay_begin(Game *g) {
     if (g->replay_ok && wp_replay_start(&g->rp, &g->rlog)) wp_render_reset_anim(&g->rctx);
@@ -309,7 +323,7 @@ static void apply_vsync(Game *g) {
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, replay_shot = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false;
+    bool gallery = false, demo = false, replay_shot = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false, force_audio = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
@@ -327,6 +341,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--check-keymap")) return check_keymap();
         else if (!strcmp(argv[i], "--check-gamepad")) return wp_gamepad_check();
         else if (!strcmp(argv[i], "--check-replay")) return wp_replay_check();
+        else if (!strcmp(argv[i], "--check-audio")) return wp_check_audio();
+        else if (!strcmp(argv[i], "--check-settings")) return wp_check_settings();
+        else if (!strcmp(argv[i], "--audio")) force_audio = true;
         else if (!strcmp(argv[i], "--replay-shot")) replay_shot = true;
         else if (!strcmp(argv[i], "--menu")) menu_shot = true;
         else if (!strcmp(argv[i], "--5v5")) five = true;             /* the old 5-a-side format (40 x 25 m) */      /* with --screenshot: capture the Controls screen */
@@ -345,7 +362,10 @@ int main(int argc, char **argv) {
     apply_vsync(&g);
     wp_gamepad_init(&g.pad);
     wp_keymap_defaults(&g.km);
-    if (!(shot_path || autoplay || demo || gallery)) wp_keymap_load(&g.km);   /* the player's saved controls */
+    bool harness = shot_path || autoplay || demo || gallery;
+    if (!harness) wp_keymap_load(&g.km);                  /* the player's saved controls */
+    if (harness) wp_settings_defaults(&g.set); else wp_settings_load(&g.set);
+    g.menu.set = &g.set;
     if (board_sheet && shot_path) {                      /* visual check of the advertising-board faces (D-033) */
         int w, h;
         WpStadium st = {0};
@@ -373,12 +393,13 @@ int main(int argc, char **argv) {
 
     /* the match format: 7-a-side by default (owner, CP0.3a); harness modes keep the 5v5 their scripts were made for */
     WpMatchConfig cfg = (autoplay || demo || gallery) ? sim_default_config() : five ? sim_config_5v5() : sim_config_7v7();
-    g.menu.difficulty = (shot_path || autoplay || demo || gallery) ? WP_AI_NORMAL : wp_settings_load_difficulty();
-    cfg.ai_level[1] = (uint8_t)g.menu.difficulty;          /* the opposition; our AI team-mates stay NORMAL */
-    g.menu.assist = (shot_path || autoplay || demo || gallery) ? WP_ASSIST_NORMAL : wp_settings_load_assist();
-    if (!(autoplay || demo || gallery)) cfg.assist_level = (uint8_t)g.menu.assist;   /* D-037 (harnesses: as configured) */
-    g.menu.switching = (shot_path || autoplay || demo || gallery) ? WP_SWITCH_EVENTS : wp_settings_load_switching();
-    if (!(autoplay || demo || gallery)) cfg.switch_mode = (uint8_t)g.menu.switching;   /* D-050 */
+    cfg.ai_level[1] = (uint8_t)g.set.difficulty;            /* the opposition; our AI team-mates stay NORMAL */
+    if (!(autoplay || demo || gallery)) cfg.assist_level = (uint8_t)g.set.assist;   /* D-037 (harnesses: as configured) */
+    if (!(autoplay || demo || gallery)) cfg.switch_mode = (uint8_t)g.set.switching;   /* D-050 */
+    /* sound (D-055): harness and capture modes stay silent unless --audio; no device = a silent no-op */
+    if (!harness || force_audio) wp_audio_open(&g.audio);
+    wp_audio_apply(&g.audio, &g.set, false);
+    wp_sfx_reset(&g.sfx);
     sim_init(&g.cur, &cfg);
     if (!(autoplay || demo || gallery)) sim_kickoff_setpiece(&g.cur);   /* a real kick-off (D-032) */
     g.demo = demo;
@@ -401,9 +422,14 @@ int main(int argc, char **argv) {
     long total_frames = 0;
     Uint64 start_ns = SDL_GetTicksNS();
     bool running = true, menu_dirty = true;
+    bool was_paused = false;
     if (menu_shot) { wp_menu_open(&g.menu); if (!getenv("WP_MENU_MAIN")) { g.menu.screen = WP_MENU_CONTROLS; g.menu.sel = WP_KEY_PASS; } else g.menu.sel = 1; }
     while (running) {
         SDL_Event e;
+        if ((g.menu.screen != WP_MENU_CLOSED) != was_paused) {   /* the crowd drops back while paused */
+            was_paused = g.menu.screen != WP_MENU_CLOSED;
+            wp_audio_apply(&g.audio, &g.set, was_paused);
+        }
         if (g.menu.screen != WP_MENU_CLOSED) {
             /* paused: draw the menu, then sleep until the next event (no busy loop, nothing redrawn meanwhile) */
             if (menu_dirty) {                             /* redraw only when something relevant happened */
@@ -438,10 +464,15 @@ int main(int argc, char **argv) {
                 }
                 WpMenuResult res = wp_menu_event(&g.menu, &e, &g.km);
                 if (res == WP_MENU_QUIT) running = false;
+                if (res == WP_MENU_CHANGED) {                 /* volumes apply at once (with a sample to hear them) */
+                    wp_audio_apply(&g.audio, &g.set, true);
+                    wp_audio_play(&g.audio, WP_SND_KICK_SHOT, 0.8f, 0, 1, 0);
+                }
                 if (res == WP_MENU_RESTART) {                 /* new match, same format, chosen difficulty */
-                    cfg.ai_level[1] = (uint8_t)g.menu.difficulty;
-                    cfg.assist_level = (uint8_t)g.menu.assist;
-                    cfg.switch_mode = (uint8_t)g.menu.switching;
+                    cfg.ai_level[1] = (uint8_t)g.set.difficulty;
+                    cfg.assist_level = (uint8_t)g.set.assist;
+                    cfg.switch_mode = (uint8_t)g.set.switching;
+                    wp_sfx_reset(&g.sfx);
                     sim_init(&g.cur, &cfg);
                     sim_kickoff_setpiece(&g.cur);
                     g.prev = g.cur;
@@ -472,6 +503,11 @@ int main(int argc, char **argv) {
                 if (sc == g.km.key[WP_KEY_LOOK]) g.rctx.style = (g.rctx.style + 1) % WP_AVATAR_STYLE_COUNT;
                 if (sc == g.km.key[WP_KEY_ZOOM]) g.zoom = (g.zoom + 1) % 3;
                 if (sc == g.km.key[WP_KEY_REPLAY]) replay_begin(&g);
+                if (sc == SDL_SCANCODE_M) {               /* mute (fixed key, like F3) */
+                    g.set.muted = !g.set.muted;
+                    if (!harness) wp_settings_save(&g.set);
+                    wp_audio_apply(&g.audio, &g.set, false);
+                }
             }
             if (btn) {
                 WpPadUi ui = wp_pad_ui_action(e.gbutton.button);
@@ -503,6 +539,7 @@ int main(int argc, char **argv) {
                 if (g.rp.slow && (++g.rp.sub & 1)) continue;   /* half speed */
                 if (!wp_replay_step(&g.rp, &g.rlog)) { replay_end(&g); break; }
                 frame_ev |= g.rp.cur.events;
+                sfx_tick(&g, &g.rp.prev, &g.rp.cur, true);
                 if (g.rp.cur.events & WP_EV_RESET) { g.rp.prev = g.rp.cur; wp_render_reset_anim(&g.rctx); }
             }
             while (acc >= tick_ns && !g.rp.active) {
@@ -518,6 +555,7 @@ int main(int argc, char **argv) {
                 g.prev = g.cur;
                 sim_step(&g.cur, &in);
                 frame_ev |= g.cur.events;
+                sfx_tick(&g, &g.prev, &g.cur, false);
                 if (autoplay && (g.cur.events & (WP_EV_KICK | WP_EV_GOAL | WP_EV_POST)))
                     fprintf(stderr, "tick %u events %04x\n", g.cur.tick, g.cur.events);
                 if (g.cur.events & WP_EV_RESET) {     /* teleport: don't interpolate or animate across it */
@@ -528,6 +566,7 @@ int main(int argc, char **argv) {
                 g.sim_ms_avg = g.sim_ms_avg * 0.98 + ms * 0.02;
                 acc -= tick_ns;
             }
+            if (!g.rp.active) wp_sfx_frame(&g.sfx, &g.audio, &g.cur, dts);
             float alpha = (float)acc / (float)tick_ns;
             if (g.rp.active && g.rp.slow) alpha = ((float)(g.rp.sub & 1) * (float)tick_ns + (float)acc) / (2.0f * (float)tick_ns);
             const SimState *vp = g.rp.active ? &g.rp.prev : &g.prev, *vc = g.rp.active ? &g.rp.cur : &g.cur;   /* what we show */
@@ -594,7 +633,7 @@ int main(int argc, char **argv) {
             } else {   /* hints show the player's actual keys */
                 const WpKeymap *k = &g.km;
                 snprintf(buf, sizeof buf, "%s/%s/%s/%s move  %s sprint  %s pass (hold: through; tackle)  %s lob/slide  "
-                         "%s shoot  %s chip  %s switch  %s zoom  %s look  %s replay  Esc menu",
+                         "%s shoot  %s chip  %s switch  %s zoom  %s look  %s replay  M mute  Esc menu",
                          wp_keymap_key_name(k, WP_KEY_UP), wp_keymap_key_name(k, WP_KEY_LEFT), wp_keymap_key_name(k, WP_KEY_DOWN),
                          wp_keymap_key_name(k, WP_KEY_RIGHT), wp_keymap_key_name(k, WP_KEY_SPRINT), wp_keymap_key_name(k, WP_KEY_PASS),
                          wp_keymap_key_name(k, WP_KEY_LOB), wp_keymap_key_name(k, WP_KEY_SHOOT), wp_keymap_key_name(k, WP_KEY_CHIP),
@@ -685,6 +724,7 @@ int main(int argc, char **argv) {
             printf("avg %.1f fps over %.1f s (display %.0f Hz, vsync %s)\n", (double)total_frames / secs, secs,
                    m ? (double)m->refresh_rate : 0.0, vsync ? "on" : "off");
     }
+    wp_audio_close(&g.audio);
     wp_gamepad_close(&g.pad);
     SDL_Quit();
     return 0;

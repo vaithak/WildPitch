@@ -799,3 +799,33 @@ the ball whatever way he moves: he backpedals and shuffles. 0.03% after (a turn 
 in the same sample (noise). Presentation: the run cycle plays backwards when a player moves against his facing
 (`wp_avatar_anim_update`), so the backpedal doesn't moonwalk. Test: `tests/test_keeper_face.c` (< 1%). Goldens
 updated on purpose (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
+
+## D-055 — Sound is synthesised, driven by sim events per tick (2026-11-17, CP0.6)
+ROADMAP CP0.5 "Juice and cool" asked for audio; no third-party dependency and no sound files allowed. So every sound
+is **synthesised once at startup** (`src/game/synth.c`, pure C, ~20 s of 48 kHz mono float in one static pool, a few
+ms): pitch-swept sine thumps + filtered noise clicks (kicks, header, bounce), inharmonic decaying partials (post), an
+FM-trilled tone + breath (pea whistle), band-limited noise with slow random modulation (crowd bed / excited loop,
+seamless by cross-faded ends; roar and "ooh" with sliding formants). Each sound is DC-blocked, peak-normalised to
+a per-sound level and faded at the ends.
+- **Mixer** (`mixer.c`, no device): 24 one-shot voices (gain, constant-power pan, playback rate for small pitch
+  variation, start delay for whistle sequences; oldest stolen) on two buses (effects, crowd) + the two crowd loops
+  (the right ear reads half a loop later = wide stereo). Bus and loop gains glide per sample (no zipper clicks); a
+  peak limiter keeps the sum within 0.95.
+- **Device** (`audio.c`): SDL3 audio stream with a callback that pulls from the mixer (512-frame buffers); the game
+  thread changes the mixer only under `SDL_LockAudioStream`. No device / no driver = every call is a no-op.
+  Harness and capture modes (--screenshot, --autoplay, --demo, --gallery) stay silent unless `--audio`.
+- **What sounds when** (`sfx.c`): read after **every sim step** (live and replay), not per frame (two ticks per frame
+  at 30 fps must both sound). Kick sound by the kicker's `WpKick.kind` (pass/through/volley, shot/punt, chip/lob;
+  throws and rolls silent), gain by the ball's speed. Bounce gain by the incoming vz. Rate limits for dribble touches,
+  bounces, net, body hits. Whistles: WP_EV_FOUL / OFFSIDE short; WP_EV_WHISTLE long at half time, short-short-long
+  at full time; a kick-off / penalty whistle when the set piece becomes takeable (phase PLAY + that restart; no
+  event bit exists for it); goal: roar + whistle 0.45 s later. Groan on a post or when a goalward strike (heading at
+  the goal it nears, projected within 4 m of the posts) goes out over the goal line. Crowd: bed + excited loop
+  follow a smoothed "danger" (ball near a goal line, central > wide); a goal holds it up ~4 s. Replays play the
+  ball sounds but no whistles / crowd reactions. Pan = ball x against the camera, x0.75.
+- **Volumes:** settings.cfg `volume_master / volume_effects / volume_crowd` (0-10; master squared for a
+  loudness-like slider), `muted` (M in game). Pause menu: crowd x0.25 (effects stay so volume changes are heard with
+  a sample kick).
+- Checks: `--check-audio` (ctest `audio`): every sound non-silent, <= full scale, sane length, |DC| < 0.01, ends at
+  zero / seamless loop; worst-case mix <= 0.95; pan; mute; voice stealing. End-to-end via SDL's disk driver.
+- Settings moved to `settings.c` (one struct, line-based key = value; old three-key files still load).

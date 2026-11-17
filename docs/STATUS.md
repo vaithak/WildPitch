@@ -1,8 +1,40 @@
 # Status
 
-_Last updated: 2026-11-17 by Claude session (CP0.5a stage 5)_
+_Last updated: 2026-11-17 by Claude session (CP0.6 part 1, audio)_
 
 ## Current checkpoint
+**CP0.5a (aerial play, stages 0-5, D-046..D-052) + CP0.5b (chase assist D-049, switching D-050) + D-053 (a human's
+corner) + D-054 (keepers face the ball): ✅ done, all committed, awaiting the owner's playtest** (he asked to test
+them together with the next checkpoint). Their playtest guides are below (stage 5 down to CP0.5b part 1, D-053/D-054
+in DECISIONS).
+
+**CP0.6 "Juice and cool" (ROADMAP's CP0.5, renamed): in progress.** Presentation only - goldens unchanged all
+checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
+- **Part 1 - audio (D-055): done.** Every sound synthesised at startup (no files, no new dependency): kicks graded by
+  kind and power, header thud, bounce, post ping, net swish, whistles (short: fouls / offside / kick-offs / goals;
+  long: half time; three blasts: full time), slide / tackle scuff, crowd murmur that swells near a goal, roar on a
+  goal, "ooh" on a post or a goalward miss. Stereo pan by the ball's x against the camera. Esc menu: Master / Effects
+  / Crowd volume (0-10, saved in settings.cfg); **M** mutes (saved). New `settings.c` (one struct, key = value file;
+  old files still load). Verified: `--check-audio` (ctest `audio`), `--check-settings` (ctest `settings`), and an
+  end-to-end `--autoplay --audio` run through SDL's *disk* driver (crowd bed ~0.013-0.02 RMS, kicks / whistles as
+  spikes on the kick ticks, peak 0.34); no-device paths (`SDL_AUDIO_DRIVER=bogus` / `dummy`) run silently. SDL here
+  has ALSA + PulseAudio (no rebuild was needed). **Not verified by ear** (the agent has no speakers): timbre and the
+  balance between sounds are guesses - owner, please judge.
+- Part 2 visual juice, part 3 battery mode + PERF.md, part 4 title screen + quick match: next.
+
+### Playtest guide (CP0.6 part 1, audio) - listen for
+1. Launch normally: a short whistle at kick-off, a soft crowd murmur under everything.
+2. Pass (tap S) vs shoot (hold D) vs lob (A): three different boot sounds; harder shots are louder and sharper.
+   Dribble touches are quiet taps. Headers are a dull thud.
+3. Shoot at the post / bar: a metallic ping and the crowd's "ooh". A shot just wide: "ooh". A goal: net swish, a roar,
+   then the whistle; the crowd stays up for a few seconds.
+4. Take the ball near the box: the crowd gets louder and brighter; back in midfield it settles.
+5. Commit a foul / get caught offside: one short whistle. Half time: one long blast; full time: short-short-long.
+6. Ball on the left / right of the screen: the sound comes from that side.
+7. Esc: the crowd drops back; change the volumes (a kick plays so you hear the level); M mutes / unmutes in game.
+8. Tell me: too loud / quiet? whistle too shrill? crowd too hissy? any sound that's annoying after 10 minutes?
+
+### History (CP0.4 - CP0.5b, kept for reference)
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
 / penalties, offside (line + banner), gamepad, replay, slide tackle (A), restart transitions, kick-off hold, passes
 that stay in, lofted-pass meter (hold A).
@@ -394,15 +426,14 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Log the owner's CP0.3b playtest feedback; tune (keeper: T_DIVE_*, T_KEEPER_*; difficulty tables).
-2. CP0.3c player stats (advisor list): stats survive kickoff memsets; one top-speed helper used everywhere speed is
-   assumed (move, dribble predictor, team_steer_speed, meet_choose 6.5 m/s, pass/through solvers, receive clamp);
-   AI-match tests use mirrored/neutral stats; stamina shown on the HUD, mild drain; regression config neutral.
-3. Then CP0.4 "A real match" (rules, restarts, halves) per ROADMAP.
+1. Finish CP0.6 (parts 2-4 in the "Current checkpoint" block), then stop for the owner's playtest of CP0.5a/b +
+   D-053/D-054 + CP0.6 together. Log feedback in PLAYTEST_FEEDBACK.md.
+2. Open from earlier: AI attack with offside, the AI never slides, a seat receiver at a contested corner header.
 
 ## Known issues / environment notes
-- **No audio backend:** owner to run `sudo apt install libasound2-dev libpulse-dev libudev-dev`, then
-  `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build` (needed by CP0.4/CP0.5).
+- Audio: SDL is built with ALSA + PulseAudio (dev packages installed). If a fresh machine has no sound, install
+  `libasound2-dev libpulse-dev`, then `rm -rf build && cmake -S . -B build -G Ninja && cmake --build build`;
+  the game prints `audio: driver ...` (or `audio: off (...)`) at launch.
 - No fouls/offside/free kicks/halves yet (CP0.4).
 - Headers: height bands exist; the trigger is CP0.2.
 - No gamepad mapping yet (CP0.4). Keeper doesn't dive (CP0.3).
