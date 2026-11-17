@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-17 by Claude session #1 (CP0.5a stage 3)_
+_Last updated: 2026-11-17 by Claude session (CP0.5b part 0)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -92,6 +92,15 @@ volley from 12 m 20/20 on target (no keeper); header passes to a jogging mate 6-
 bench_sim 18.7 us/tick (stage 2 16.8; stage 1 15.6: +20% over the two stages - profile before RL; first suspects the
 header-pass bisection + its per-mate retarget and meet_choose in the buffer's eta check). Chest band now 1.0-1.6 m
 (a ball at 1.5-1.6 m with a button pressed was neither headed nor controlled).
+
+**CP0.5b (owner requests after stage 3: chase assist everywhere near the ball + switching redesign) - in progress.**
+- **Part 0 (perf), done, goldens unchanged:** callgrind showed 63% of all instructions in `fv2_len` (isqrt), ~half of
+  the tick in `meet_choose` (team plan x 10 players every 3 ticks, brain, intents, seats - every call re-integrated
+  the same ball path). `meet_choose` now predicts the ball's 80-step path once per ball state (static cache keyed
+  on pos/vel/z/vz, like contact.c's ring) and skips the square root wherever an exact squared bound decides the
+  step. Bit-identical results. bench_sim 18.7 -> 10.6 us/tick (1578x real time).
+  AI-vs-AI reference before CP0.5b (`WP_STATS=1 WP_RULES=3`, 20 x 5 min 7v7): aimatch goals 18+26, passes 74/76%;
+  aerial goals 0.44/min, lobs 71% (76/107), crosses 52% (27/52), headers 0.40/min.
 
 ### Playtest guide (CP0.5a stage 3, first-time play)
 1. Header pass: as a cross comes in, press S (pass) early with the stick at a team-mate - he heads it down to him

@@ -55,14 +55,20 @@ static int nearest_to_ball(const SimState *s, int team, int skip, fx *out_d) {
  * rolling decel on the grass, bounces ignored). Candidates: points at head height or below that he can run to in
  * time (~6.5 m/s + 0.15 s to react). No preference -> the candidate CLOSEST to him (step across, let it come).
  * With a stick preference (unit vector) -> min cost t/2 + 0.3*(1 - cos(stick, direction to candidate)) (GRF's
- * 0.6*angle/pi weighting). Not found -> the last predicted point. */
-Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
-    const WpBall *b = &s->ball;
+ * 0.6*angle/pi weighting). Not found -> the last predicted point.
+ * The ball's path depends on the ball only, so it is predicted once and kept in a static cache keyed on the
+ * complete input (pos, vel, z, vz; derived data, like contact.c's ring): every caller in a tick (team plan, brain,
+ * seats, intents) shares it. The per-player pass skips the square root wherever an exact squared bound already
+ * decides the outcome, so results are bit-identical to the plain loop (CP0.5b perf). */
+#define MC_STEPS 80
+static struct { fv2 pos, vel; fx z, vz; int valid; fv2 at[MC_STEPS]; uint8_t high[MC_STEPS]; } MC;
+
+static void mc_path(const WpBall *b) {
+    if (MC.valid && MC.pos.x == b->pos.x && MC.pos.y == b->pos.y && MC.vel.x == b->vel.x && MC.vel.y == b->vel.y &&
+        MC.z == b->z && MC.vz == b->vz) return;
     fv2 pos = b->pos, v = b->vel;
-    fx z = b->z, vz = b->vz, dt = FX(0.05), best_cost = 0;
-    fx reach_v = fx_mul(player_top_speed(s, (int)(p - s->players), 1), FX(0.8125));   /* 6.5 m/s for an 8 m/s sprinter */
-    Meet m = {b->pos, 0, 0};
-    for (int k = 1; k <= 80; k++) {
+    fx z = b->z, vz = b->vz, dt = FX(0.05);
+    for (int k = 0; k < MC_STEPS; k++) {
         fx hs = fv2_len(v);
         if (z > 0 || vz > 0) {
             fx kd = fx_min(fx_mul(fx_mul(T_AIR_DRAG, fv2_len(fv2_make(hs, vz))), dt), FX_ONE);
@@ -75,9 +81,31 @@ Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
             v = hs <= dec ? fv2_make(0, 0) : fv2_scale(v, fx_div(hs - dec, hs));
         }
         pos = fv2_add(pos, fv2_scale(v, dt));
-        if (z > FX(1.9)) continue;
+        MC.at[k] = pos;
+        MC.high[k] = z > FX(1.9);
+    }
+    MC.pos = b->pos; MC.vel = b->vel; MC.z = b->z; MC.vz = b->vz; MC.valid = 1;
+}
+
+Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
+    const WpBall *b = &s->ball;
+    fx dt = FX(0.05), best_cost = 0;
+    fx reach_v = fx_mul(player_top_speed(s, (int)(p - s->players), 1), FX(0.8125));   /* 6.5 m/s for an 8 m/s sprinter */
+    Meet m = {b->pos, 0, 0};
+    mc_path(b);
+    for (int k = 1; k <= MC_STEPS; k++) {
+        if (MC.high[k - 1]) continue;
+        fv2 pos = MC.at[k - 1];
         fv2 to = fv2_sub(pos, p->pos);
-        fx d = fv2_len(to), t = dt * k;
+        fx t = dt * k;
+        /* unreachable for sure: d > (t - 0.15) reach_v + 1 cm  =>  d / reach_v + 0.15 > t (fx_div truncates by
+         * < 1 ulp, the centimetre covers it); for t < 0.15 nothing is reachable */
+        if (t - FX(0.15) < 0) continue;
+        int64_t l2 = fv2_len2_wide(to), rb = (int64_t)fx_mul(t - FX(0.15), reach_v) + FX(0.01);
+        if (l2 > rb * rb) continue;
+        /* no preference: cost = d; it can't beat the best unless floor(sqrt(l2)) < best_cost */
+        if (!has_pref && m.found && l2 >= (int64_t)best_cost * best_cost) continue;
+        fx d = fv2_len(to);
         if (fx_div(d, reach_v) + FX(0.15) > t) continue;
         fx cost = d;
         if (has_pref) {
@@ -86,7 +114,7 @@ Meet meet_choose(const SimState *s, const WpPlayer *p, fv2 pref, int has_pref) {
         }
         if (!m.found || cost < best_cost) { m.pos = pos; m.t = t; m.found = 1; best_cost = cost; }
     }
-    if (!m.found) m.pos = pos;
+    if (!m.found) m.pos = MC.at[MC_STEPS - 1];
     return m;
 }
 
