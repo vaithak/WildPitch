@@ -16,6 +16,7 @@
  *   --check-replay         instant replay reproduces the live sim hash tick for tick (no window)
  *   --check-audio          every synthesised sound + the mixer (worst case, pan, mute) (no window, no device)
  *   --check-settings       settings.cfg defaults / round trip / old files / menu rows (no window)
+ *   --check-sfx            a 7v7 AI match (rules, 3-min halves) -> the sounds sfx.c asks for vs the events (no device)
  *   --audio                harness modes are silent by default; this opens the audio device anyway
  *   --battery              30 fps cap for this run; --perf-seconds N: quit after N s, print CPU% (docs/PERF.md)
  *   --title                with --screenshot: capture the title screen (WP_TITLE_SETUP=1: the quick-match setup)
@@ -412,6 +413,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--check-replay")) return wp_replay_check();
         else if (!strcmp(argv[i], "--check-audio")) return wp_check_audio();
         else if (!strcmp(argv[i], "--check-settings")) return wp_check_settings();
+        else if (!strcmp(argv[i], "--check-sfx")) return wp_check_sfx();
         else if (!strcmp(argv[i], "--audio")) force_audio = true;
         else if (!strcmp(argv[i], "--battery")) force_battery = true;
         else if (!strcmp(argv[i], "--perf-seconds") && i + 1 < argc) perf_secs = atoi(argv[++i]);
@@ -586,7 +588,7 @@ int main(int argc, char **argv) {
                 int tw_, th_;
                 SDL_GetRenderOutputSize(g.ren, &tw_, &th_);
                 wp_title_draw(&g.title, g.ren, tw_, th_);
-                if (shot_path) {                          /* visual check of the title screen */
+                if (shot_path && !keys) {                 /* visual check of the title screen (with --keys: play on) */
                     SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
                     if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
                     break;
@@ -643,7 +645,9 @@ int main(int argc, char **argv) {
                 if (sc == g.km.key[WP_KEY_LOOK]) g.rctx.style = (g.rctx.style + 1) % WP_AVATAR_STYLE_COUNT;
                 if (sc == g.km.key[WP_KEY_ZOOM]) g.zoom = (g.zoom + 1) % 3;
                 if (sc == g.km.key[WP_KEY_REPLAY]) replay_begin(&g);
-                if (sc == SDL_SCANCODE_M) {               /* mute (fixed key, like F3) */
+                bool m_bound = false;                     /* M mutes unless the player put an action on it */
+                for (int k = 0; k < WP_KEY_COUNT; k++) m_bound |= g.km.key[k] == SDL_SCANCODE_M;
+                if (sc == SDL_SCANCODE_M && !m_bound) {   /* mute (fixed key, like F3) */
                     g.set.muted = !g.set.muted;
                     if (!harness) wp_settings_save(&g.set);
                     wp_audio_apply(&g.audio, &g.set, false);

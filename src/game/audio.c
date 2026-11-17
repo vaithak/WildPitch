@@ -56,6 +56,7 @@ void wp_audio_apply(WpAudio *a, const WpSettings *s, bool paused) {
 }
 
 void wp_audio_play(WpAudio *a, WpSoundId id, float gain, float pan, float rate, float delay_s) {
+    if (id >= 0 && id < WP_SND_COUNT) a->plays[id]++;
     if (!a->ok) return;
     int bus = id >= WP_SND_CROWD_BED ? WP_BUS_CROWD : WP_BUS_FX;
     SDL_LockAudioStream(a->stream);

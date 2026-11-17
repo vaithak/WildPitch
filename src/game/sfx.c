@@ -51,7 +51,7 @@ void wp_sfx_tick(WpSfx *s, WpAudio *a, const SimState *prev, const SimState *cur
         s->last_touch = s->n;
         wp_audio_play(a, WP_SND_KICK_PASS, 0.16f, pan, 1.15f * vary(s->n, 0.08f), 0);
     }
-    if ((ev & WP_EV_BODY) && s->n - s->last_body > 6) {
+    if ((ev & WP_EV_BODY) && s->n - s->last_body > 20) {          /* scrambles hit bodies every few ticks */
         s->last_body = s->n;
         wp_audio_play(a, WP_SND_HEADER, 0.35f, pan, 0.85f, 0);
     }

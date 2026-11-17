@@ -16,8 +16,11 @@ checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
   goal, "ooh" on a post or a goalward miss. Stereo pan by the ball's x against the camera. Esc menu: Master / Effects
   / Crowd volume (0-10, saved in settings.cfg); **M** mutes (saved). New `settings.c` (one struct, key = value file;
   old files still load). Verified: `--check-audio` (ctest `audio`), `--check-settings` (ctest `settings`), and an
-  end-to-end `--autoplay --audio` run through SDL's *disk* driver (crowd bed ~0.013-0.02 RMS, kicks / whistles as
-  spikes on the kick ticks, peak 0.34); no-device paths (`SDL_AUDIO_DRIVER=bogus` / `dummy`) run silently. SDL here
+  end-to-end `--autoplay --audio` run through SDL's *disk* driver (crowd bed ~0.013 RMS, kicks / whistles as
+  spikes on the kick ticks, peak 0.34 - measured before the volume curve was changed to master² x bus, so today's
+  levels are somewhat louder); `--check-sfx` (ctest `sfx`): a 7v7 AI match with rules and 3-min halves to full time
+  asks for one roar per goal, two long whistles, short whistles = fouls + offsides + goals + kick-offs + full time,
+  one post ping per post, no sound more than 3x in any second (body hits are rate-limited to 1 per 1/3 s); no-device paths (`SDL_AUDIO_DRIVER=bogus` / `dummy`) run silently. SDL here
   has ALSA + PulseAudio (no rebuild was needed). **Not verified by ear** (the agent has no speakers): timbre and the
   balance between sounds are guesses - owner, please judge.
 - **Part 2 - visual juice: done** (`src/game/juice.c`, fixed pools, time-based): a fading ribbon behind fast balls
@@ -27,12 +30,15 @@ checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
   goal flashes the screen once and a band in the scorer's kit colour sweeps in with a popping "G O A L !" and the
   score. Trail / puffs clear on teleports and replay jumps. Checked in screenshots (Modern + Retro) on the
   `--autoplay` goal (frames 140-185).
+  Not captured: slide-tackle dust (no harness slides; same code path as the dive dust, which was seen). The net
+  ripple is subtle from the match camera (the goal is seen nearly edge-on) - owner to judge.
 - **Part 3 - runs cool (D-056): done.** Esc menu row **Frame rate: 60 / 30 (battery)** (saved; applies at once):
   vsync at the interval that gives ~30 fps, plus a deadline pacer (`pacer.c`) that switches itself on when vsync is
   off or ignored (2 s over 1.2x the target) - the old no-vsync fallback slept half a tick and could run uncapped.
   The dedication card no longer spins without vsync. `--perf-seconds N` / `--battery` / `WP_NO_VSYNC=1` for
-  measuring; `tools/perf_measure.py`. Numbers in **docs/PERF.md**: match 6.1% of one core at 60 fps, 3.8% at 30;
-  pause menu 0 redraws and 0.0% CPU over 60 s; package power below the method's noise (±1.5 W desktop background).
+  measuring; `tools/perf_measure.py`. Numbers in **docs/PERF.md** (real 7v7 launches, audio on): match 6.9% of one core at
+  60 fps, 4.2% at 30; title and pause menu 0 redraws and 0.6% CPU (the audio callback) over 60 s; package power
+  ~+2 W at 60 fps vs ~+0.1 W at 30 over idle, but within the desktop's ±1.5 W background noise.
 - **Part 4 - title screen + quick match (D-057): done.** After the dedication card: WILDPITCH title with Quick match
   / Controls / Settings / Quit and the dedication in the footer (`WP_DEDICATION_TEXT` + `wp_draw_heart`, the
   launch card's own line and heart). Quick match: Format 7v7 / 5v5, Difficulty, Movement assist, Auto switching,
@@ -469,9 +475,14 @@ Frame pacing: 61.9 fps on a 60 Hz display (vsync on). 120/144 Hz not tested here
 | chip 100% | 15 m/s | 20.9 m | 3.28 m | 1.62 s |
 
 ## Next step (exact)
-1. Finish CP0.6 (parts 2-4 in the "Current checkpoint" block), then stop for the owner's playtest of CP0.5a/b +
-   D-053/D-054 + CP0.6 together. Log feedback in PLAYTEST_FEEDBACK.md.
-2. Open from earlier: AI attack with offside, the AI never slides, a seat receiver at a contested corner header.
+1. **Stop: the owner playtests CP0.5a/b + D-053/D-054 + CP0.6 together** (guides in "Current checkpoint"). Log his
+   feedback in PLAYTEST_FEEDBACK.md, then tune / re-plan. Especially: sound by ear (levels, whistle, crowd), the
+   title wording, kits, default volumes, battery mode feel.
+2. Open owner decisions from CP0.6: restart whistles only for kick-offs / penalties (not throw-ins, corners, goal
+   kicks - real refs mostly don't); title tagline "a football game" is a placeholder; kit list (6) and default
+   volumes (8 / 8 / 6); M is a fixed mute key (ignored if he binds an action to M).
+3. Then Gate 1 (ROADMAP: playtest with others) or the open sim items: AI attack with offside, the AI never slides, a
+   seat receiver at a contested corner header.
 
 ## Known issues / environment notes
 - Audio: SDL is built with ALSA + PulseAudio (dev packages installed). If a fresh machine has no sound, install

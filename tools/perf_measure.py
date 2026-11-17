@@ -19,8 +19,13 @@ def run(name, args, env_extra, secs=60):
     ppt=[x[0] for x in s if x[0]]; tc=[x[1] for x in s if x[1]]; ge=[x[2] for x in s if x[2]]
     print(f"{name}: PPT {sum(ppt)/len(ppt)/1e6:.2f} W  Tctl {sum(tc)/len(tc)/1e3:.1f} C (max {max(tc)/1e3:.1f})  GPU edge {sum(ge)/len(ge)/1e3:.1f} C  || {outp}", flush=True)
     time.sleep(10)
+# real launches driven by queued keys (card -> title -> setup -> kick-off); settings in a scratch dir (never the
+# player's); audio through SDL's dummy driver (the mixer callback runs, nothing is heard)
+import tempfile
+X={'XDG_DATA_HOME': tempfile.mkdtemp(prefix='wp_perf_')}
 run('idle desktop (no game)', None, {})
-run('autoplay 60 fps, audio (dummy)', ['--autoplay','--audio'], {})
-run('autoplay 30 fps battery, audio (dummy)', ['--autoplay','--audio','--battery'], {})
-run('pause menu open (idle)', ['--autoplay','--menu'], {'WP_MENU_MAIN':'1'})
-run('autoplay 60 fps, no vsync (pacer only)', ['--autoplay','--audio'], {'WP_NO_VSYNC':'1'})
+run('title screen, no input', ['--keys','Return'], X)
+run('7v7 match 60 fps', ['--keys','Return Return Return'], X)
+run('7v7 match 30 fps (battery)', ['--keys','Return Return Return','--battery'], X)
+run('7v7 match, pause menu open', ['--keys','Return Return Return Escape'], X)
+run('5v5 --autoplay harness 60 fps, audio', ['--autoplay','--audio'], {})

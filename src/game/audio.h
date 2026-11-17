@@ -14,6 +14,7 @@ typedef struct {
     bool             ok;
     WpMixer          mix;
     float            buf[2 * 512];   /* callback scratch (interleaved stereo) */
+    uint32_t         plays[WP_SND_COUNT];   /* requests per sound, counted with or without a device (--check-sfx) */
 } WpAudio;
 
 bool wp_audio_open(WpAudio *a);                /* builds the sounds, opens the default device; false = no audio */
@@ -22,4 +23,5 @@ void wp_audio_close(WpAudio *a);
 void wp_audio_apply(WpAudio *a, const WpSettings *s, bool paused);
 void wp_audio_play(WpAudio *a, WpSoundId id, float gain, float pan, float rate, float delay_s);
 void wp_audio_crowd(WpAudio *a, float bed, float excite);    /* crowd loop targets 0..1 */
+int  wp_check_sfx(void);   /* --check-sfx: a 7v7 AI match with rules + clock -> the sounds it asks for (no device) */
 #endif

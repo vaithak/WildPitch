@@ -83,3 +83,64 @@ int wp_check_audio(void) {
     printf(bad ? "audio check: FAIL\n" : "audio check: ok\n");
     return bad ? 1 : 0;
 }
+
+/* --check-sfx (ctest `sfx`): sfx.c driven by a whole AI-vs-AI 7v7 match with fouls, offside and a 3-minute-half clock,
+ * no device. The sounds asked for must match the events the sim raised, and no sound may machine-gun. */
+#include <string.h>
+#include "game/sfx.h"
+
+int wp_check_sfx(void) {
+    static SimState prev, cur;
+    static WpAudio a;
+    static WpSfx sx;
+    memset(&a, 0, sizeof a);                                   /* ok = false: counts only */
+    wp_synth_build();                                          /* (sound names) */
+    WpMatchConfig cfg = sim_config_7v7();
+    cfg.half_ticks = 3u * 60u * WP_TICK_HZ;
+    sim_init(&cur, &cfg);
+    sim_kickoff_setpiece(&cur);
+    for (int k = 0; k < WP_MAX_SEATS; k++) cur.seat_player[k] = -1;
+    wp_sfx_reset(&sx);
+    WpInput in;
+    memset(&in, 0, sizeof in);
+    int goals = 0, fouls = 0, posts = 0, kicks = 0, headers = 0, whistles = 0, worst_sec = 0, worst_id = -1;
+    uint32_t last[WP_SND_COUNT], sec_start = 0;
+    memcpy(last, a.plays, sizeof last);
+    for (long t = 0; t < 60L * 60 * 9 && cur.phase != WP_PHASE_FULLTIME; t++) {
+        prev = cur;
+        sim_step(&cur, &in);
+        uint16_t ev = cur.events;
+        goals += !!(ev & WP_EV_GOAL); fouls += !!(ev & (WP_EV_FOUL | WP_EV_OFFSIDE)); posts += !!(ev & WP_EV_POST);
+        kicks += !!(ev & WP_EV_KICK); headers += !!(ev & WP_EV_HEADER); whistles += !!(ev & WP_EV_WHISTLE);
+        wp_sfx_tick(&sx, &a, &prev, &cur, false, 0, 30);
+        wp_sfx_frame(&sx, &a, &cur, 1.0f / 60.0f);
+        if (cur.tick - sec_start >= 60) {                      /* the busiest second per sound */
+            for (int id = 0; id < WP_SND_COUNT; id++) {
+                int n = (int)(a.plays[id] - last[id]);
+                if (n > worst_sec && id != WP_SND_KICK_PASS && id != WP_SND_BOUNCE) { worst_sec = n; worst_id = id; }
+            }
+            memcpy(last, a.plays, sizeof last);
+            sec_start = cur.tick;
+        }
+    }
+    const uint32_t *p = a.plays;
+    uint32_t boots = p[WP_SND_KICK_PASS] + p[WP_SND_KICK_SHOT] + p[WP_SND_KICK_LOB] ;
+    printf("match: phase %d, goals %d, fouls+offsides %d, posts %d, kicks %d (headers %d), half/full whistles %d\n",
+           cur.phase, goals, fouls, posts, kicks, headers, whistles);
+    for (int id = 0; id < WP_SND_COUNT; id++) printf("  %-14s %u\n", wp_sound((WpSoundId)id)->name ? wp_sound((WpSoundId)id)->name : "?", p[id]);
+    printf("busiest second (not passes / bounces): %d x sound %d\n", worst_sec, worst_id);
+    int bad = 0;
+    bad += cur.phase != WP_PHASE_FULLTIME;
+    bad += p[WP_SND_CROWD_ROAR] != (uint32_t)goals;
+    bad += p[WP_SND_WHISTLE_LONG] != 2;                        /* half time + the last of full time's three */
+    bad += p[WP_SND_POST] != (uint32_t)posts;
+    bad += p[WP_SND_HEADER] < (uint32_t)headers;               /* + body hits */
+    /* short whistles: fouls / offsides + one per goal + full time's two + kick-offs (match, half, after goals)
+     * + penalties: at least the fixed part, and not wildly more */
+    uint32_t fixed = (uint32_t)(fouls + goals + 2 + 2 + goals);
+    bad += p[WP_SND_WHISTLE_SHORT] < fixed || p[WP_SND_WHISTLE_SHORT] > fixed + 20;
+    bad += boots + p[WP_SND_HEADER] < (uint32_t)(kicks / 2);   /* throws / rolls are silent */
+    bad += worst_sec > 4;
+    printf(bad ? "sfx check: FAIL\n" : "sfx check: ok\n");
+    return bad ? 1 : 0;
+}
