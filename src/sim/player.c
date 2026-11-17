@@ -567,6 +567,12 @@ static void move(SimState *s, int i, const WpSeatInput *in) {
     wp_angle want = p->facing;
     if (winding) want = s->ball.owner == i ? contact_dir(s, i) : p->kick.dir;   /* turn to meet the ball */
     else if (has) want = fx_atan2(dir.y, dir.x);
+    if (!winding && p->role == WP_ROLE_KEEPER && s->ball.owner != i && seat_of(s, i) < 0) {
+        /* a keeper keeps his eyes on the ball: he backpedals / shuffles to his spot instead of turning his back to it
+         * (owner: "goalkeeper facing in random direction sometimes, like facing its own goal", D-054) */
+        fv2 tb = fv2_sub(s->ball.pos, p->pos);
+        if (fx_abs(tb.x) + fx_abs(tb.y) > FX(0.05)) want = fx_atan2(tb.y, tb.x);
+    }
     int deg = (in->buttons & WP_BTN_SPRINT) && fv2_len(p->vel) > FX(6.5) ? T_TURN_DEG_S_SPRINT
             : (s->ball.owner == i ? T_TURN_DEG_S_BALL : T_TURN_DEG_S);
     if (winding) deg = 1080;

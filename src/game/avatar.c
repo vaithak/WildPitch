@@ -115,7 +115,9 @@ void wp_avatar_anim_update(WpAvatarAnim *a, float x, float y, float sim_facing, 
     float dx = x - a->last_x, dy = y - a->last_y, dist = sqrtf(dx * dx + dy * dy);
     if (dist > 3.0f) dist = 0;                         /* teleport (kickoff reset) */
     float cycle = 1.1f + 0.22f * speed;                /* metres per full stride cycle (2 steps) */
-    a->phase = fmodf(a->phase + dist / cycle * 2 * PI_F, 2 * PI_F);
+    float fwd = dx * cosf(a->facing) + dy * sinf(a->facing);
+    if (fwd < -0.3f * dist) dist = -dist;              /* moving backwards (a keeper backpedalling): legs cycle back */
+    a->phase = fmodf(a->phase + dist / cycle * 2 * PI_F + 2 * PI_F, 2 * PI_F);
     a->last_x = x; a->last_y = y;
     float diff = wrap_pi(sim_facing - a->facing), maxturn = 11.0f * dt;
     a->facing = wrap_pi(a->facing + (diff > maxturn ? maxturn : (diff < -maxturn ? -maxturn : diff)));

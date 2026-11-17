@@ -789,3 +789,13 @@ with a tap).
   attackers win the first touch in few cases; the AI's own corners win ~30%). A seat receiver doesn't attack a
   contested ball the way aerial_ai.c's AI receiver does (contact_reachable finds no head-height point for him) - a
   follow-up. Tests: `tests/test_corner.c`. Goldens updated on purpose (5v5 `319956738752144e`, 7v7 `9dfc679575aa1e19`).
+
+## D-054 — Keepers keep their eyes on the ball (2026-11-17, owner)
+Owner: "there is the problem of goalkeeper facing in random direction sometimes, like facing its own goal". Cause:
+every player's body faces where he is moving (player.c `move`), so a keeper walking back to his line turned his back
+to the play. Measured (6 AI matches x 5 min, 7v7): a keeper not diving / holding faced away from the ball in 30.4% of
+his ticks. Now an AI keeper who isn't winding up a kick and isn't on the ball turns (at the normal turn rate) toward
+the ball whatever way he moves: he backpedals and shuffles. 0.03% after (a turn after a switch of play); goals 14 -> 13
+in the same sample (noise). Presentation: the run cycle plays backwards when a player moves against his facing
+(`wp_avatar_anim_update`), so the backpedal doesn't moonwalk. Test: `tests/test_keeper_face.c` (< 1%). Goldens
+updated on purpose (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).

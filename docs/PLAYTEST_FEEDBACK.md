@@ -221,5 +221,6 @@ Format:
 - **Action:** D-053.
 - **Feedback (verbatim):** "also, there is the problem of goalkeeper facing in random direction sometimes, like facing
   its own goal, I am not sure what the logic of goalkeeper moving direction is, but it should be improved"
+- **Action:** D-054 (keepers face the ball).
 - **Feedback (verbatim):** "once both of these are done and committed, continue with the next checkpoint as I am
   going to sleep and will test them together tomorrow"
