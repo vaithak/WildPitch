@@ -24,6 +24,7 @@ typedef struct {
     WpJuice       juice;                 /* ball trail, net ripple, dust, goal flash (CP0.6) */
     uint64_t      look_seed;
     bool          looks_ready;
+    int           kit[2];                /* kits.h index per team (quick-match setup) */
     int           style;                 /* index into wp_avatar_styles */
     bool          hide_markers;          /* --demo: no 'controlled player' arrows */
     uint16_t      frame_events;          /* OR of sim events over the ticks stepped this frame (set by main) */
@@ -32,6 +33,7 @@ typedef struct {
 
 void wp_render_ctx_init(WpRenderCtx *ctx, SDL_Renderer *r, uint64_t seed);
 void wp_render_reset_anim(WpRenderCtx *ctx);
+void wp_render_set_kits(WpRenderCtx *ctx, int kit0, int kit1);   /* repaints the looks on the next frame */
 
 /* Draw the whole match view. alpha in [0,1] interpolates between prev and cur tick; dt = frame seconds. */
 void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,

@@ -8,7 +8,7 @@ corner) + D-054 (keepers face the ball): ✅ done, all committed, awaiting the o
 them together with the next checkpoint). Their playtest guides are below (stage 5 down to CP0.5b part 1, D-053/D-054
 in DECISIONS).
 
-**CP0.6 "Juice and cool" (ROADMAP's CP0.5, renamed): in progress.** Presentation only - goldens unchanged all
+**CP0.6 "Juice and cool" (ROADMAP's CP0.5, renamed): ✅ done, awaiting the owner's playtest (with CP0.5a/b).** Presentation only - goldens unchanged all
 checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
 - **Part 1 - audio (D-055): done.** Every sound synthesised at startup (no files, no new dependency): kicks graded by
   kind and power, header thud, bounce, post ping, net swish, whistles (short: fouls / offside / kick-offs / goals;
@@ -33,7 +33,26 @@ checkpoint (5v5 `b23b8e7d1e2a481d`, 7v7 `980606f7054393f4`).
   The dedication card no longer spins without vsync. `--perf-seconds N` / `--battery` / `WP_NO_VSYNC=1` for
   measuring; `tools/perf_measure.py`. Numbers in **docs/PERF.md**: match 6.1% of one core at 60 fps, 3.8% at 30;
   pause menu 0 redraws and 0.0% CPU over 60 s; package power below the method's noise (±1.5 W desktop background).
-- Part 4 title screen + quick match: next.
+- **Part 4 - title screen + quick match (D-057): done.** After the dedication card: WILDPITCH title with Quick match
+  / Controls / Settings / Quit and the dedication in the footer (`WP_DEDICATION_TEXT` + `wp_draw_heart`, the
+  launch card's own line and heart). Quick match: Format 7v7 / 5v5, Difficulty, Movement assist, Auto switching,
+  Half length 3 / 5 / 8 min, Your kit / Opponent kit (RED BLUE WHITE BLACK YELLOW GREEN, never the same; swatches),
+  Kick off!. Settings: volumes + frame rate. All saved in settings.cfg. Pause menu gained **Main menu**; banners /
+  half-time use the kit names. Title / menus redraw on input only. Every CLI flag skips the title (--5v5 = straight
+  into a 5-a-side match); `--title --screenshot F` captures it (`WP_TITLE_SETUP=1` the setup, `WP_KITS=a,b` kits in
+  captures); `--keys "Return Down ..."` queues key presses (used to drive card -> title -> setup -> kick-off, pause
+  -> Main menu -> kick-off, title -> Controls -> back, with `XDG_DATA_HOME` pointed at a scratch dir so the owner's
+  settings.cfg was never touched). New test `test_half_length` (3/5/8 min AI-vs-AI to full time: halves end after
+  regulation + stoppage, clock 45' / 90', added 1-4'). Fixed on the way: keys pressed in the same frame as Esc /
+  a menu closing / Controls opening were eaten by the wrong screen.
+
+### Playtest guide (CP0.6 part 4, title + quick match)
+1. Launch: the dedication card, then the title (dedication line + heart at the bottom). Quick match -> the setup
+   (Enter lands on Kick off!, so Enter-Enter is the fastest way into a game).
+2. Try 5v5 + 3 min halves + YELLOW vs WHITE: kits on the pitch, names in "KICK-OFF - YELLOW", the goal banner
+   and half time. The clock still reads 45' a half (it just runs faster or slower).
+3. Esc -> Main menu returns to the title; Settings on the title has the volumes and the frame rate.
+4. Tell me: the title's look / wording ("a football game" under the name is a placeholder), kit list, defaults.
 
 ### Playtest guide (CP0.6 part 1, audio) - listen for
 1. Launch normally: a short whistle at kick-off, a soft crowd murmur under everything.

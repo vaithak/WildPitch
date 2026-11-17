@@ -59,7 +59,7 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   camera.h              WpCamera + wp_project (tilted 2.5D projection)
   render.h/.c           WpRenderCtx (presentation state), pitch/goals/shadows, depth sort, sim -> avatar pose adapter
   keymap.h/.c           rebindable controls (D-024): defaults, text save/load in the pref dir, swap-on-rebind
-  menu.h/.c             Esc pause menu + Controls screen (rebind); paused + redraw-on-input only
+  menu.h/.c             Esc pause menu (settings rows, Restart, Main menu) + Controls screen (rebind); redraw on input
   dedication.h/.c       the owner's dedication card on launch (D-018; wording is fixed)
   settings.h/.c         settings.cfg (one struct, key = value, old files load) + the settings rows menus show
   kits.h/.c             team kits (shirt / shorts / socks / keeper) for the quick-match setup
@@ -67,6 +67,7 @@ src/game/               PRESENTATION + PLATFORM (SDL3, floats OK)
   mixer.h/.c            software mixer (voices, buses, crowd loops, glides, limiter); no device needed
   audio.h/.c            SDL audio stream + callback around the mixer; silent no-op without a device
   audio_check.c         --check-audio: sounds + mixer checks (ctest `audio`)
+  title.h/.c            title screen (Quick match / Controls / Settings / Quit, dedication footer) + quick-match setup
   pacer.h/.c            frame cap (D-056): vsync interval for 60 / 30 fps + deadline pacer fallback; CPU-time probe
   juice.h/.c            visual effects (CP0.6): fast-ball ribbon, net bulge / ripple, dust puffs, goal flash + banner
   sfx.h/.c              sim state + WP_EV_* (per tick, live and replay) -> sounds; crowd danger per frame
@@ -85,6 +86,7 @@ tests/                  headless tests (test_*.c auto-registered with ctest), be
                         pressed/released mid-flight (0 misses), deflection switch, untargeted hold, live short room
   test_ai_rules.c       possession rules: tackle, closest wins, control follows our ball, no ball through bodies
   test_ai_match.c       AI vs AI: balanced teams, football-like goal/shot/pass/tackle rates, nobody stuck
+  test_half_length.c    quick-match half lengths (3 / 5 / 8 min) reach half / full time with a sane clock
   test_passing.c        targeted passes reach the receiver (standing/jog/sprint), hand-off timing, one-two aim,
                         switching rules, through balls (lead by hold), lob over a defender + solver agreement,
                         headers (stand/jump, at goal scores, pass hands off)

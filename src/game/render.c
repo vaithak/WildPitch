@@ -1,6 +1,7 @@
 /* render.c - tilted 2.5D "tabletop" match renderer on SDL_Renderer. */
 #include "game/render.h"
 #include "sim/tuning.h"
+#include "game/kits.h"
 #include <math.h>
 
 static float tof(fx v) { return (float)v / 65536.0f; }
@@ -133,6 +134,11 @@ void wp_render_ctx_init(WpRenderCtx *ctx, SDL_Renderer *r, uint64_t seed) {
     ctx->juice.net_t[0] = ctx->juice.net_t[1] = -1;
 }
 
+void wp_render_set_kits(WpRenderCtx *ctx, int kit0, int kit1) {
+    ctx->kit[0] = kit0; ctx->kit[1] = kit1;
+    ctx->looks_ready = false;
+}
+
 void wp_render_reset_anim(WpRenderCtx *ctx) {
     for (int i = 0; i < WP_MAX_PLAYERS; i++) { ctx->anim[i].init = false; ctx->stance[i].valid = false; }
     wp_ball_vis_reset(&ctx->ball);
@@ -196,7 +202,15 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
     int np = 2 * cur->n_per_side;
     if (!ctx->looks_ready) {
         for (int i = 0; i < np; i++)
-            wp_avatar_make_look(&ctx->look[i], ctx->look_seed, i, cur->players[i].team, cur->players[i].role == WP_ROLE_KEEPER);
+        {
+            bool keeper = cur->players[i].role == WP_ROLE_KEEPER;
+            wp_avatar_make_look(&ctx->look[i], ctx->look_seed, i, cur->players[i].team, keeper);
+            const WpKit *k = wp_kit(ctx->kit[cur->players[i].team & 1]);   /* the chosen kit (CP0.6) */
+            WpAvatarLook *L = &ctx->look[i];
+            L->shirt = L->sleeve = keeper ? k->keeper : k->shirt;
+            if (!keeper) { L->shorts = k->shorts; L->socks = k->socks; }
+            else L->socks = k->keeper;
+        }
         ctx->looks_ready = true;
     }
     const WpAvatarStyle *style = &wp_avatar_styles[ctx->style];

@@ -116,7 +116,7 @@ Not playable; invisible plumbing every later CP depends on.
 - Stamina + sprint cost; the **shout** button (v1: "press!" / "drop back").
 - Replay of last 10 s (free thanks to determinism: inputs log).
 
-### CP0.5 — "Juice and cool" (Gate 1 candidate) ⬜ ⚪
+### CP0.5 — "Juice and cool" (Gate 1 candidate) — done as CP0.6 (D-055..D-057), awaiting playtest
 - Audio (kicks, crowd murmur, whistle) — *needs `libasound2-dev`/`libpulse-dev` installed*.
 - Visual juice: player animation frames, ball trail, net ripple, light post-process.
 - Battery mode (30 fps), power/thermal reading, menus that redraw only on change; measure CPU%,

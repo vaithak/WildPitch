@@ -17,6 +17,11 @@
  *   --check-audio          every synthesised sound + the mixer (worst case, pan, mute) (no window, no device)
  *   --check-settings       settings.cfg defaults / round trip / old files / menu rows (no window)
  *   --audio                harness modes are silent by default; this opens the audio device anyway
+ *   --battery              30 fps cap for this run; --perf-seconds N: quit after N s, print CPU% (docs/PERF.md)
+ *   --title                with --screenshot: capture the title screen (WP_TITLE_SETUP=1: the quick-match setup)
+ *   --keys "Return Down"   queue these key presses at launch (drives the card / title / menus in checks)
+ * A normal launch shows the dedication card, then the title screen; every flag above skips the title (--5v5 starts
+ * a 5-a-side match straight away).
  *   --replay-shot          with --screenshot: start an instant replay halfway to the captured frame
  *   --screenshot F.bmp     save frame number --frames N (default 60) to F.bmp and exit
  */
@@ -41,6 +46,7 @@
 #include "game/sfx.h"
 #include "game/kits.h"
 #include "game/pacer.h"
+#include "game/title.h"
 
 static const float ZOOM_VIEW_M[3] = {50.0f, 36.0f, 27.0f};   /* metres visible across the screen (40 m pitch) */
 /* bigger pitches show a bit more (7v7 55 m: x1.19) so the wide view still reads the game */
@@ -72,7 +78,50 @@ typedef struct {
     WpPacer       pacer;           /* frame cap: 60, or 30 in battery mode (D-056) */
     bool          force_battery;   /* --battery */
     bool          vsync;
+    WpTitle       title;           /* title screen + quick-match setup (CP0.6) */
+    bool          in_title;
+    bool          force_five;      /* --5v5 */
+    bool          harness;
+    WpMatchConfig cfg;             /* the match being played (Restart replays it with the menu's new levels) */
 } Game;
+
+static const char *team_name(const Game *g, int t) { return wp_kit(g->set.kit[t & 1])->name; }
+
+/* a real match from the settings: format, half length, opposition level, assist, switching (harnesses build theirs) */
+static WpMatchConfig match_config(const Game *g) {
+    WpMatchConfig cfg = (g->force_five || g->set.format == WP_FORMAT_5V5) ? sim_config_5v5() : sim_config_7v7();
+    cfg.half_ticks = (uint32_t)g->set.half_min * 60u * WP_TICK_HZ;   /* the clock still shows 45' a half */
+    cfg.ai_level[1] = (uint8_t)g->set.difficulty;                    /* the opposition; our team-mates stay NORMAL */
+    cfg.assist_level = (uint8_t)g->set.assist;                       /* D-037 */
+    cfg.switch_mode = (uint8_t)g->set.switching;                     /* D-050 */
+    return cfg;
+}
+
+/* start a real match (title "Kick off!", menu "Restart match") */
+static void new_match(Game *g) {
+    g->cfg = match_config(g);
+    sim_init(&g->cur, &g->cfg);
+    sim_kickoff_setpiece(&g->cur);                                   /* a real kick-off (D-032) */
+    g->prev = g->cur;
+    wp_replay_reset(&g->rlog);
+    wp_replay_stop(&g->rp);
+    wp_render_set_kits(&g->rctx, g->set.kit[0], g->set.kit[1]);
+    wp_render_reset_anim(&g->rctx);
+    wp_sfx_reset(&g->sfx);
+}
+
+/* a pad button in a menu -> the key the menu understands (false: ignore the event) */
+static bool pad_as_key(Game *g, SDL_Event *e, bool waiting) {
+    if (!wp_gamepad_is_active_button(&g->pad, e)) return true;
+    SDL_Scancode msc = wp_pad_menu_key(e->gbutton.button, waiting);
+    if (msc == SDL_SCANCODE_UNKNOWN) return false;
+    SDL_Event ke;
+    SDL_zero(ke);
+    ke.type = SDL_EVENT_KEY_DOWN;
+    ke.key.scancode = msc;
+    *e = ke;
+    return true;
+}
 
 /* the sounds follow the camera: pan by the ball's x against the view's centre and half width */
 static void sfx_tick(Game *g, const SimState *prev, const SimState *cur, bool replay) {
@@ -341,8 +390,9 @@ static Uint32 SDLCALL perf_timer(void *ud, SDL_TimerID id, Uint32 interval) {
 int main(int argc, char **argv) {
     const char *shot_path = NULL;
     int shot_frame = 60, start_style = 0, start_zoom = 0;   /* owner: Modern look, wide zoom (D-011) */
-    bool gallery = false, demo = false, replay_shot = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false, force_audio = false, force_battery = false;
+    bool gallery = false, demo = false, replay_shot = false, autoplay = false, force_card = false, board_sheet = false, menu_shot = false, five = false, force_audio = false, force_battery = false, title_shot = false;
     int perf_secs = 0;
+    const char *keys = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) shot_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) shot_frame = atoi(argv[++i]);
@@ -367,6 +417,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--perf-seconds") && i + 1 < argc) perf_secs = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--replay-shot")) replay_shot = true;
         else if (!strcmp(argv[i], "--menu")) menu_shot = true;
+        else if (!strcmp(argv[i], "--title")) title_shot = true;
+        else if (!strcmp(argv[i], "--keys") && i + 1 < argc) keys = argv[++i];
         else if (!strcmp(argv[i], "--5v5")) five = true;             /* the old 5-a-side format (40 x 25 m) */      /* with --screenshot: capture the Controls screen */
     }
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -385,7 +437,15 @@ int main(int argc, char **argv) {
     bool harness = shot_path || autoplay || demo || gallery;
     if (!harness) wp_keymap_load(&g.km);                  /* the player's saved controls */
     if (harness) wp_settings_defaults(&g.set); else wp_settings_load(&g.set);
+    if (shot_path && getenv("WP_KITS")) {                 /* captures: WP_KITS=home,away (kits.h indices) */
+        sscanf(getenv("WP_KITS"), "%d,%d", &g.set.kit[0], &g.set.kit[1]);
+        if (g.set.kit[0] < 0 || g.set.kit[0] >= WP_KIT_COUNT || g.set.kit[1] < 0 || g.set.kit[1] >= WP_KIT_COUNT ||
+            g.set.kit[0] == g.set.kit[1]) { g.set.kit[0] = 0; g.set.kit[1] = 1; }
+    }
     g.menu.set = &g.set;
+    g.title.set = &g.set;
+    g.harness = harness;
+    g.force_five = five;
     g.force_battery = force_battery;
     apply_vsync(&g);
     if (board_sheet && shot_path) {                      /* visual check of the advertising-board faces (D-033) */
@@ -408,14 +468,27 @@ int main(int argc, char **argv) {
         SDL_Quit();
         return 0;
     }
+    if (keys) {                                          /* scripted key presses (checks drive the menus with these) */
+        char buf[256];
+        snprintf(buf, sizeof buf, "%s", keys);
+        for (char *k = strtok(buf, " "); k; k = strtok(NULL, " ")) {
+            SDL_Event ke;
+            SDL_zero(ke);
+            ke.type = SDL_EVENT_KEY_DOWN;
+            ke.key.scancode = SDL_GetScancodeFromName(k);
+            if (ke.key.scancode != SDL_SCANCODE_UNKNOWN) SDL_PushEvent(&ke);
+        }
+    }
     /* the owner's dedication (D-018): on a normal launch only, never in harness/capture modes */
     if ((force_card || !(shot_path || gallery || demo || autoplay)) && !wp_dedication_run(g.ren)) { SDL_Quit(); return 0; }
 
-    /* the match format: 7-a-side by default (owner, CP0.3a); harness modes keep the 5v5 their scripts were made for */
-    WpMatchConfig cfg = (autoplay || demo || gallery) ? sim_default_config() : five ? sim_config_5v5() : sim_config_7v7();
-    cfg.ai_level[1] = (uint8_t)g.set.difficulty;            /* the opposition; our AI team-mates stay NORMAL */
-    if (!(autoplay || demo || gallery)) cfg.assist_level = (uint8_t)g.set.assist;   /* D-037 (harnesses: as configured) */
-    if (!(autoplay || demo || gallery)) cfg.switch_mode = (uint8_t)g.set.switching;   /* D-050 */
+    /* the match: from the settings (7-a-side by default, owner CP0.3a); harness modes keep the 5v5 their scripts were
+     * made for, with harness levels */
+    WpMatchConfig cfg = (autoplay || demo || gallery) ? sim_default_config() : match_config(&g);
+    if (autoplay || demo || gallery) cfg.ai_level[1] = (uint8_t)g.set.difficulty;
+    g.cfg = cfg;
+    /* the title screen: a normal launch (after the card), or --title for a capture */
+    g.in_title = title_shot || !(harness || five || menu_shot || force_card);
     /* sound (D-055): harness and capture modes stay silent unless --audio; no device = a silent no-op */
     if (!harness || force_audio) wp_audio_open(&g.audio);
     wp_audio_apply(&g.audio, &g.set, false);
@@ -431,6 +504,7 @@ int main(int argc, char **argv) {
     g.replay_ok = !(autoplay || demo || gallery);
     wp_replay_reset(&g.rlog);
     wp_render_ctx_init(&g.rctx, g.ren, cfg.seed);
+    wp_render_set_kits(&g.rctx, g.set.kit[0], g.set.kit[1]);
     g.rctx.style = start_style;
     g.rctx.hide_markers = demo;
     g.zoom = start_zoom;
@@ -444,12 +518,18 @@ int main(int argc, char **argv) {
     double cpu0 = wp_cpu_seconds();
     if (perf_secs > 0) SDL_AddTimer((Uint32)perf_secs * 1000u, perf_timer, NULL);   /* measurement run: quit after N s */
     bool running = true, menu_dirty = true;
-    bool was_paused = false;
+    bool was_paused = false, title_dirty = true;
+    if (g.in_title) {
+        wp_title_open(&g.title);
+        if (title_shot && getenv("WP_TITLE_SETUP")) { g.title.screen = WP_TS_SETUP; g.title.sel = 7; }
+        wp_audio_crowd(&g.audio, 0.6f, 0);                /* a murmur behind the title */
+    }
     if (menu_shot) { wp_menu_open(&g.menu); if (!getenv("WP_MENU_MAIN")) { g.menu.screen = WP_MENU_CONTROLS; g.menu.sel = WP_KEY_PASS; } else g.menu.sel = 1; }
     while (running) {
         SDL_Event e;
-        if ((g.menu.screen != WP_MENU_CLOSED) != was_paused) {   /* the crowd drops back while paused */
-            was_paused = g.menu.screen != WP_MENU_CLOSED;
+        bool paused = g.menu.screen != WP_MENU_CLOSED || g.in_title;
+        if (paused != was_paused) {                       /* the crowd drops back while paused */
+            was_paused = paused;
             wp_audio_apply(&g.audio, &g.set, was_paused);
         }
         if (g.menu.screen != WP_MENU_CLOSED) {
@@ -474,37 +554,74 @@ int main(int argc, char **argv) {
                     e.type == SDL_EVENT_GAMEPAD_REMOVED || (e.type >= SDL_EVENT_WINDOW_FIRST && e.type <= SDL_EVENT_WINDOW_LAST))
                     menu_dirty = true;
                 wp_gamepad_event(&g.pad, &e);
-                if (wp_gamepad_is_active_button(&g.pad, &e)) {   /* pad -> the keys the menu already understands */
-                    if (e.gbutton.button == SDL_GAMEPAD_BUTTON_START && !g.menu.waiting) { g.menu.screen = WP_MENU_CLOSED; continue; }
-                    SDL_Scancode msc = wp_pad_menu_key(e.gbutton.button, g.menu.waiting);
-                    if (msc == SDL_SCANCODE_UNKNOWN) continue;
-                    SDL_Event ke;
-                    SDL_zero(ke);
-                    ke.type = SDL_EVENT_KEY_DOWN;
-                    ke.key.scancode = msc;
-                    e = ke;
+                if (wp_gamepad_is_active_button(&g.pad, &e) && e.gbutton.button == SDL_GAMEPAD_BUTTON_START && !g.menu.waiting) {
+                    g.menu.screen = WP_MENU_CLOSED;
+                    title_dirty = true;
+                    continue;
                 }
+                if (!pad_as_key(&g, &e, g.menu.waiting)) continue;   /* pad -> the keys the menu already understands */
                 WpMenuResult res = wp_menu_event(&g.menu, &e, &g.km);
+                if (g.menu.screen == WP_MENU_CLOSED) title_dirty = true;   /* Controls from the title: back to it */
+                if (res == WP_MENU_TITLE) {                   /* Main menu: leave the match */
+                    wp_replay_stop(&g.rp);
+                    g.in_title = true;
+                    wp_title_open(&g.title);
+                }
                 if (res == WP_MENU_QUIT) running = false;
                 if (res == WP_MENU_CHANGED) {                 /* volumes apply at once (with a sample to hear them) */
                     wp_audio_apply(&g.audio, &g.set, true);
                     apply_vsync(&g);                          /* the frame-rate row */
                     wp_audio_play(&g.audio, WP_SND_KICK_SHOT, 0.8f, 0, 1, 0);
                 }
-                if (res == WP_MENU_RESTART) {                 /* new match, same format, chosen difficulty */
-                    cfg.ai_level[1] = (uint8_t)g.set.difficulty;
-                    cfg.assist_level = (uint8_t)g.set.assist;
-                    cfg.switch_mode = (uint8_t)g.set.switching;
-                    wp_sfx_reset(&g.sfx);
-                    sim_init(&g.cur, &cfg);
-                    sim_kickoff_setpiece(&g.cur);
-                    g.prev = g.cur;
-                    wp_replay_reset(&g.rlog);
-                    wp_replay_stop(&g.rp);
-                    wp_render_reset_anim(&g.rctx);
-                }
+                if (res == WP_MENU_RESTART) new_match(&g);    /* same format / length / kits, the menu's new levels */
+                if (g.menu.screen == WP_MENU_CLOSED) break;   /* the rest of the queue belongs to the match / title */
             } while (SDL_PollEvent(&e));
             last = SDL_GetTicksNS();                      /* don't fast-forward the time spent paused */
+            acc = 0;
+            continue;
+        }
+        if (g.in_title) {
+            /* title screen: like the menu, drawn on input only, sleeping in SDL_WaitEvent in between */
+            if (title_dirty) {
+                int tw_, th_;
+                SDL_GetRenderOutputSize(g.ren, &tw_, &th_);
+                wp_title_draw(&g.title, g.ren, tw_, th_);
+                if (shot_path) {                          /* visual check of the title screen */
+                    SDL_Surface *surf = SDL_RenderReadPixels(g.ren, NULL);
+                    if (surf) { SDL_SaveBMP(surf, shot_path); SDL_DestroySurface(surf); }
+                    break;
+                }
+                SDL_RenderPresent(g.ren);
+                title_dirty = false;
+            }
+            if (!SDL_WaitEvent(&e)) continue;
+            do {
+                if (e.type == SDL_EVENT_QUIT) running = false;
+                if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || e.type == SDL_EVENT_GAMEPAD_ADDED ||
+                    e.type == SDL_EVENT_GAMEPAD_REMOVED || (e.type >= SDL_EVENT_WINDOW_FIRST && e.type <= SDL_EVENT_WINDOW_LAST))
+                    title_dirty = true;
+                wp_gamepad_event(&g.pad, &e);
+                if (e.type == SDL_EVENT_WINDOW_DISPLAY_CHANGED) apply_vsync(&g);
+                if (!pad_as_key(&g, &e, false)) continue;
+                int sel_before = g.title.sel;
+                WpTitleResult tr = wp_title_event(&g.title, &e);
+                if (tr == WP_TITLE_QUIT) running = false;
+                if (tr == WP_TITLE_CONTROLS) { wp_menu_open_controls(&g.menu); break; }   /* the queue is the menu's now */
+                if (tr == WP_TITLE_CHANGED) {
+                    wp_audio_apply(&g.audio, &g.set, true);
+                    apply_vsync(&g);
+                    if (g.title.screen == WP_TS_SETTINGS && sel_before < 3)   /* a volume row: hear it */
+                        wp_audio_play(&g.audio, WP_SND_KICK_SHOT, 0.8f, 0, 1, 0);
+                }
+                if (tr == WP_TITLE_KICKOFF) {
+                    g.in_title = false;
+                    new_match(&g);
+                    if (keys) printf("kick-off: %d v %d, half %u ticks, kits %s / %s\n", g.cur.n_per_side, g.cur.n_per_side,
+                                     g.cur.half_ticks, team_name(&g, 0), team_name(&g, 1));
+                    break;
+                }
+            } while (SDL_PollEvent(&e));
+            last = SDL_GetTicksNS();
             acc = 0;
             continue;
         }
@@ -540,6 +657,7 @@ int main(int argc, char **argv) {
                 if (ui == WP_PAD_UI_REPLAY) replay_begin(&g);
             }
             if (e.type == SDL_EVENT_WINDOW_DISPLAY_CHANGED) apply_vsync(&g);
+            if (g.menu.screen != WP_MENU_CLOSED) break;   /* the rest of the queue belongs to the menu */
         }
         if (replay_shot && shot_path && frames == shot_frame / 2 && !g.rp.active) replay_begin(&g);
         Uint64 now = SDL_GetTicksNS();
@@ -667,15 +785,15 @@ int main(int argc, char **argv) {
             wp_hud_player(g.ren, vc, 0, w, h);             /* controlled player's stats + energy (D-034) */
             if (vc->phase == WP_PHASE_HALFTIME || vc->phase == WP_PHASE_FULLTIME) {
                 char msg[64];
-                snprintf(msg, sizeof msg, "%s   RED %d - %d BLUE", vc->phase == WP_PHASE_HALFTIME ? "HALF TIME" : "FULL TIME",
-                         vc->score[0], vc->score[1]);
+                snprintf(msg, sizeof msg, "%s   %s %d - %d %s", vc->phase == WP_PHASE_HALFTIME ? "HALF TIME" : "FULL TIME",
+                         team_name(&g, 0), vc->score[0], vc->score[1], team_name(&g, 1));
                 float sc = 3.0f;
                 SDL_SetRenderScale(g.ren, sc, sc);
                 SDL_SetRenderDrawColor(g.ren, 255, 235, 90, 255);
                 SDL_RenderDebugText(g.ren, ((float)w / sc - 8.0f * (float)strlen(msg)) * 0.5f, (float)h / sc * 0.22f, msg);
                 SDL_SetRenderScale(g.ren, 1, 1);
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
-                const char *sub = vc->phase == WP_PHASE_HALFTIME ? "teams change ends" : "Esc - menu - Restart match";
+                const char *sub = vc->phase == WP_PHASE_HALFTIME ? "teams change ends" : "Esc - menu - Restart match / Main menu";
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(sub), (float)h * 0.22f + 34, sub);
             } else if (vc->restart_kind == WP_RS_FREEKICK && vc->restart_indirect && vc->phase != WP_PHASE_PLAY) {
                 const char *msg = "O F F S I D E";                /* D-041: big, like GOAL; the line is drawn on the pitch */
@@ -686,7 +804,7 @@ int main(int argc, char **argv) {
                 SDL_SetRenderScale(g.ren, 1, 1);
                 SDL_SetRenderDrawColor(g.ren, 255, 255, 255, 255);
                 char ob[48];
-                snprintf(ob, sizeof ob, "indirect free kick - %s", vc->restart_team == 0 ? "RED" : "BLUE");
+                snprintf(ob, sizeof ob, "indirect free kick - %s", team_name(&g, vc->restart_team));
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(ob), (float)h * 0.22f + 34, ob);
             } else if (vc->phase == WP_PHASE_GOAL) {          /* flash + the scorer's colours sweep in (CP0.6) */
                 const WpKit *k0 = wp_kit(g.set.kit[0]), *k1 = wp_kit(g.set.kit[1]);
@@ -697,10 +815,10 @@ int main(int argc, char **argv) {
                 const char *lab = RS[vc->restart_kind < 7 ? vc->restart_kind : 0];
                 char rb[64];
                 if (vc->restart_kind == WP_RS_FREEKICK && vc->restart_indirect)      /* D-041 */
-                    snprintf(rb, sizeof rb, "OFFSIDE - indirect free kick %s", vc->restart_team == 0 ? "RED" : "BLUE");
+                    snprintf(rb, sizeof rb, "OFFSIDE - indirect free kick %s", team_name(&g, vc->restart_team));
                 else if (vc->restart_kind == WP_RS_FREEKICK || vc->restart_kind == WP_RS_PENALTY)   /* D-040 */
-                    snprintf(rb, sizeof rb, "FOUL - %s %s", lab, vc->restart_team == 0 ? "RED" : "BLUE");
-                else snprintf(rb, sizeof rb, "%s - %s", lab, vc->restart_team == 0 ? "RED" : "BLUE");
+                    snprintf(rb, sizeof rb, "FOUL - %s %s", lab, team_name(&g, vc->restart_team));
+                else snprintf(rb, sizeof rb, "%s - %s", lab, team_name(&g, vc->restart_team));
                 SDL_RenderDebugText(g.ren, (float)w * 0.5f - 4.0f * (float)strlen(rb), 40, rb);
             } else if (vc->adv_ticks) {                       /* D-040: foul, play on */
                 const char *ab = "ADVANTAGE";

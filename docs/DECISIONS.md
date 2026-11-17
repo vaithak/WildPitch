@@ -840,3 +840,13 @@ on if vsync is not actually pacing (two 1-second windows over 1.2x the target; t
 can run unpaced, so one window isn't enough). The pacer sleeps with `SDL_DelayPrecise` to the next deadline and
 never catches up after a stall. Menus (pause, title, controls) block in `SDL_WaitEvent` and redraw only on input.
 Measured in docs/PERF.md (`--perf-seconds N`, `tools/perf_measure.py`): 6.1% -> 3.8% of one core.
+
+## D-057 — Title screen and quick-match setup (2026-11-17, CP0.6)
+Launch order: dedication card (D-018) -> title screen -> quick-match setup -> match. The title's footer is the
+dedication line itself (`WP_DEDICATION_TEXT` + `wp_draw_heart`, never retyped). Quick match edits the same
+settings.cfg as the pause menu (format, difficulty, assist, switching, half length, kits), so the last setup is the
+default next time; the pause menu's Restart replays it with the menu's new levels, and **Main menu** goes back to
+the title. Half length = `WpMatchConfig.half_ticks` (3 / 5 / 8 real minutes, default 5 = the old T_HALF_TICKS); the
+broadcast clock keeps 45' a half at any length. Kits are presentation only (`kits.c`, applied over the generated
+looks in render.c; kit 0/1 = the old RED / BLUE pixel for pixel); the two teams can never share a kit. Every
+harness / capture flag skips the title, as does `--5v5` (straight into a 5-a-side match).
