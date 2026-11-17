@@ -193,3 +193,20 @@ Format:
   still it doesn't look good. Also, when making passes by trajectory prediction of receiver, many times the ball is
   passed outside of the field because prediction goes out. Improve on these also."
 - **Action:** D-044 (all four), committed with the restart transitions.
+
+## 2026-11-17 — during CP0.5a (aerial)
+- **Feedback (verbatim):** "continue with stages 2 and 3 after that"
+- **Feedback (verbatim):** "twp more things to work post committing till stage 2 and 3 but before stage 4 and 5,
+  firstly whenever the player being actively controlled is near the ball, always have some system assist so that
+  player moves towards the ball as long as the direction of movement is somewhat in the direction of the where the
+  ball is - whether it is for chasing a stray ball/defending/receiving a pass/throughball/loft ball etc.
+  Secondly, the switching of active player needs improvement, currently I think it is just based on the vicinity of
+  the ball, this leads to frequent switching sometimes when a couple of players near the ball leading to bad
+  experience, do a deep research on this with other subagents if required on how other games handle this
+  gracefully, implement it nicely and then update the artifact with a section on active player switching streategy
+  in detail (before vs after)."
+- **Owner answers (switching, reports/Active player switching.md):** menu setting "Auto switching: Manual / Events /
+  Assisted" (default Events + 3x override); Q + direction picks the man that way (ball-relative), repeated Q cycles,
+  no right stick (R3 stays zoom); keep the 1.5 s manual lock.
+- **Action:** CP0.5b: chase assist for every ball situation near the controlled man; switching redesign (one ETA
+  scorer, next-man indicator, dwell + return lock, stick-intent suppression, post-switch blend).
