@@ -31,6 +31,7 @@ typedef struct {
     long ticks;
     long lobs, lobs_done, crosses, crosses_done;
     long lob_dist[AERIAL_DIST_N], lob_dist_done[AERIAL_DIST_N];
+    long lob_end[5];                     /* how lobs ended: mate, opponent won it, opponent headed it, out/stoppage, kicker */
     long contact[AB_N][AK_N];            /* first aerial contacts by band x kind */
     long ctrl_try[AB_N], ctrl_ok[AB_N];  /* control success (gains + body hits) by band */
     long keeper_contacts;
@@ -80,9 +81,13 @@ static inline void aerial_update(AerialStats *a, AerialTrack *t, const SimState 
             if (s->players[who].team == t->lob_team) {
                 a->lobs_done++; a->lob_dist_done[t->lob_bucket]++;
                 if (t->lob_cross) a->crosses_done++;
-            }
+                a->lob_end[0]++;
+            } else a->lob_end[gain ? 1 : 2]++;
             t->lob_from = -1;
-        } else if (stop || who == t->lob_from || (kick && !header && b->last_touch == t->lob_from)) t->lob_from = -1;
+        } else if (stop || who == t->lob_from || (kick && !header && b->last_touch == t->lob_from)) {
+            a->lob_end[stop ? 3 : 4]++;
+            t->lob_from = -1;
+        }
     }
     if (t->hp_from >= 0 && !(header && b->last_touch == t->hp_from && kick)) {
         if (who >= 0 && who != t->hp_from) {
@@ -148,8 +153,10 @@ static inline void aerial_print(const AerialStats *a) {
     static const char *bn[AB_N] = {"feet (<=0.55)", "body (<=1.45)", "head (>1.45) "};
     static const char *dn[AERIAL_DIST_N] = {"<10", "10-15", "15-20", "20-25", "25-30", "30-40", ">=40", "untargeted"};
     printf("  lobs %ld (%.2f/min) completed %ld (%.0f%%); crosses %ld (%.2f/min) completed %ld (%.0f%%)\n",
-           a->lobs, a->lobs / mins, a->lobs_done, aerial_pct(a->lobs_done, a->lobs),
-           a->crosses, a->crosses / mins, a->crosses_done, aerial_pct(a->crosses_done, a->crosses));
+           a->lobs, (double)a->lobs / mins, a->lobs_done, aerial_pct(a->lobs_done, a->lobs),
+           a->crosses, (double)a->crosses / mins, a->crosses_done, aerial_pct(a->crosses_done, a->crosses));
+    printf("  lobs ended: team-mate %ld, opponent won it %ld, opponent headed it %ld, out/stoppage %ld, kicker again %ld\n",
+           a->lob_end[0], a->lob_end[1], a->lob_end[2], a->lob_end[3], a->lob_end[4]);
     printf("  lob distance at the kick:");
     for (int k = 0; k < AERIAL_DIST_N; k++)
         if (a->lob_dist[k]) printf(" %s m %ld (%.0f%%)", dn[k], a->lob_dist[k], aerial_pct(a->lob_dist_done[k], a->lob_dist[k]));
@@ -158,7 +165,7 @@ static inline void aerial_print(const AerialStats *a) {
     for (int k = 0; k < AB_N; k++)
         printf("    %s gain %5ld body %5ld header %5ld | control success %ld/%ld (%.0f%%)\n", bn[k], a->contact[k][AK_GAIN],
                a->contact[k][AK_BODY], a->contact[k][AK_HEADER], a->ctrl_ok[k], a->ctrl_try[k], aerial_pct(a->ctrl_ok[k], a->ctrl_try[k]));
-    printf("  headers %ld (%.2f/min): shots %ld, passes %ld completed %ld (%.0f%%)\n", a->headers, a->headers / mins,
+    printf("  headers %ld (%.2f/min): shots %ld, passes %ld completed %ld (%.0f%%)\n", a->headers, (double)a->headers / mins,
            a->header_shots, a->header_pass, a->header_pass_done, aerial_pct(a->header_pass_done, a->header_pass));
 }
 #endif

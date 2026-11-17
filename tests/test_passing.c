@@ -271,7 +271,8 @@ int main(void) {
         printf("preview == receiver at %d/%d pass releases\n", n - bad, n);
         CHECKF(n >= 20 && bad == 0, "preview mismatched %d/%d", bad, n);
     }
-    /* lob meter (D-045): a hold lands it lob_meter_dist(h) along the aim (nobody near: into space) */
+    /* lob meter (D-045/D-046): a hold lands it lob_meter_dist(h) along the aim (nobody near: into space), measured from
+     * the ball at the strike (more in test_lob.c) */
     {
         fx prev = 0;
         for (int hold = T_LOB_TAP_TICKS + 4; hold <= T_LOB_TAP_TICKS + 16; hold += 6) {   /* (the 40 m test pitch) */
@@ -287,12 +288,12 @@ int main(void) {
             fx land = -1;
             for (int t = 0; t < 300 && land < 0; t++) {
                 uint16_t ev = run_seat(&s, NOIN, 1);
-                if (ev & WP_EV_KICK) kicked = 1;
+                if ((ev & WP_EV_KICK) && !kicked) { kicked = 1; start = s.ball.pos; }
                 if (kicked && (ev & WP_EV_BOUNCE)) land = fv2_len(fv2_sub(s.ball.pos, start));
             }
             fx h = fx_div(FX_INT(hold - T_LOB_TAP_TICKS), FX_INT(T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS));
-            printf("lob meter hold %d: lands %.1f m (meter %.1f m)\n", hold, tod(land), tod(lob_meter_dist(h)));
-            CHECKF(land > 0 && fx_abs(land - lob_meter_dist(h)) < FX(3.0), "lob hold %d landed %.1f", hold, tod(land));
+            printf("lob meter hold %d: lands %.1f m (meter %.1f m)\n", hold, tod(land), tod(lob_meter_dist(&s, h)));
+            CHECKF(land > 0 && fx_abs(land - lob_meter_dist(&s, h)) < FX(1.5), "lob hold %d landed %.1f", hold, tod(land));
             CHECK(land > prev);
             prev = land;
         }

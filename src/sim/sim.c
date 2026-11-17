@@ -119,6 +119,7 @@ void sim_kickoff_setpiece(SimState *s) {
 }
 
 void sim_init(SimState *s, const WpMatchConfig *cfg) {
+    lob_table_init();                                 /* immutable flight table (pure function of tuning.h), once */
     memset(s, 0, sizeof *s);
     wp_rng_seed(&s->rng, cfg->seed, 0x5157u);
     s->pitch = cfg->pitch;

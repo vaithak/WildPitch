@@ -189,14 +189,24 @@
 #define T_RECV_GONE_TICKS  6          /* no reachable meeting point this long = the ball has gone */
 #define T_RECV_HEADON_MS   FX(4.0)    /* closing on the ball head-on in its last 0.5 s: at most this fast */
 #define T_SWITCH_LATCH_TICKS 30       /* after an auto-switch the held stick is ignored until it changes (max) */
-#define T_LOB_VZ_BASE      FX(4.0)    /* lofted pass: vz = BASE + PER_M * distance, clamped */
-#define T_LOB_VZ_PER_M     FX(0.22)
+#define T_LOB_VZ_BASE      FX(5.0)    /* lofted pass (D-046): vz = BASE + PER_M * D, D = where it lands (no clamp: */
+#define T_LOB_VZ_PER_M     FX(0.245)  /* 45 deg at 10 m easing to 35 deg at 50 m) */
 #define T_LOB_TAP_TICKS    12         /* lob (D-045): A released within this = lofted to the ringed mate ... */
 #define T_LOB_MIN_D        FX(12.0)   /* ... held longer = the meter: it lands this far (just past the tap) ... */
-#define T_LOB_MAX_D        FX(45.0)   /* ... up to this far (full meter) along the aim */
-#define T_LOB_SNAP         FX(4.0)    /* a team-mate within this (+12% of the distance) of the landing spot gets it */
-#define T_LOB_VZ_MIN       FX(5.0)
-#define T_LOB_VZ_MAX       FX(9.5)
+#define T_LOB_MAX_D        FX(45.0)   /* ... up to this far (full meter) along the aim ... */
+#define T_LOB_MAX_D_PITCH  FX(0.62)   /* ... but at most this x the pitch length (45 / 37 / 25 m on 80 / 60 / 40 m) */
+#define T_LOB_SNAP         FX(4.0)    /* a team-mate whose predicted point is within this (+ SNAP_K x D) ... */
+#define T_LOB_SNAP_K       FX(0.12)
+#define T_LOB_ANGLE_M      FX(6.0)    /* ... (+ this x angle/pi off the aim) of the landing spot gets it */
+#define T_LOB_BIAS_MAX     FX(3.0)    /* meter surplus / shortfall vs the snapped mate: dropped this much deeper / shorter */
+#define T_LOB_RECV_Z       FX(1.0)    /* a targeted lob is led to where it comes DOWN through this height ... */
+#define T_LOB_HEAD_Z       FX(2.3)    /* ... an AI ball to a mate in the box (T_AI_CROSS_ZONE): through a jumping head (1.7 + 0.6) */
+#define T_LOB_TAP_D        FX(18.0)   /* a tap with nobody to pick: lands this far along the aim */
+#define T_LOB_AI_MIN_D     FX(12.0)   /* AI lobs / crosses / restart lobs: D clamped to [this, the meter's max] */
+#define T_THROW_LOFT_VZ_BASE FX(4.0)  /* from the hands (keeper's overarm throw, long throw-in): the pre-D-046 loft */
+#define T_THROW_LOFT_VZ_PER_M FX(0.22) /* vz = BASE + PER_M * distance, clamped to [MIN, MAX] */
+#define T_THROW_LOFT_VZ_MIN FX(5.0)
+#define T_THROW_LOFT_VZ_MAX FX(9.5)
 #define T_HEADER_SHOT      FX(11.0)   /* header at goal: base speed (+25% of the incoming ball's speed) */
 #define T_HEADER_SHOT_MAX  FX(17.0)
 #define T_HEADER_SHOT_VZ   -FX(0.8)   /* nodded down */

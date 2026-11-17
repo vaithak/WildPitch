@@ -239,7 +239,7 @@ void wp_render_match(SDL_Renderer *r, WpRenderCtx *ctx, const WpCamera *cam,
                            : p->kick.kind == WP_KICK_LOB ? WP_KICK_CHIP : p->kick.kind,
                 .kick_windup = (float)p->kick.windup / (float)WP_TICK_HZ,
                 .kick_power01 = (p->kick.kind == WP_KICK_PASS || p->kick.kind == WP_KICK_THROUGH) ? 0.3f
-                              : p->kick.kind == WP_KICK_LOB ? 0.5f
+                              : p->kick.kind == WP_KICK_LOB ? (p->kick.power > 0 ? fminf(tof(p->kick.power), 1.0f) : 0.5f)   /* h */
                               : (tof(p->kick.power) - 14.0f) / 16.0f,
             };
             /* a pass tap shows nothing; past the tap window it's a through ball and gets the bar (+ backswing) */

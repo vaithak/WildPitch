@@ -412,7 +412,7 @@ static void do_kick(SimState *s, int i, uint8_t kind, int to, fv2 at, fx power) 
         k.windup = T_KICK_WINDUP_SHOT;
         k.to = 0;
     } else {
-        k.power = kind == WP_KICK_THROUGH ? FX(0.4) : T_PASS_SPEED;
+        k.power = kind == WP_KICK_THROUGH ? FX(0.4) : kind == WP_KICK_LOB ? 0 : T_PASS_SPEED;   /* lob: power = h (none) */
         k.windup = kind == WP_KICK_LOB ? T_KICK_WINDUP_CHIP : T_KICK_WINDUP_PASS;
     }
     sim_player_kick(s, i, &k);

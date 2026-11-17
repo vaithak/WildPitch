@@ -121,18 +121,12 @@ static void make_kick(const SimState *s, int i, uint8_t kind, fx charge01, fv2 a
             }
         }
     } else if (kind == WP_KICK_LOB && charge01 > 0) {
-        /* the lob meter (D-045): lands lob_meter_dist(h) along the aim; a team-mate near that spot gets it (led) */
+        /* the lob meter (D-045/D-046): lands lob_meter_dist(h) along the aim; a team-mate whose predicted point is
+         * near that spot gets it (solved again at contact) */
         k->power = charge01;
         k->vz = 0;
         k->windup = T_KICK_WINDUP_CHIP;
-        fv2 land = fv2_add(s->ball.pos, fv2_from_angle(dir, lob_meter_dist(charge01)));
-        fx snap = T_LOB_SNAP + fx_mul(lob_meter_dist(charge01), FX(0.12)), bd = 0;
-        int r = -1;
-        for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
-            if (j == i || s->players[j].role == WP_ROLE_KEEPER) continue;
-            fx dj = fv2_len(fv2_sub(s->players[j].pos, land));
-            if (dj < snap && (r < 0 || dj < bd)) { r = j; bd = dj; }
-        }
+        int r = lob_snap(s, i, dir, charge01);
         if (r >= 0) k->to = (uint8_t)(r + 1);
     } else if (kind == WP_KICK_THROUGH || kind == WP_KICK_LOB) {
         /* power field = the hold h (0..1): through ball = how deep (D-020/D-039); lob tap: 0 (D-045) */
@@ -292,10 +286,9 @@ static fv2 through_solve(const SimState *s, int r, fx h, fx pace, fv2 *meet, fx 
     return fv2_scale(fv2_norm(fv2_sub(aim, b)), v0);
 }
 
-/* Lofted pass: dropped on the receiver (where he'll be at landing), higher for longer balls. */
-/* lofted ball: to receiver r led by its real flight time (D-045; was a fixed 0.8 s), or `h` of the meter along dir
- * (h = 0: the old 18 m) */
-static fv2 lob_velocity(const SimState *s, int r, wp_angle dir, fx h, fx *vz) {
+/* From the hands (keeper's overarm throw, long throw-in): the pre-D-046 loft - to receiver r led by ~its flight time,
+ * or 18 m along dir. (Feet lobs use lob.c.) */
+static fv2 throw_loft_velocity(const SimState *s, int r, wp_angle dir, fx *vz) {
     fv2 target;
     if (r >= 0) {
         const WpPlayer *q = &s->players[r];
@@ -303,15 +296,15 @@ static fv2 lob_velocity(const SimState *s, int r, wp_angle dir, fx h, fx *vz) {
         for (int it = 0; it < 3; it++) {                  /* lead = flight time: ~2 vz / g (drag shortens it a bit) */
             target = clamp_box(s, fv2_add(q->pos, fv2_scale(q->vel, t)), T_PASS_LEAD_MARGIN_X, T_PASS_LEAD_MARGIN_Y);
             fx dist0 = fv2_len(fv2_sub(target, s->ball.pos));
-            fx v = fx_clamp(T_LOB_VZ_BASE + fx_mul(T_LOB_VZ_PER_M, dist0), T_LOB_VZ_MIN, T_LOB_VZ_MAX);
+            fx v = fx_clamp(T_THROW_LOFT_VZ_BASE + fx_mul(T_THROW_LOFT_VZ_PER_M, dist0), T_THROW_LOFT_VZ_MIN, T_THROW_LOFT_VZ_MAX);
             t = fx_mul(fx_div(v * 2, T_GRAVITY), FX(0.92));
         }
     } else {
-        target = fv2_add(s->ball.pos, fv2_from_angle(dir, h > 0 ? lob_meter_dist(h) : FX(18.0)));
+        target = fv2_add(s->ball.pos, fv2_from_angle(dir, FX(18.0)));
     }
     fv2 d = fv2_sub(target, s->ball.pos);
     fx dist = fv2_len(d);
-    *vz = fx_clamp(T_LOB_VZ_BASE + fx_mul(T_LOB_VZ_PER_M, dist), T_LOB_VZ_MIN, T_LOB_VZ_MAX);
+    *vz = fx_clamp(T_THROW_LOFT_VZ_BASE + fx_mul(T_THROW_LOFT_VZ_PER_M, dist), T_THROW_LOFT_VZ_MIN, T_THROW_LOFT_VZ_MAX);
     return fv2_scale(fv2_norm(d), ball_lob_speed_for(dist, *vz));
 }
 
@@ -338,7 +331,7 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
     fv2 meet = r >= 0 ? s->players[r].pos : b->pos;
     uint8_t plan = WP_PLAN_CLOSEST;
     if (p->kick.kind == WP_KICK_THROW && p->role == WP_ROLE_KEEPER && from_hands) {   /* keeper's overarm throw */
-        b->vel = lob_velocity(s, r, p->kick.dir, 0, &vz);
+        b->vel = throw_loft_velocity(s, r, p->kick.dir, &vz);
     }
     else if (p->kick.kind == WP_KICK_THROW) {             /* throw-in: from over the head, dropping into him */
         if (r >= 0) b->vel = pass_solve(s, r, pace, &meet, &t_meet, &plan);
@@ -357,7 +350,14 @@ static void contact(SimState *s, int i, const WpSeatInput *in) {
         vz = 0;
     }
     else if (p->kick.kind == WP_KICK_PUNT) b->vel = fv2_from_angle(p->kick.dir, T_PUNT_SPEED);
-    else if (p->kick.kind == WP_KICK_LOB) b->vel = lob_velocity(s, r, p->kick.dir, p->kick.power, &vz);
+    else if (p->kick.kind == WP_KICK_LOB && from_hands) b->vel = throw_loft_velocity(s, r, p->kick.dir, &vz);   /* long throw-in */
+    else if (p->kick.kind == WP_KICK_LOB) {               /* lofted pass (D-046): AI balls keep to the meter's range */
+        int ai = seat_of(s, i) < 0;
+        fv2 goal = fv2_make(team_dir(s, p->team) * (s->pitch.length / 2), 0);
+        int head = ai && r >= 0 && fv2_len(fv2_sub(s->players[r].pos, goal)) < T_AI_CROSS_ZONE;   /* a cross / corner */
+        b->vel = lob_solve(s, r, p->kick.dir, p->kick.power, ai ? T_LOB_AI_MIN_D : 0, head, &vz, &meet, &t_meet);
+        plan = WP_PLAN_RUN;                               /* the receiver runs to the drop point, in time */
+    }
     else if (p->kick.kind == WP_KICK_THROUGH && r >= 0) b->vel = through_solve(s, r, p->kick.power, pace, &meet, &t_meet, &plan);
     else if (r >= 0) b->vel = pass_solve(s, r, pace, &meet, &t_meet, &plan);
     else if (p->kick.kind == WP_KICK_PASS || p->kick.kind == WP_KICK_THROUGH) {
@@ -439,7 +439,7 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     }
     /* pass, shoot, chip and lob share the hold/release mechanic. Pass: a tap (<= T_PASS_TAP_TICKS) = targeted pass,
      * held longer = through ball whose lead grows with the hold. Lob (D-045): a tap = lofted to the ringed mate,
-     * held longer = the meter sets how far (T_LOB_MIN_D .. T_LOB_MAX_D) along the aim. */
+     * held longer = the meter sets how far (T_LOB_MIN_D .. lob_max_d) along the aim. */
     for (int c = 0; c < 4; c++) {
         uint16_t btn = c == 0 ? WP_BTN_PASS : c == 1 ? WP_BTN_SHOOT : c == 2 ? WP_BTN_CHIP : WP_BTN_LOB;
         uint8_t kind = c == 0 ? WP_KICK_PASS : c == 1 ? WP_KICK_SHOT : c == 2 ? WP_KICK_CHIP : WP_KICK_LOB;

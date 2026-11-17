@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-16 by Claude session #1 (CP0.5a stage 0)_
+_Last updated: 2026-11-16 by Claude session #1 (CP0.5a stage 1)_
 
 ## Current checkpoint
 **CP0.4 — "A real match" (D-040..D-045): ✅ done, waiting for the owner's playtest.** Fouls / advantage / free kicks
@@ -35,6 +35,36 @@ Aerial counters: `tests/aerial_metrics.h` (definitions frozen there, shared by t
 | Headers | 0.23/min: 6 shots, 17 passes completed 35% (6/17) |
 
 bench_sim 16.2 us/tick (1031x real time).
+
+**CP0.5a stage 1 (D-046): done, goldens updated on purpose** (5v5 `51ad9c0dcc50f6a7`, 7v7 `41955f92797c21c8`).
+Lofted passes come from one D-indexed flight table (`src/sim/lob.c`): vz = 5 + 0.245 D unclamped (floats, no more
+drives), meter 12 m .. min(45 m, 0.62 x pitch), snap on team-mates' PREDICTED points, led to the ball coming down
+through 1.0 m, the drop point handed to the receive assist, landings kept inside the pitch, AI lobs on the same solve
+(balls into the box met at 2.3 m for a header), avatar lob pose = meter h. Throws from the hands unchanged.
+Stage-1 numbers (same harness, `aerial 20 5 1`; in brackets 80 matches, baseline -> stage 1):
+
+| Metric | Stage 0 baseline | Stage 1 |
+|---|---|---|
+| Lob completion | 70% (78/111) [69%, 309/447] | 70% (79/113) [70.5%, 315/447] |
+| Cross completion | 43% (21/49) [45%] | 47% (27/57) [49%] |
+| Lobs lost to an opponent's header | 9 [25] | 8 [35] |
+| Headers / min | 0.23 (6 shots, 17 passes 35%) | 0.43 (19 shots, 24 passes 38%) |
+| Control success, body band | 91% | 95% |
+| Goals / min | 0.49 | 0.44 [0.43 -> 0.49] |
+
+Meter landing error <= 0.37 m on 40 / 60 / 80 m pitches; lobs to moving mates come down within 1.0 m of P (z <= 1.6)
+42/42, the mate within 2 m of P 38/42 (sprinters still accelerating miss by 2-4 m). bench_sim 15.6 us/tick.
+**Next: stage 2** (prediction ring + contact planner, CONTROL intent only) - after the owner's playtest.
+
+### Playtest guide (CP0.5a stage 1, lofted passes)
+1. Hold A (lob) longer and longer into space: the ball lands where the violet meter says - and floats (high, ~2-3 s
+   for long switches) instead of being driven. Full meter = 45 m on the 7v7 pitch.
+2. Hold A aiming at where a running team-mate WILL be: the ball snaps to him and drops onto his run; he runs to it.
+3. Tap A: the quick lob to the ringed mate, now led onto his run.
+4. Lob toward a touchline/byline: it never lands outside the pitch.
+5. Watch the AI cross: the ball is put up for a header in the box.
+Questions: do long switches now float rather than fizz? Is 45 m enough? Is 2-3 s of hang time too slow? (flatter:
+vz = 5 + 0.2 D is one constant).
 
 ### Playtest guide (CP0.4)
 1. Mistime a tackle (S near their carrier) and take the man: FOUL - free kick to them (in your box: PENALTY). If
@@ -149,8 +179,8 @@ Numbers (7v7, 20 x 5 min AI vs AI, stats on): passes 78% complete (was 61%), >20
 - **Dedication card on launch (D-018)**: "In the memory of my brother Shubham Thakkar" + red heart, ~4 s, any key
   skips (not shown in --screenshot/--autoplay/--demo/--gallery; `--dedication --screenshot F.bmp` captures it).
 - Flags: `--5v5`, `--menu` (with --screenshot: capture the Controls screen), `--check-keymap`, `--autoplay-header H` (scripted cross arriving at height H, K pressed: header visual check), `--dedication`, `--demo`, `--gallery`, `--autoplay`, `--autoplay-chip`, `--autoplay-dribble`, `--check-kick-pose`, `--style N`, `--zoom N`, `--screenshot F.bmp [--frames N]`.
-- **Tests (18 ctest entries, all passing):** test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
-  (golden 5v5 `a034042ea9bdd9a8`, 7v7 `0456aca621621227`; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
+- **Tests (19 ctest entries, all passing):** test_lob, test_rules, gamepad, replay, test_chase_assist, test_clock, test_stats, test_fixed, test_sim, test_ball, test_ball_control, test_passing, test_reception, test_ai_rules, test_ai_match, test_scoring, test_determinism, avatar_kick_pose, keymap
+  (golden 5v5 `51ad9c0dcc50f6a7`, 7v7 `41955f92797c21c8` after D-046; scripted seat chases the ball + taps/holds pass, lobs, switches, heads: ~140 kicks, 360 touches, 10 goals, 750 switches, 5 headers, owner invariant per 10 min, asserted),
   avatar_kick_pose. `tools/check_determinism.sh`: identical across gcc/clang × -O0/-O2.
 - Perf: full game loop ~5% of one core; `bench_sim` ~930× real time (17.9 µs/tick after the team plan; was 15 with 10 AI players; ~0.1% of a core in play). RL training will want a
   faster brain (fewer candidates / squared distances) — measure before optimising. Callgrind: 47% in `fv2_len` (fixed-point sqrt), players_step 13%,

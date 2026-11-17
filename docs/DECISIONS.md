@@ -524,3 +524,35 @@ gets it (led onto his run), otherwise it drops into space. Targeted lobs now lea
 time (~2 vz/g; was a fixed 0.8 s). Measured: 17.5 / 25.7 / 34.0 m on the meter land at 18.7 / 27.5 / 36.2 m. AI lobs
 and crosses are unchanged (no meter). Also: AI shot utility weight 24 -> 32 (D-041 cost back: 49 goals / 110 shots
 per 100 AI minutes, vs 54 / 109 before offside).
+
+## D-046 — Lofted passes from one flight table: unclamped loft, predicted snap, drop-point hand-off (2026-11-16, CP0.5a stage 1)
+Report `reports/Aerial ball control and lofted passes.md` ("The lob meter: keep D-045's controls, fix what it
+inherited"). Owner decisions: D-045's controls stay (tap A = auto lob to the ringed mate, hold = meter = distance along
+the aim with a receiver snap), no landing ghost ring, meter range 12 m .. min(45 m, 0.62 x pitch length).
+- **Trajectory:** vz = 5.0 + 0.245 D (D = where it first lands), no 9.5 m/s clamp: ~45 deg at 10 m easing to ~35 deg at
+  50 m (the old clamp turned every lob past ~25 m into a 15-21 deg drive).
+- **Table (`src/sim/lob.c`):** 64 entries (D = 0..47.25 m, 0.75 m steps): launch vh (bisection over
+  `ball_flight_to`), and the distance / time at which the ball comes down through the receiving height. Filled once
+  by `sim_init` from fixed-point code only (a pure function of tuning.h: identical on gcc/clang, immutable afterwards,
+  not in SimState, replays unaffected); lookups interpolate linearly. Meter landings: within 0.37 m of D on the 40 /
+  60 / 80 m pitches (was ~7% long).
+- **Meter:** D(h) = 12 m .. lob_max_d = min(45, 0.62 L) (24.8 / 37.2 / 45 m). Snap on PREDICTED points: each
+  outfield mate's P_j = q_j + v_j t_c (3 iterations), miss = |P_j - land| + 6 m x angle/pi, accepted within
+  4 m + 12% of D; the snapped mate gets the ball on P_j with the meter's surplus / shortfall as a depth bias along his
+  run clamped to +-3 m. Untargeted: D along the aim, shortened along the ray to stay T_THROUGH_MARGIN_X/Y inside
+  (a carrier who runs the ball onto the line and lobs out of the pitch gets D = 0: it pops up). Every targeted point
+  is clamped by the same margins. "Never out of play" = the first bounce (a 20 m/s ball may still roll out after).
+- **Lead:** targeted lobs are led to where the ball comes DOWN through z = 1.0 m (T_LOB_RECV_Z), not the grass; the
+  solved point P and t_c go to `seats_pass_handoff` with WP_PLAN_RUN, so the receive assist (and the AI receiver) runs
+  to the drop point. Receiver picked at the release, P / bias / t_c solved at contact.
+- **AI:** AI lobs, crosses and restart lobs use the same solve with D clamped to [12 m, lob_max_d]
+  (T_LOB_AI_MIN_D); `do_kick` sets power 0 for lobs (power = h). An AI ball to a mate within T_AI_CROSS_ZONE of the
+  goal is met at T_LOB_HEAD_Z = 2.3 m (a jumping head) instead of 1.0 m - a second table column. Measured: led to
+  1.0 m, crosses lost the aerial duel (the receiver waited at the drop and the marker jumped in front: opponent
+  headers 25 -> 71 per 400 min, lob completion 69% -> 62%); 1.8 m: 67%; 2.3 m: 70%. This is a stopgap until stage 4's
+  driven cross class.
+- **From the hands** (keeper's overarm throw, long throw-in): unchanged, the pre-D-046 clamped loft
+  (T_THROW_LOFT_VZ_*).
+- **Avatar:** the lob strike poses kick_power01 = h (taps / AI: 0.5 as before).
+- Precedence unchanged: slide (D-043) wins the LOB press edge with their carrier within 3 m; ball in the hands is a
+  throw. Tests: `tests/test_lob.c`.
