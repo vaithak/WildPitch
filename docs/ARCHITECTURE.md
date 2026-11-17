@@ -19,6 +19,8 @@ src/sim/                DETERMINISTIC CORE — no SDL, no floats, no libm, no ma
                         flight, assisted receive (legs only; aim stays the human's stick)
   pass_pick.c           who receives a pass (D-021): two-bearing cone + score, keyboard stage B, keeper band, lane
                         danger, stick memory, per-tick preview (pick_recv) that passes read
+  lob.c                 lofted passes (D-045/D-046): D-indexed flight table (filled once at sim_init), meter range,
+                        predicted-point snap, lob solve (lead to the receiving height, pitch margins)
   header.c              contextual headers (D-010/D-019): trigger on J/K at a high ball, legs step under it while
                         the stick aims, jump timed so the apex meets it, head-band contact, header pass/shot
   brain.c               INSTINCT AI (D-023): candidates x feature utility -> input/kick/tackle for every non-seat player

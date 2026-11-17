@@ -63,6 +63,8 @@ Meter landing error <= 0.37 m on 40 / 60 / 80 m pitches; lobs to moving mates co
 3. Tap A: the quick lob to the ringed mate, now led onto his run.
 4. Lob toward a touchline/byline: it never lands outside the pitch.
 5. Watch the AI cross: the ball is put up for a header in the box.
+6. An AI team-mate crosses to YOUR man in the box: the ball comes over at ~2.3 m where he stands; do nothing and he
+   takes it as it drops (scripted: 24/24), or press S/D for a header.
 Questions: do long switches now float rather than fizz? Is 45 m enough? Is 2-3 s of hang time too slow? (flatter:
 vz = 5 + 0.2 D is one constant).
 

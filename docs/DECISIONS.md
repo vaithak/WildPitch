@@ -540,7 +540,8 @@ the aim with a receiver snap), no landing ghost ring, meter range 12 m .. min(45
   outfield mate's P_j = q_j + v_j t_c (3 iterations), miss = |P_j - land| + 6 m x angle/pi, accepted within
   4 m + 12% of D; the snapped mate gets the ball on P_j with the meter's surplus / shortfall as a depth bias along his
   run clamped to +-3 m. Untargeted: D along the aim, shortened along the ray to stay T_THROUGH_MARGIN_X/Y inside
-  (a carrier who runs the ball onto the line and lobs out of the pitch gets D = 0: it pops up). Every targeted point
+  (a carrier who dribbles the ball past the margin and lobs outward gets D = 0: it pops up at his feet and his
+  momentum can still take it over the line - 14 of 120 such scripted cases on the 40 m pitch; known). Every targeted point
   is clamped by the same margins. "Never out of play" = the first bounce (a 20 m/s ball may still roll out after).
 - **Lead:** targeted lobs are led to where the ball comes DOWN through z = 1.0 m (T_LOB_RECV_Z), not the grass; the
   solved point P and t_c go to `seats_pass_handoff` with WP_PLAN_RUN, so the receive assist (and the AI receiver) runs
