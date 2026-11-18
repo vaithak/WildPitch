@@ -81,5 +81,30 @@ int main(void) {
         printf("dead-ball meter at the penalty spot: to a man in the box %d/%d\n", got, n);
         CHECK(got == n);
     }
+    /* 4. the way it's played: A pressed at once (it skips the walk-up AND starts the meter), keyboard 8-way "down"
+     *    from the flag (along the goal line); the hold walks the ball out: short option -> near post -> spot -> far post */
+    {
+        int prev_d = -1, mono = 1, in_box = 0, dead = 0;
+        for (int hold = 30; hold <= 54; hold += 12) {
+            corner(3, 0);
+            WpSeatInput in = {0, -127, WP_BTN_LOB};       /* (+y flag: down = along the line, toward the goal) */
+            for (int t = 0; t < hold; t++) step(in);
+            int me = s.seat_player[0];
+            in.buttons = 0;
+            for (int t = 0; t < 10; t++) step(in);
+            int r = s.players[me].kick.to - 1;
+            dead += fx_abs(s.ball.vel.x) + fx_abs(s.ball.vel.y) < FX(1.0);
+            if (r >= 0) {
+                in_box += in_their_box(s.players[r].pos);
+                int dd = (int)(fv2_len(fv2_sub(s.players[r].pos, s.players[me].pos)) / 65536);
+                if (dd < prev_d) mono = 0;
+                prev_d = dd;
+            }
+            printf("pressed at once, keyboard down, hold %d: to p%d (in the box %d)\n", hold, r, r >= 0 && in_their_box(s.players[r].pos));
+        }
+        CHECK(in_box == 3);
+        CHECK(mono);
+        CHECK(dead == 0);                                 /* never popped straight up */
+    }
     return TEST_DONE();
 }

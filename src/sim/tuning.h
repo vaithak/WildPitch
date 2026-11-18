@@ -244,6 +244,9 @@
 #define T_LOB_TAP_D        FX(18.0)   /* a tap with nobody to pick: lands this far along the aim */
 #define T_LOB_SET_RAMP     60         /* a dead-ball restart (corner, free kick...): the meter fills over this many ticks
                                          after the tap window (open play: T_CHARGE_MAX_TICKS - T_LOB_TAP_TICKS = 24) */
+#define T_LOB_SET_TOL      FX(6.0)    /* a dead-ball taker's meter (D-053) snaps to the man in the cone whose distance */
+#define T_LOB_SET_CONE_DEG 50         /* ... is nearest the meter's (|d - D| + ANGLE_M x angle/pi), within this cone */
+#define T_LOB_SET_ANGLE_M  FX(4.0)
 #define T_CORNER_SETUP_ARRIVE FX(2.0) /* corner walk-up (D-053): waits for the box runners this close ... */
 #define T_CORNER_SETUP_MAX 420        /* ... for at most 7 s (any button skips it: everyone is placed at once) */
 #define T_LOB_AI_MIN_D     FX(12.0)   /* AI lobs / crosses / restart lobs: D clamped to [this, the meter's max] */

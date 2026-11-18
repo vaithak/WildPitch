@@ -475,7 +475,10 @@ static void handle_buttons(SimState *s, int i, const WpSeatInput *in, uint16_t p
     for (int c = 0; c < 4; c++) {
         uint16_t btn = c == 0 ? WP_BTN_PASS : c == 1 ? WP_BTN_SHOOT : c == 2 ? WP_BTN_CHIP : WP_BTN_LOB;
         uint8_t kind = c == 0 ? WP_KICK_PASS : c == 1 ? WP_KICK_SHOT : c == 2 ? WP_KICK_CHIP : WP_KICK_LOB;
-        if ((pressed & btn) && p->charge_kind == 0xFF) {
+        /* a set piece's taker: a button already down when he gets the ball (the press that skipped the walk-up,
+         * D-053) starts the charge too - else that press was swallowed and holding it did nothing */
+        int held_on = (now & btn) && restart_is_taker(s, i) && s->ball.owner == i && s->restart_ticks <= 1;
+        if (((pressed & btn) || held_on) && p->charge_kind == 0xFF) {
             p->charge_kind = kind; p->kick_charge = 0;
             if (kind != WP_KICK_CHIP && s->ball.owner < 0 && !ball_reachable(s, i, KICK_START_REACH))
                 intent_press(s, i, kind);                 /* the ball is still coming: buffer it (D-048) */

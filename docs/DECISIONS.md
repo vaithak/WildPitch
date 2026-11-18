@@ -851,3 +851,18 @@ the title. Half length = `WpMatchConfig.half_ticks` (3 / 5 / 8 real minutes, def
 broadcast clock keeps 45' a half at any length. Kits are presentation only (`kits.c`, applied over the generated
 looks in render.c; kit 0/1 = the old RED / BLUE pixel for pixel); the two teams can never share a kit. Every
 harness / capture flag skips the title, as does `--5v5` (straight into a 5-a-side match).
+
+### D-053 addendum (2026-11-18, owner: "the corner is still bulshit you can just pass to the nearest person that is,
+not possible to chip in the D area or long pass to someone else")
+Found headless: (1) the press that skips the walk-up (what everyone does: press A at once) was swallowed - it skipped
+the walk-up but never started the meter, so holding A did nothing and the next tap went to the nearest man;
+(2) a keyboard's 8 directions can't aim at a man in the box from the flag: "down" runs along the goal line and the
+margin clamp made it D = 0 (the ball popped straight up), "down-left" points past the box.
+- A set-piece taker whose button is already down when he gets the ball starts charging (player.c, `held_on`).
+- A dead-ball taker's meter picks among team-mates within 50 deg of the aim the one whose distance best matches the
+  meter (`T_LOB_SET_TOL` 6 m, `T_LOB_SET_CONE_DEG`, `T_LOB_SET_ANGLE_M`): from a corner, tap = short option, ~0.5 s
+  near post, ~0.7 s penalty spot, ~0.9 s far post, longer = a long ball / switch.
+- An untargeted meter ball struck from outside the safe margins is bent back inside them (`meter_point`) instead of
+  shortened along the aim to 0 (also fixes D-046's "carrier past the margin lobs outward" edge case).
+- Still open: the runner loses the header to his marker (headless 0/24 even with a button buffered) - next.
+Goldens updated on purpose (5v5 `bba2791af60cffe6`, 7v7 `38047897fbfdc089`). `tests/test_corner.c` #4.

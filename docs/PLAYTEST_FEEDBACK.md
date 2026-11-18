@@ -224,3 +224,9 @@ Format:
 - **Action:** D-054 (keepers face the ball).
 - **Feedback (verbatim):** "once both of these are done and committed, continue with the next checkpoint as I am
   going to sleep and will test them together tomorrow"
+
+## 2026-11-18 — morning playtest
+- **Feedback (verbatim):** "the corner is still bulshit you can just pass to the nearest person that is, not possible
+  to chip in the D area or long pass to someone else"
+- **Action:** D-053 addendum (the skipping press now starts the meter; dead-ball meter picks the runner by distance;
+  no pop-up along the goal line). Header duel at corners next.

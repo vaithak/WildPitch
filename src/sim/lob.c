@@ -132,13 +132,24 @@ static fx meter_land(const SimState *s, fv2 from, wp_angle dir, fx D) {
     return fx_min(D, room);
 }
 
+/* where an untargeted meter ball lands: D along the aim, shortened to stay inside the margins - but from a spot
+ * already outside them (a corner flag, a man on the line) it is bent back in instead, else it popped straight up
+ * (D = 0: the D-046 edge case; a keyboard's "down" at a corner runs along the goal line, D-053) */
+static fv2 meter_point(const SimState *s, fv2 from, wp_angle dir, fx D) {
+    fv2 u = fv2_from_angle(dir, FX_ONE), c = in_margins(s, from);
+    if (c.x != from.x || c.y != from.y) return in_margins(s, fv2_add(from, fv2_scale(u, D)));
+    return fv2_add(from, fv2_scale(u, meter_land(s, from, dir, D)));
+}
+
 /* at the release: which team-mate does the meter (h > 0) snap to? -1 = nobody, it drops into space */
 int lob_snap(const SimState *s, int i, wp_angle dir, fx h) {
     const WpPlayer *p = &s->players[i];
     fv2 from = s->ball.pos;
     fx D = lob_meter_dist(s, h);
-    fv2 land = fv2_add(from, fv2_from_angle(dir, meter_land(s, from, dir, D)));
+    fv2 land = meter_point(s, from, dir, D);
     fx tol = T_LOB_SNAP + fx_mul(D, T_LOB_SNAP_K), best = 0;
+    int dead = lob_ramp_ticks(s, i) == T_LOB_SET_RAMP;    /* a dead-ball taker: the meter picks the runner by distance */
+    if (dead) tol = T_LOB_SET_TOL;
     int r = -1;
     for (int j = p->team * s->n_per_side; j < (p->team + 1) * s->n_per_side; j++) {
         if (j == i || s->players[j].role == WP_ROLE_KEEPER) continue;
@@ -148,6 +159,12 @@ int lob_snap(const SimState *s, int i, wp_angle dir, fx h) {
         int32_t a = fx_abs(d.x) + fx_abs(d.y) > FX(0.05) ? ang_diff(fx_atan2(d.y, d.x), dir) : 0;
         if (a < 0) a = -a;
         fx miss = fv2_len(fv2_sub(P, land)) + fx_mul(T_LOB_ANGLE_M, (fx)(a * 2));   /* a/32768 = angle/pi */
+        if (dead) {                                       /* (D-053: a keyboard's 8 directions can't aim at a man in
+                                                           * the box from the flag - any man within the cone, the hold
+                                                           * saying how far: near post / spot / far post) */
+            if (a > DEG_TO_ANG(T_LOB_SET_CONE_DEG)) continue;
+            miss = fx_abs(fv2_len(d) - D) + fx_mul(T_LOB_SET_ANGLE_M, (fx)(a * 2));
+        }
         if (miss <= tol && (r < 0 || miss < best)) { r = j; best = miss; }
     }
     return r;
@@ -172,9 +189,11 @@ fv2 lob_solve(const SimState *s, int r, wp_angle dir, fx h, fx d_min, int head, 
         u = dl > FX(0.05) ? fv2_scale(d, fx_div(FX_ONE, dl)) : fv2_from_angle(dir, FX_ONE);
         D = fx_clamp(lob_d_for_recv(dl, head), fx_min(d_min, d_max), d_max);
     } else {
-        u = fv2_from_angle(dir, FX_ONE);
         head = 0;
-        D = meter_land(s, from, dir, h > 0 ? lob_meter_dist(s, h) : fx_min(T_LOB_TAP_D, d_max));
+        fv2 L = meter_point(s, from, dir, h > 0 ? lob_meter_dist(s, h) : fx_min(T_LOB_TAP_D, d_max));
+        fv2 dl = fv2_sub(L, from);
+        D = fv2_len(dl);
+        u = D > FX(0.05) ? fv2_scale(dl, fx_div(FX_ONE, D)) : fv2_from_angle(dir, FX_ONE);
     }
     *vz = lob_vz(D);
     *meet = fv2_add(from, fv2_scale(u, lob_recv_dist(D, head)));
